@@ -1,0 +1,128 @@
+{
+    "flashicon": "icons/SceneController.png",
+    "default_icon": "..\/generic_default.png",
+    "imgIconBody": "",
+    "imgIconDimmable": "",
+    "imgIconTurnable": "",
+    "imgIconMin": "",
+    "imgIconMax": "",
+    "halloIconsDir": "pics/hallo",
+    "inScene": "1",
+    "DisplayStatus": {},
+    "doc_url": {
+        "doc_language": 1,
+        "doc_manual": 1,
+        "doc_version": 1,
+        "doc_platform": 0,
+        "doc_page": "lighting_devices"
+    },
+    "Tabs": [
+        {
+            "Label": {
+                "lang_tag": "tabname_control",
+                "text": "Control"
+            },
+            "Position": "0",
+            "TabType": "flash",
+            "Control": [
+                {
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "code",
+                        "text": "Code:"
+                    },
+                    "Display": {
+                        "Top": 50,
+                        "Left": 50,
+                        "Width": 40,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "input",
+                    "ID": "Code",
+                    "Style": "numeric",
+                    "Display":{
+                        "Top": 45,
+                        "Left": 100,
+                        "Width": 30,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "button",
+                    "Label": {
+                        "lang_tag": "cmd_send",
+                        "text": "Send"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:ATIRemote1",
+                        "Top": 45,
+                        "Left": 150,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:ATIRemote1",
+                        "Action": "SendCode",
+                        "Parameters": [
+                            {
+                                "Name": "Code",
+                                "ID": "Code"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "Label": {
+                "lang_tag": "advanced",
+                "text": "Advanced"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "advanced_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "notifications",
+                "text": "Notifications"
+            },
+            "Position": "5",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_notifications"
+        }
+    ],
+    "eventList2": [
+        {
+            "id": 1,
+            "label": {
+                "lang_tag": "a_scene_is_activated",
+                "text": "A scene is activated"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneActivated",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag":"which_scene_number",
+                        "text":"Which scene number"
+                    },
+                    "suffix": {},
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_scene_number_is_activated",
+                        "text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is activated"
+                    }
+                }
+            ]
+        }
+    ],
+    "DeviceType": "urn:rfxcom-com:device:ATIRemote:1"
+}

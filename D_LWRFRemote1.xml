@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <device>
+    <deviceType>urn:rfxcom-com:device:LWRFRemote:1</deviceType>
+    <staticJson>D_LWRFRemote1.json</staticJson>
+    <serviceList>
+      <service>
+        <serviceType>urn:rfxcom-com:service:LWRFRemote:1</serviceType>
+        <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+        <SCPDURL>S_LWRFRemote1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:SceneController:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:SceneController1</serviceId>
+        <SCPDURL>S_SceneController1.xml</SCPDURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

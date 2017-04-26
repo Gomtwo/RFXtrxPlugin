@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <serviceStateTable>
+  </serviceStateTable>
+  <actionList>
+    <action>
+      <name>Dim</name>
+    </action>
+    <action>
+      <name>Bright</name>
+    </action>
+    <action>
+      <name>GroupOn</name>
+    </action>
+    <action>
+      <name>GroupOff</name>
+    </action>
+  </actionList>
+</scpd>

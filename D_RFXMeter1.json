@@ -1,0 +1,267 @@
+{
+    "flashicon": "icons\/generic_sensor.swf",
+    "default_icon": "meter_default.png",
+    "imgIconBody": "",
+    "imgIconDimmable": "",
+    "imgIconTurnable": "",
+    "imgIconMin": "",
+    "imgIconMax": "",
+    "halloIconsDir": "pics/hallo",
+    "inScene": "0",
+    "DisplayStatus": {},
+    "doc_url": {
+        "doc_language": 1,
+        "doc_manual": 1,
+        "doc_version": 1,
+        "doc_platform": 0,
+        "doc_page": "sensors" 
+    },
+
+  "Tabs": [
+    {
+      "Label": {
+        "lang_tag": "tabname_control",
+        "text": "Information"
+      },
+      "Position": "0",
+      "TabType": "flash",
+      "SceneGroup": [
+                {
+                    "id": "1",
+                    "top": "0.75",
+                    "left": "0",
+                    "x": "2",
+                    "y": "1"
+                },
+                {
+                    "id": "2",
+                    "top": "1.75",
+                    "left": "0",
+                    "x": "2",
+                    "y": "1"
+                },
+                {
+                    "id": "3",
+                    "top": "2.75",
+                    "left": "0",
+                    "x": "2",
+                    "y": "1"
+                }
+      ],
+      "ControlGroup":[
+        {
+            "id":"1",
+            "scenegroup": "1",
+            "type": "info"
+        },
+        {
+            "id":"2",
+            "scenegroup": "2",
+            "type": "info"
+        },
+        {
+            "id":"3",
+            "scenegroup": "3",
+            "type": "info"
+        }
+      ],
+      "Control": [
+			{
+                    "ControlGroup": "1",
+                    "ControlPair": "1",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "0",
+                    "x": "1.25",
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "Pulsen",
+                        "text": "Pulsen:"
+                    },
+                    "Display": {
+                        "Top": 30,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlPair": "1",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "1.25",
+                    "x": "0.75",
+                    "ControlType": "variable",
+                    "Display": {
+                        "Service": "urn:delanghe-com:serviceId:RFXMetering1",
+                        "Variable": "Pulsen",
+                        "Top": 30,
+                        "Left": 150,
+                        "Width": 25,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "2",
+                    "ControlPair": "2",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "0",
+                    "x": "1.25",
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "Mult",
+                        "text": "Mult:"
+                    },
+                    "Display": {
+                        "Top": 55,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "2",
+                    "ControlPair": "2",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "1.25",
+                    "x": "0.75",
+                    "ControlType": "variable",
+                    "Display": {
+                        "Service": "urn:delanghe-com:serviceId:RFXMetering1",
+                        "Variable": "Mult",
+                        "Top": 55,
+                        "Left": 150,
+                        "Width": 25,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "3",
+                    "ControlPair": "3",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "0",
+                    "x": "1.25",
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "Offset",
+                        "text": "Offset:"
+                    },
+                    "Display": {
+                        "Top": 80,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "3",
+                    "ControlPair": "3",
+                    "ControlHeader": "1",
+                    "top": "0",
+                    "left": "1.25",
+                    "x": "0.75",
+                    "ControlType": "variable",
+                    "Display": {
+                        "Service": "urn:delanghe-com:serviceId:RFXMetering1",
+                        "Variable": "Offset",
+                        "Top": 80,
+                        "Left": 150,
+                        "Width": 25,
+                        "Height": 20
+                    }
+                }
+      ]
+    },
+    {
+      "Label": {
+        "lang_tag": "advanced",
+        "text": "Advanced"
+      },
+      "Position": "1",
+      "TabType": "javascript",
+      "ScriptName": "shared.js",
+      "Function": "advanced_device"
+    },
+        {
+            "Label": {
+                "lang_tag": "logs",
+                "text": "Logs"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_logs"
+        },
+        {
+            "Label": {
+                "lang_tag": "notifications",
+                "text": "Notifications"
+            },
+            "Position": "3",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_notifications"
+        }
+  ],
+    "eventList2": [
+        {
+            "id": 1,
+            "label": {
+                "lang_tag": "avg_speed_goes_above",
+                "text": "Average speed goes above"
+            },
+            "serviceId": "urn:delanghe-com:serviceId:RFXMetering1",
+            "norepeat": "1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui4",
+                    "name": "Pulsen",
+                    "comparisson": ">",
+                    "prefix": {
+                        "lang_tag": "Pulsen",
+                        "text": "Pulsen"
+                    },
+                    "suffix": {
+                    },
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_avg_speed_goes_above",
+                        "text": "Average speed for _DEVICE_NAME_ goes above _ARGUMENT_VALUE_"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "label": {
+                "lang_tag": "avg_speed_goes_below",
+                "text": "Average speed goes below"
+            },
+            "serviceId": "urn:delanghe-com:serviceId:RFXMetering1",
+            "norepeat": "1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui4",
+                    "name": "Pulsen",
+                    "comparisson": "<",
+                    "prefix": {
+                        "lang_tag": "Pulsen",
+                        "text": "Pulsen"
+                    },
+                    "suffix": {
+                    },
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_avg_speed_goes_below",
+                        "text": "Average speed for _DEVICE_NAME_ goes below _ARGUMENT_VALUE_"
+                    }
+                }
+            ]
+        }
+    ],
+  "DeviceType": "urn:casa-delanghe-com:device:RFXMeter:1"
+}

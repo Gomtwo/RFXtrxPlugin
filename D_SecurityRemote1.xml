@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <device>
+    <deviceType>urn:rfxcom-com:device:SecurityRemote:1</deviceType>
+    <Category_Num>23</Category_Num>
+    <SubCategory_Num>0</SubCategory_Num>
+    <staticJson>D_SecurityRemote1.json</staticJson>
+    <friendlyName>Security Remote</friendlyName>
+    <serviceList>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:HaDevice:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
+        <SCPDURL>S_HaDevice1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:AlarmPartition:2</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:AlarmPartition2</serviceId>
+        <SCPDURL>S_AlarmPartition2.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:rfxcom-com:service:SecurityRemote:1</serviceType>
+        <serviceId>urn:rfxcom-com:serviceId:SecurityRemote1</serviceId>
+        <SCPDURL>S_SecurityRemote1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:SceneController:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:SceneController1</serviceId>
+        <SCPDURL>S_SceneController1.xml</SCPDURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

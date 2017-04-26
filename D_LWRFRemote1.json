@@ -1,0 +1,254 @@
+{
+    "flashicon": "icons/SceneController.png",
+    "default_icon": "..\/generic_default.png",
+    "imgIconBody": "",
+    "imgIconDimmable": "",
+    "imgIconTurnable": "",
+    "imgIconMin": "",
+    "imgIconMax": "",
+    "halloIconsDir": "pics/hallo",
+    "inScene": "1",
+    "DisplayStatus": {},
+    "doc_url": {
+        "doc_language": 1,
+        "doc_manual": 1,
+        "doc_version": 1,
+        "doc_platform": 0,
+        "doc_page": "lighting_devices"
+    },
+    "Tabs": [
+        {
+            "Label": {
+                "lang_tag": "tabname_control",
+                "text": "Control"
+            },
+            "Position": "0",
+            "TabType": "flash",
+            "SceneGroup": [
+                {
+                    "id": "1",
+                    "top": "0.5",
+                    "left": "0",
+                    "x": "2",
+                    "y": "3"
+                }
+            ],
+            "ControlGroup": [
+                {
+                    "id": "1",
+                    "scenegroup": "1",
+                    "isSingle": "1"
+                }
+            ],
+            "Control": [
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "0",
+                    "top": "0",
+                    "Label": {
+                        "lang_tag": "cmd_mood1",
+                        "text": "Mood 1"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 50,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "Mood1",
+                        "Parameters": []
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "1",
+                    "top": "0",
+                    "Label": {
+                        "lang_tag": "cmd_mood2",
+                        "text": "Mood 2"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 50,
+                        "Left": 150,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "Mood2",
+                        "Parameters": []
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "0",
+                    "top": "1",
+                    "Label": {
+                        "lang_tag": "cmd_mood3",
+                        "text": "Mood 3"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 50,
+                        "Left": 250,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "Mood3",
+                        "Parameters": []
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "1",
+                    "top": "1",
+                    "Label": {
+                        "lang_tag": "cmd_mood4",
+                        "text": "Mood 4"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 50,
+                        "Left": 350,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "Mood4",
+                        "Parameters": []
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "0",
+                    "top": "2",
+                    "Label": {
+                        "lang_tag": "cmd_mood5",
+                        "text": "Mood 5"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 50,
+                        "Left": 450,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "Mood5",
+                        "Parameters": []
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlType": "button",
+                    "left": "1",
+                    "top": "2",
+                    "Label": {
+                        "lang_tag": "cmd_group_off",
+                        "text": "Group Off"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Top": 100,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:LWRFRemote1",
+                        "Action": "GroupOff",
+                        "Parameters": []
+                    }
+                }
+            ]
+        },
+        {
+            "Label": {
+                "lang_tag": "advanced",
+                "text": "Advanced"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "advanced_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "notifications",
+                "text": "Notifications"
+            },
+            "Position": "5",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_notifications"
+        }
+    ],
+    "eventList2": [
+        {
+            "id": 1,
+            "label": {
+                "lang_tag": "a_scene_is_activated",
+                "text": "A scene is activated"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneActivated",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag":"which_scene_number",
+                        "text":"Which scene number"
+                    },
+                    "suffix": {},
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_scene_number_is_activated",
+                        "text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is activated"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "label": {
+                "lang_tag": "a_scene_is_deactivated",
+                "text": "A scene is de-activated"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneDeactivated",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag":"which_scene_number",
+                        "text":"Which scene number"
+                    },
+                    "suffix": {},
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_scene_number_is_deactivated",
+                        "text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is deactivated"
+                    }
+                }
+            ]
+        }
+    ],
+    "DeviceType": "urn:rfxcom-com:device:LWRFRemote:1"
+}

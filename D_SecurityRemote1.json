@@ -1,0 +1,633 @@
+{
+    "flashicon": "icons\/Door_Lock.swf",
+    "default_icon": "door_lock_default.png",
+    "imgIconBody": "",
+    "imgIconDimmable": "",
+    "imgIconTurnable": "",
+    "imgIconMin": "",
+    "imgIconMax": "",
+    "state_icons": [
+        "Door_Lock_0.png",
+        "Door_Lock_100.png",
+        {
+            "img": "door_lock_unlocked.png",
+            "conditions": [
+                {
+                    "service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+                    "variable": "ArmModeNum",
+                    "operator": "==",
+                    "value": 0
+                }
+            ]
+        },
+        {
+            "img": "door_lock_locked.png",
+            "conditions": [
+                {
+                    "service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+                    "variable": "ArmModeNum",
+                    "operator": "==",
+                    "value": 1
+                }
+            ]
+        }
+    ],
+    "halloIconsDir": "pics\/hallo",
+    "inScene": "1",
+    "DisplayStatus": {
+        "Style": "label",
+        "Service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+        "Variable": "ArmModeNum",
+        "MinValue": "0",
+        "MaxValue": "1"
+    },
+    "doc_url": {
+        "doc_language": 1,
+        "doc_manual": 1,
+        "doc_version": 1,
+        "doc_platform": 0,
+        "doc_page": "devices"
+    },
+    "Tabs": [
+        {
+            "Label": {
+                "lang_tag": "tabname_control",
+                "text": "Alarm Partition"
+            },
+            "Position": "0",
+            "TabType": "flash",
+            "SceneGroup": [
+                {
+                    "id": "1",
+                    "top": "1",
+                    "left": "0",
+                    "x": "2",
+                    "y": "1"
+                },
+                {
+                    "id": "2",
+                    "top": "2",
+                    "left": "0",
+                    "x": "2",
+                    "y": "2"
+                }
+            ],
+            "ControlGroup": [
+                {
+                    "id": "1",
+                    "type": "info",
+                    "scenegroup": "1"
+                },
+                {
+                    "id": "2",
+                    "scenegroup": "2",
+                    "isSingle": "1"
+                }
+            ],
+            "Control": [
+                {
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "exit_delay",
+                        "text": "Exit delay: "
+                    },
+                    "Display": {
+                        "Top": 20,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+                        "Variable": "ExitDelay",
+                        "Top": 20,
+                        "Left": 150,
+                        "Width": 25,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "exit_delay_unit",
+                        "text": "seconds"
+                    },
+                    "Display": {
+                        "Top": 20,
+                        "Left": 175,
+                        "Width": 40,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "input",
+                    "ID": "ExitDelay",
+                    "Style": "numeric",
+                    "Display":{
+                        "Top": 15,
+                        "Left": 240,
+                        "Width": 25,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlType": "button",
+                    "Label": {
+                        "lang_tag": "cmd_update",
+                        "text": "Update"
+                    },
+                    "Display": {
+                        "Service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+                        "Top": 15,
+                        "Left": 280,
+                        "Width": 75,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:rfxcom-com:serviceId:SecurityRemote1",
+                        "Action": "SetExitDelay",
+                        "Parameters": [
+                            {
+                                "Name": "ExitDelayValue",
+                                "ID": "ExitDelay"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlHeader": "1",
+                    "ControlType": "label",
+                    "Label": {
+                        "lang_tag": "status",
+                        "text": "Status: "
+                    },
+                    "text_align" : "left",
+                    "left": "0",
+                    "top": "0",
+                    "Display": {
+                        "Top": 60,
+                        "Left": 50,
+                        "Width": 75,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "1",
+                    "ControlHeader": "1",
+                    "ControlType": "variable",
+                    "left": "1",
+                    "top": "0",
+                    "Display": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Variable": "DetailedArmMode",
+                        "Top": 60,
+                        "Left": 150,
+                        "Width": 200,
+                        "Height": 20
+                    }
+                },
+                {
+                    "ControlGroup": "2",
+                    "ControlPair": "1",
+                    "ControlType": "button",
+                    "left": "0",
+                    "top": "0",
+                    "Label": {
+                        "lang_tag": "cmd_arm_away",
+                        "text": "Arm Away"
+                    },
+                    "Display": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Variable": "DetailedArmMode",
+                        "Value": "Armed",
+                        "Top": 100,
+                        "Left": 50,
+                        "Width": 100,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Action": "RequestQuickArmMode",
+                        "Parameters": [
+                            {
+                                "Name": "State",
+                                "Value": "Armed"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "ControlGroup": "2",
+                    "ControlPair": "1",
+                    "ControlType": "button",
+                    "left": "1",
+                    "top": "0",
+                    "Label": {
+                        "lang_tag": "cmd_arm_home",
+                        "text": "Arm Home"
+                    },
+                    "Display": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Variable": "DetailedArmMode",
+                        "Value": "Stay",
+                        "Top": 100,
+                        "Left": 160,
+                        "Width": 100,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Action": "RequestQuickArmMode",
+                        "Parameters": [
+                            {
+                                "Name": "State",
+                                "Value": "Stay"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "ControlGroup": "2",
+                    "ControlPair": "1",
+                    "ControlType": "button",
+                    "left": "0.5",
+                    "top": "1",
+                    "Label": {
+                        "lang_tag": "cmd_disarm",
+                        "text": "Disarm"
+                    },
+                    "Display": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Variable": "DetailedArmMode",
+                        "Value": "Disarmed",
+                        "Top": 100,
+                        "Left": 270,
+                        "Width": 100,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Action": "RequestQuickArmMode",
+                        "Parameters": [
+                            {
+                                "Name": "State",
+                                "Value": "Disarmed"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "ControlType": "button",
+                    "Label": {
+                        "lang_tag": "cmd_panic",
+                        "text": "Panic"
+                    },
+                    "Display": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Top": 150,
+                        "Left": 50,
+                        "Width": 100,
+                        "Height": 20
+                    },
+                    "Command": {
+                        "Service": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                        "Action": "RequestPanicMode",
+                        "Parameters": [
+                            {
+                                "Name": "State",
+                                "Value": "Medical"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "Label": {
+                "lang_tag": "advanced",
+                "text": "Advanced"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "advanced_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "logs",
+                "text": "Logs"
+            },
+            "Position": "3",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_logs"
+        },
+        {
+            "Label": {
+                "lang_tag": "notifications",
+                "text": "Notifications"
+            },
+            "Position": "4",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_notifications"
+        }
+    ],
+    "eventList": {
+        "event_1": {
+            "label": "Armed state",
+            "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+            "argumentList" : {
+                "argument_1" : {
+                    "dataType": "string",
+                    "defaultValue": "Armed",
+                    "allowedValueList" : {
+                        "Yes" : "Armed",
+                        "No" : "Disarmed"
+                    },
+                    "name": "ArmMode",
+                    "comparisson": "=",
+                    "prefix": "Is Armed?",
+                    "suffix": ""
+                }
+            }
+        },
+        "event_2": {
+            "label": "Armed detailed state",
+            "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+            "argumentList" : {
+                "argument_1" : {
+                    "dataType": "string",
+                    "defaultValue": "Armed",
+                    "allowedValueList" : {
+                        "Disarmed" : "Disarmed",
+                        "Armed" : "Armed",
+                        "Stay" : "Stay",
+                        "ExitDelay" : "ExitDelay"
+                    },
+                    "name": "DetailedArmMode",
+                    "comparisson": "=",
+                    "prefix": "Armed state",
+                    "suffix": ""
+                }
+            }
+        },
+        "event_3": {
+            "label": "A scene is activated",
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList" : {
+                "argument_1" : {
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneActivated",
+                    "comparisson": "=",
+                    "prefix": "Which scene number",
+                    "suffix": ""
+                }
+            }
+        },
+        "event_4": {
+            "label": "A scene is de-activated",
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList" : {
+                "argument_1" : {
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneDeactivated",
+                    "comparisson": "=",
+                    "prefix": "Which scene number",
+                    "suffix": ""
+                }
+            }
+        },
+        "event_5": {
+            "label": "Battery level goes below",
+            "serviceId": "urn:micasaverde-com:serviceId:HaDevice1",
+            "argumentList" : {
+                "argument_1" : {
+                    "dataType": "i4",
+                    "defaultValue": "100",
+                    "name": "BatteryLevel",
+                    "comparisson": "<",
+                    "prefix": "Level",
+                    "suffix": "%"
+                }
+            }
+        }
+    },
+    "sceneList": {
+        "group_1": {
+            "cmd_1": {
+                "label": "Set Disarmed",
+                "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                "action": "RequestQuickArmMode",
+                "arguments": {
+                    "State": "Disarmed"
+                }
+            },
+            "cmd_2": {
+                "label": "Set Armed",
+                "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                "action": "RequestQuickArmMode",
+                "arguments": {
+                    "State": "Armed"
+                }
+            },
+            "cmd_3": {
+                "label": "Set Stay",
+                "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                "action": "RequestQuickArmMode",
+                "arguments": {
+                    "State": "Stay"
+                }
+            }
+        },
+        "group_2": {
+            "cmd_1": {
+                "label": "Request Panic",
+                "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+                "action": "RequestPanicMode",
+                "arguments": {
+                    "State": "Medical"
+                }
+            }
+        }
+    },
+    "eventList2": [
+        {
+            "id": 1,
+            "label": {
+                "lang_tag": "armed_state",
+                "text": "Armed state"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "string",
+                    "defaultValue": "Armed",
+                    "allowedValueList": [
+                        {
+                            "Yes": "Armed",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_armed",
+                                "text": "_DEVICE_NAME_ is Armed"
+                            }
+                        },
+                        {
+                            "No": "Disarmed",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_disarmed",
+                                "text": "_DEVICE_NAME_ is Disarmed"
+                            }
+                        }
+                    ],
+                    "name": "ArmMode",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag": "is_armed",
+                        "text": "Is Armed?"
+                    },
+                    "suffix": {}
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "label": {
+                "lang_tag": "armed_detailed_state",
+                "text": "Armed detailed state"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:AlarmPartition2",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "string",
+                    "defaultValue": "Armed",
+                    "allowedValueList": [
+                        {
+                            "Disarmed": "Disarmed",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_disarmed",
+                                "text": "_DEVICE_NAME_ is Disarmed"
+                            }
+                        },
+                        {
+                            "Armed": "Armed",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_armed",
+                                "text": "_DEVICE_NAME_ is Armed Away"
+                            }
+                        },
+                        {
+                            "Stay": "Stay",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_armed_stay",
+                                "text": "_DEVICE_NAME_ is Armed Home"
+                            }
+                        },
+                        {
+                            "ExitDelay": "ExitDelay",
+                            "HumanFriendlyText": {
+                                "lang_tag": "is_on_exit_delay",
+                                "text": "_DEVICE_NAME_ is on Exit Delay"
+                            }
+                        }
+                    ],
+                    "name": "DetailedArmMode",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag": "armed_state",
+                        "text": "Armed state"
+                    },
+                    "suffix": {}
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "label": {
+                "lang_tag": "a_scene_is_activated",
+                "text": "A scene is activated"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneActivated",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag":"which_scene_number",
+                        "text":"Which scene number"
+                    },
+                    "suffix": {},
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_scene_number_is_activated",
+                        "text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is activated"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "label": {
+                "lang_tag": "a_scene_is_deactivated",
+                "text": "A scene is de-activated"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "dataType": "ui2",
+                    "defaultValue": "",
+                    "name": "sl_SceneDeactivated",
+                    "comparisson": "=",
+                    "prefix": {
+                        "lang_tag":"which_scene_number",
+                        "text":"Which scene"
+                    },
+                    "suffix": {},
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_scene_number_is_deactivated",
+                        "text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is deactivated"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "label": {
+                "lang_tag": "battery_level_goes_below",
+                "text": "Battery level goes below"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:HaDevice1",
+            "argumentList": [
+                {
+                    "id": 1,
+                    "prefix": {
+                        "lang_tag": "Level",
+                        "text": "Level"
+                    },
+                    "dataType": "i4",
+                    "name": "BatteryLevel",
+                    "comparisson": "<",
+                    "suffix": {
+                        "lang_tag": "percent_sign",
+                        "text": "%"
+                    },
+                    "HumanFriendlyText": {
+                        "lang_tag": "hft_battery_level_goes_below",
+                        "text": "Battery level for _DEVICE_NAME_ goes below _ARGUMENT_VALUE_%"
+                    }
+                }
+            ]
+        }
+    ],
+    "DeviceType": "urn:rfxcom-com:device:SecurityRemote:1"
+}

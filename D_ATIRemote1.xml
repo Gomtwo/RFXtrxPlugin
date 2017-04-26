@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <device>
+    <deviceType>urn:rfxcom-com:device:ATIRemote:1</deviceType>
+    <staticJson>D_ATIRemote1.json</staticJson>
+    <serviceList>
+      <service>
+        <serviceType>urn:rfxcom-com:service:ATIRemote:1</serviceType>
+        <serviceId>urn:rfxcom-com:serviceId:ATIRemote1</serviceId>
+        <SCPDURL>S_ATIRemote1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:SceneController:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:SceneController1</serviceId>
+        <SCPDURL>S_SceneController1.xml</SCPDURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

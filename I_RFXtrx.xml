@@ -1,0 +1,229 @@
+<?xml version="1.0"?>
+<implementation>
+  <settings>
+    <protocol>raw</protocol>
+  </settings>
+  <functions>
+	local pluginLib
+
+	function startup(lul_device)
+		luup.log("RFXtrx: loading library L_RFXtrx ...")
+		if (package.path:find ("/etc/cmh-ludl/?.lua;/etc/cmh-lu/?.lua", 1, true) == nil) then
+			package.path = package.path .. ";/etc/cmh-ludl/?.lua;/etc/cmh-lu/?.lua"
+		end
+
+		package.loaded.L_RFXtrx = nil
+		pluginLib = require("L_RFXtrx")
+		if (package.loaded.L_RFXtrx == nil)
+		then
+			luup.log("RFXtrx: plugin is not installed correctly. Library L_RFXtrx cannot be loaded.", 1)
+			luup.task("Plugin not correctly installed", 2, "RFXtrx", -1)
+			return false
+		end
+
+		luup.log("RFXtrx: library L_RFXtrx loaded")
+
+		return pluginLib.startup(lul_device)
+	end
+
+	function handleDelayedCmds(data)
+		if (pluginLib ~= nil) then pluginLib.handleDelayedCmds(data) end
+	end
+
+	function clearTask(data)
+		if (pluginLib ~= nil) then pluginLib.clearTask(data) end
+	end
+
+	function deferredStartup(data)
+		if (pluginLib ~= nil) then pluginLib.deferredStartup(data) end
+	end
+  </functions>
+
+  <incoming>
+    <lua>if (pluginLib ~= nil) then pluginLib.incomingData(lul_device, lul_data) end</lua>
+  </incoming>
+
+  <startup>startup</startup>
+  <actionList>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
+  		<name>SetTarget</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.switchPower(lul_device, lul_settings.newTargetValue) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:Dimming1</serviceId>
+  		<name>SetLoadLevelTarget</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setDimLevel(lul_device, lul_settings.newLoadlevelTarget) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
+  		<name>Up</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Up") end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
+  		<name>Down</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Down") end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
+  		<name>Stop</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Stop") end</run>
+    </action>
+    <action>
+    	<serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+    	<name>SetArmed</name>
+    	<run>if (pluginLib ~= nil) then pluginLib.setArmed(lul_device, lul_settings.newArmedValue) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetTemperatureUnit</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setTemperatureUnit(lul_settings.unit) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetSpeedUnit</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setSpeedUnit(lul_settings.unit) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetVoltage</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setVoltage(lul_settings.voltage) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetAutoCreate</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setAutoCreate(lul_settings.enable) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetDebugLogs</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setDebugLogs(lul_settings.enable) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SetupReceiving</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setupReceiving(lul_settings.protocol, lul_settings.enable) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SaveSettings</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.saveSettings() end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>CreateNewDevice</name>
+  		<run>if (pluginLib ~= nil and lul_settings~= nil) then pluginLib.createNewDevice(lul_settings.CategoryType, lul_settings.DeviceType, lul_settings.Name, lul_settings.RemoteId, lul_settings.HouseCode, lul_settings.GroupCode, lul_settings.UnitCode, lul_settings.SystemCode, lul_settings.Channel) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>ChangeDeviceType</name>
+  		<run>if (pluginLib ~= nil and lul_settings~= nil) then pluginLib.changeDeviceType(lul_settings.DeviceId, lul_settings.DeviceType, lul_settings.Name) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>DeleteDevices</name>
+  		<run>if (pluginLib ~= nil and lul_settings~= nil) then pluginLib.deleteDevices(lul_settings.ListDevices, lul_settings.DisableCreation) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SendCommand</name>
+  		<run>if (pluginLib ~= nil and lul_settings~= nil) then pluginLib.sendUnusualCommand(lul_settings.DeviceId, lul_settings.CommandType) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>ReceiveMessage</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.receiveMessage(lul_settings.Message or "") end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-rfxcom-com:serviceId:rfxtrx1</serviceId>
+  		<name>SendMessage</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.sendMessage(lul_settings.Message or "") end</run>
+    </action>
+    <action>
+      <serviceId>urn:micasaverde-com:serviceId:AlarmPartition2</serviceId>
+      <name>RequestArmMode</name>
+      <run>if (pluginLib ~= nil) then pluginLib.requestArmMode(lul_device, lul_settings.State, lul_settings.PINCode or "") end</run>
+    </action>
+    <action>
+      <serviceId>urn:micasaverde-com:serviceId:AlarmPartition2</serviceId>
+      <name>RequestQuickArmMode</name>
+      <run>if (pluginLib ~= nil) then pluginLib.requestQuickArmMode(lul_device, lul_settings.State) end</run>
+    </action>
+    <action>
+      <serviceId>urn:micasaverde-com:serviceId:AlarmPartition2</serviceId>
+      <name>RequestPanicMode</name>
+      <run>if (pluginLib ~= nil) then pluginLib.requestPanicMode(lul_device, lul_settings.State) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:SecurityRemote1</serviceId>
+      <name>SetExitDelay</name>
+      <run>if (pluginLib ~= nil) then pluginLib.setExitDelay(lul_device, lul_settings.ExitDelayValue) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:X10ChaconRemote1</serviceId>
+      <name>Dim</name>
+      <run>if (pluginLib ~= nil) then pluginLib.dim(lul_device) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:X10ChaconRemote1</serviceId>
+      <name>Bright</name>
+      <run>if (pluginLib ~= nil) then pluginLib.bright(lul_device) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:X10ChaconRemote1</serviceId>
+      <name>GroupOff</name>
+      <run>if (pluginLib ~= nil) then pluginLib.groupOff(lul_device) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:X10ChaconRemote1</serviceId>
+      <name>GroupOn</name>
+      <run>if (pluginLib ~= nil) then pluginLib.groupOn(lul_device) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>GroupOff</name>
+      <run>if (pluginLib ~= nil) then pluginLib.groupOff(lul_device) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>Mood1</name>
+      <run>if (pluginLib ~= nil) then pluginLib.mood(lul_device, 1) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>Mood2</name>
+      <run>if (pluginLib ~= nil) then pluginLib.mood(lul_device, 2) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>Mood3</name>
+      <run>if (pluginLib ~= nil) then pluginLib.mood(lul_device, 3) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>Mood4</name>
+      <run>if (pluginLib ~= nil) then pluginLib.mood(lul_device, 4) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:LWRFRemote1</serviceId>
+      <name>Mood5</name>
+      <run>if (pluginLib ~= nil) then pluginLib.mood(lul_device, 5) end</run>
+    </action>
+    <action>
+      <serviceId>urn:rfxcom-com:serviceId:ATIRemote1</serviceId>
+      <name>SendCode</name>
+      <run>if (pluginLib ~= nil) then pluginLib.sendATICode(lul_device, lul_settings.Code or "") end</run>
+    </action>
+    <action>
+  		<serviceId>urn:upnp-org:serviceId:HVAC_UserOperatingMode1</serviceId>
+  		<name>SetModeTarget</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.setModeTarget(lul_device, lul_settings.NewModeTarget) end</run>
+    </action>
+    <action>
+  		<serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
+  		<name>ToggleState</name>
+  		<run>if (pluginLib ~= nil) then pluginLib.toggleState(lul_device) end</run>
+    </action>
+    </actionList>
+</implementation>
