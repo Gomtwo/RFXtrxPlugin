@@ -19,6 +19,14 @@
     	<dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
+    	<name>FirmwareType</name>
+    	<dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
+    	<name>HardwareVersion</name>
+    	<dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
     	<name>CelciusTemp</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
@@ -38,113 +46,133 @@
     	<dataType>boolean</dataType>
     	<defaultValue>0</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
+    	<name>UndecodedReceiving</name>
+    	<dataType>boolean</dataType>
+    	<defaultValue>1</defaultValue>
+    </stateVariable>
+    <stateVariable sendEvents="yes">
+    	<name>ImagintronixReceiving</name>
+    	<dataType>boolean</dataType>
+    	<defaultValue>1</defaultValue>
+    </stateVariable>
+    <stateVariable sendEvents="yes">
     	<name>ByronSXReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>RSLReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>Lighting4Receiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>FineOffsetReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>RubicsonReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>AEReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>BlindsT1Receiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>BlindsT0Receiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>ProGuardReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>FS20Receiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>LaCrosseReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>HidekiReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>ADReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>MertikReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>VisonicReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>ATIReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>OregonReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>MeiantechReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>HEUReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>ACReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>ARCReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
-    <stateVariable sendEvents="no">
+    <stateVariable sendEvents="yes">
     	<name>X10Receiving</name>
+    	<dataType>boolean</dataType>
+    	<defaultValue>1</defaultValue>
+    </stateVariable>
+    <stateVariable sendEvents="yes">
+    	<name>HomeConfortReceiving</name>
+    	<dataType>boolean</dataType>
+    	<defaultValue>1</defaultValue>
+    </stateVariable>
+    <stateVariable sendEvents="yes">
+    	<name>KeelogReceiving</name>
     	<dataType>boolean</dataType>
     	<defaultValue>1</defaultValue>
     </stateVariable>
@@ -300,6 +328,10 @@
 			<allowedValue>LIGHTING4</allowedValue>
 			<allowedValue>RSL</allowedValue>
 			<allowedValue>BYRON_SX</allowedValue>
+			<allowedValue>KEELOQ</allowedValue>
+			<allowedValue>HOMECONFORT</allowedValue>
+			<allowedValue>IMAGINTRONIX</allowedValue>
+			<allowedValue>UNDECODED</allowedValue>
 		</allowedValueList>
     </stateVariable>
     <stateVariable sendEvents="no">
