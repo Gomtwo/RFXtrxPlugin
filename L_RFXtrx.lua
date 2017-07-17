@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.10"
+local PLUGIN_VERSION = "1.20"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -134,8 +134,8 @@ local tableMsgTypes = {
 	SECURITY_X10DS = { 0x20, 0x0, 8, nil, nil, "X10 security door/window sensor" },
 	SECURITY_X10MS = { 0x20, 0x1, 8, nil, nil, "X10 security motion sensor" },
 	SECURITY_X10SR = { 0x20, 0x2, 8, nil, nil, "X10 security remote" },
-	POWERCODE_PRIMDS = { 0x20, 0x4, 8, nil, "Visonic", "PowerCode door/window sensor – primary contact" },
-	POWERCODE_AUXDS = { 0x20, 0x7, 8, nil, "Visonic", "PowerCode door/window sensor – auxiliary contact" },
+	POWERCODE_PRIMDS = { 0x20, 0x4, 8, nil, "Visonic", "PowerCode door/window sensor ï¿½ primary contact" },
+	POWERCODE_AUXDS = { 0x20, 0x7, 8, nil, "Visonic", "PowerCode door/window sensor ï¿½ auxiliary contact" },
 	POWERCODE_MS = { 0x20, 0x5, 8, nil, "Visonic", "PowerCode motion sensor" },
 	SECURITY_MEISR = { 0x20, 0x8, 8, nil, "Meiantech", "Meiantech/Atlantic security remote" },
 	KD101 = { 0x20, 0x3, 8, nil, nil, "KD101 smoke detector" },
@@ -183,7 +183,17 @@ local tableCommands = {
 	CMD_DIM = { "Dim", "DIMMER", "VAR_DIMMER" },
 	CMD_PROGRAM = { "Program", nil, nil },
 	CMD_TEMP = { "Temperature", "TEMP", "VAR_TEMP" },
+	CMD_TEMPTABLE = { "Temptable", "TEMP", "VAR_TEMPMAXMIN" },
+	CMD_TEMPMAX24HR = { "Tempmax24hr", "TEMP", "VAR_TEMPMAX24HR" },
+	CMD_TEMPMIN24HR = { "Tempmin24hr", "TEMP", "VAR_TEMPMIN24HR" },
+	CMD_TEMPMAX = { "Tempmax", "TEMP", "VAR_TEMPMAX" },
+	CMD_TEMPMIN = { "Tempmin", "TEMP", "VAR_TEMPMIN" },
 	CMD_HUM = { "Humidity", "HUM", "VAR_HUM" },
+	CMD_HUMTABLE = { "Humtable", "HUM", "VAR_HUMMAXMIN" },
+	CMD_HUMMAX24HR = { "Hummax24hr", "HUM", "VAR_HUMMAX24HR" },
+	CMD_HUMMIN24HR = { "Hummin24hr", "HUM", "VAR_HUMMIN24HR" },
+	CMD_HUMMAX = { "Hummax", "HUM", "VAR_HUMMAX" },
+	CMD_HUMMIN = { "Hummin", "HUM", "VAR_HUMMIN" },
 	CMD_PRESSURE = { "Pressure", "BARO", "VAR_PRESSURE" },
 	CMD_FORECAST = { "Forecast", "BARO", "VAR_FORECAST" },
 	CMD_RAIN = { "Rain", "RAIN", "VAR_RAIN" },
@@ -209,6 +219,7 @@ local tableCommands = {
 	CMD_OFFSET = { "Offset", "RFXMETER", "VAR_OFFSET" },
 	CMD_MULT = { "MULT", "RFXMETER", "VAR_MULT" },
 	CMD_BATTERY = { "BatteryLevel", nil, "VAR_BATTERY_LEVEL" },
+	CMD_STRENGTH = { "CommStrength", nil, "VAR_COMM_STRENGTH" },
 	CMD_SCENE_ON = { "SceneOn", "REMOTE", "VAR_SCENE_ON" },
 	CMD_SCENE_OFF = { "SceneOff", "REMOTE", "VAR_SCENE_OFF" },
 	CMD_LWRF_SCENE_ON = { "LWRFSceneOn", "LWRF_REMOTE", "VAR_SCENE_ON" },
@@ -230,7 +241,17 @@ local tableCommands = {
 -- 5) true if the variable is not updated when the value is unchanged
 local tabVars = {
 	VAR_TEMP = { "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", false, true, true },
+	VAR_TEMPMAX24HR = { "urn:upnp-org:serviceId:TemperatureSensor1", "MaxTemp24hr", false, true, true },
+	VAR_TEMPMIN24HR = { "urn:upnp-org:serviceId:TemperatureSensor1", "MinTemp24hr", false, true, true },
+	VAR_TEMPMAXMIN = { "urn:upnp-org:serviceId:TemperatureSensor1", "MaxMinTemps", false, false, true },
+	VAR_TEMPMAX = { "urn:upnp-org:serviceId:TemperatureSensor1", "MaxTemp", false, true, true },
+	VAR_TEMPMIN = { "urn:upnp-org:serviceId:TemperatureSensor1", "MinTemp", false, true, true },
 	VAR_HUM = { "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", false, true, true },
+	VAR_HUMMAX24HR = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxHum24hr", false, true, true },
+	VAR_HUMMIN24HR = { "urn:upnp-org:serviceId:HumiditySensor1", "MinHum24hr", false, true, true },
+	VAR_HUMMAXMIN = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxMinHum", false, false, true },
+	VAR_HUMMAX = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxHum", false, true, true },
+	VAR_HUMMIN = { "urn:upnp-org:serviceId:HumiditySensor1", "MinHum", false, true, true },
 	VAR_LIGHT = { "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true },
 	VAR_DIMMER = { "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, false, true },
 	VAR_PRESSURE = { "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, true, true },
@@ -266,6 +287,7 @@ local tabVars = {
 	VAR_MULT = { "urn:delanghe-com:serviceId:RFXMetering1", "Mult", false, false, true },
 	VAR_LIGHT_LEVEL = { "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, false, true },
 	VAR_COMM_FAILURE = { "urn:micasaverde-com:serviceId:HaDevice1", "CommFailure", false, false, true },
+	VAR_COMM_STRENGTH = { "urn:micasaverde-com:serviceId:HaDevice1", "CommStrength", false, false, true },
 
 	VAR_PLUGIN_VERSION = { "upnp-rfxcom-com:serviceId:rfxtrx1", "PluginVersion", false, false, true },
 	VAR_AUTO_CREATE = { "upnp-rfxcom-com:serviceId:rfxtrx1", "AutoCreate", true, false, true },
@@ -379,7 +401,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
+	"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
 	ARC = {	"ARC", true, false, true, true, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -387,7 +409,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
+	"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
 	ELRO_AB400D = {	"ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -395,7 +417,7 @@ local tableCategories = {
 		true, 1, 64,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
 	PHENIX = {	"Phenix", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -403,7 +425,7 @@ local tableCategories = {
 		true, 1, 32,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
 	WAVEMAN = {	"Waveman", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -411,7 +433,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.3/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.3/", "%s%s%02d", nil, nil, nil, nil	},
 	EMW200 = {	"Chacon EMW200", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x43,
@@ -419,7 +441,7 @@ local tableCategories = {
 		true, 1, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.4/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.4/", "%s%s%02d", nil, nil, nil, nil	},
 	IMPULS = {	"Impuls", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -427,7 +449,7 @@ local tableCategories = {
 		true, 1, 64,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.5/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.5/", "%s%s%02d", nil, nil, nil, nil	},
 	RISINGSUN = {	"RisingSun", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x44,
@@ -435,7 +457,7 @@ local tableCategories = {
 		true, 1, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.6/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.6/", "%s%s%02d", nil, nil, nil, nil	},
 	PHILIPS_SBC = {	"Philips SBC", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -443,7 +465,7 @@ local tableCategories = {
 		true, 1, 8,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
+	"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
 	ENERGENIE_ENER010 = {	"Energenie ENER010", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -451,7 +473,7 @@ local tableCategories = {
 		true, 1, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
+	"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
 	ENERGENIE_5GANG = {	"Energenie 5 gang", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -459,7 +481,7 @@ local tableCategories = {
 		true, 1, 10,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.9/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.9/", "%s%s%02d", nil, nil, nil, nil	},
 	COCO = {	"COCO GDR2-2000R", true, false, false, false, false, false,
 		false, nil, nil,
 		true, 0x41, 0x44,
@@ -467,7 +489,7 @@ local tableCategories = {
 		true, 1, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"L1.A/", "%s%s%02d", nil, nil, nil, nil	},
+	"L1.A/", "%s%s%02d", nil, nil, nil, nil	},
 	AC = {	"AC", true, true, true, true, true, true,
 		true, 1, 0x3FFFFFF,
 		false, nil, nil,
@@ -475,7 +497,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
+	"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
 	HOMEEASY_EU = {	"HomeEasy EU", true, true, false, false, false, false,
 		true, 1, 0x3FFFFFF,
 		false, nil, nil,
@@ -483,7 +505,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
+	"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
 	ANSLUT = {	"ANSLUT", true, true, false, false, false, false,
 		true, 1, 0x3FFFFFF,
 		false, nil, nil,
@@ -491,7 +513,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
+	"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
 	IKEA_KOPPLA = {	"Ikea Koppla", true, false, false, false, false, false,
 		false, nil, nil,
 		false, nil, nil,
@@ -499,7 +521,7 @@ local tableCategories = {
 		false, nil, nil,
 		true, 1, 16,
 		true, 1, 10,
-		"L3.0/", "%s%X%02d", nil, nil, nil, nil	},
+	"L3.0/", "%s%X%02d", nil, nil, nil, nil	},
 	LIGHTWAVERF_SIEMENS = {	"LightwaveRF, Siemens", true, true, true, true, false, true,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -507,7 +529,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	},
+	"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	},
 	EMW100 = {	"GAO/Everflourish EMW100", true, false, false, false, false, false,
 		true, 1, 0x3FFF,
 		false, nil, nil,
@@ -515,7 +537,7 @@ local tableCategories = {
 		true, 1, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	},
+	"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	},
 	BBSB = {	"Bye Bye Standby (new)", true, false, false, false, false, false,
 		true, 1, 0x7FFFF,
 		false, nil, nil,
@@ -523,7 +545,7 @@ local tableCategories = {
 		true, 1, 6,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
+	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
 	RSL2 = {	"Conrad RSL2", true, false, false, false, false, false,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -531,7 +553,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
+	"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
 	LIVOLO_1GANG = {	"Livolo (1 gang)", true, true, false, false, false, false,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -539,7 +561,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.5/", "%s%06X/1", nil, nil, nil, nil	},
+	"L5.5/", "%s%06X/1", nil, nil, nil, nil	},
 	LIVOLO_2GANG = {	"Livolo (2 gang)", true, false, false, false, false, false,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -547,7 +569,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	},
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	},
 	LIVOLO_3GANG = {	"Livolo (3 gang)", true, false, false, false, false, false,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -555,7 +577,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	},
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	},
 	BLYSS = {	"Blyss", true, false, true, true, false, false,
 		true, 0, 0xFFFF,
 		false, nil, nil,
@@ -563,7 +585,7 @@ local tableCategories = {
 		true, 1, 5,
 		false, nil, nil,
 		false, nil, nil,
-		"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	},
+	"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	},
 	HARRISON_CURTAIN = {	"Harrison Curtain", false, false, false, false, false, true,
 		false, nil, nil,
 		true, 0x41, 0x50,
@@ -571,7 +593,7 @@ local tableCategories = {
 		true, 1, 16,
 		false, nil, nil,
 		false, nil, nil,
-		"C0/", "%s%s%02d", nil, nil, nil, nil	},
+	"C0/", "%s%s%02d", nil, nil, nil, nil	},
 	ROLLERTROL = {	"RollerTrol", false, false, false, false, false, true,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -579,7 +601,7 @@ local tableCategories = {
 		true, 0, 15,
 		false, nil, nil,
 		false, nil, nil,
-		"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
 	HASTA_NEW = {	"Hasta (new)", false, false, false, false, false, true,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -587,7 +609,7 @@ local tableCategories = {
 		true, 0, 15,
 		false, nil, nil,
 		false, nil, nil,
-		"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
 	HASTA_OLD = {	"Hasta (old)", false, false, false, false, false, true,
 		true, 1, 0xFFFF,
 		false, nil, nil,
@@ -595,7 +617,7 @@ local tableCategories = {
 		true, 0, 15,
 		false, nil, nil,
 		false, nil, nil,
-		"B1/", "%s%06X/%02d", nil, nil, nil, nil	},
+	"B1/", "%s%06X/%02d", nil, nil, nil, nil	},
 	A_OK_RF01 = {	"A-OK RF01", false, false, false, false, false, true,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -603,7 +625,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"B2/", "%s%06X/00", nil, nil, nil, nil	},
+	"B2/", "%s%06X/00", nil, nil, nil, nil	},
 	A_OK_AC114 = {	"A-OK AC114", false, false, false, false, false, true,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -611,7 +633,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"B3/", "%s%06X/00", nil, nil, nil, nil	},
+	"B3/", "%s%06X/00", nil, nil, nil, nil	},
 	RAEX = {	"Raex YR1326 T16 motor", false, false, false, false, false, true,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -619,7 +641,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"B4/", "%s%06X/00", nil, nil, nil, nil	},
+	"B4/", "%s%06X/00", nil, nil, nil, nil	},
 	MEDIA_MOUNT = {	"Media Mount projector screen", false, false, false, false, false, true,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -627,7 +649,7 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 		false, nil, nil,
-		"B5/", "%s%06X/00", nil, nil, nil, nil	},
+	"B5/", "%s%06X/00", nil, nil, nil, nil	},
 	DC_RMF_YOODA = {	"DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true,
 		true, 1, 0x0FFFFFFF,
 		false, nil, nil,
@@ -635,7 +657,7 @@ local tableCategories = {
 		true, 0, 15,
 		false, nil, nil,
 		false, nil, nil,
-		"B6/", "%s%07X/%02d", nil, nil, nil, nil	},
+	"B6/", "%s%07X/%02d", nil, nil, nil, nil	},
 	FOREST = {	"Forest", false, false, false, false, false, true,
 		true, 1, 0x0FFFFFFF,
 		false, nil, nil,
@@ -643,7 +665,7 @@ local tableCategories = {
 		true, 0, 15,
 		false, nil, nil,
 		false, nil, nil,
-		"B7/", "%s%07X/%02d", nil, nil, nil, nil	},
+	"B7/", "%s%07X/%02d", nil, nil, nil, nil	},
 	RFY = {	"RFY", false, false, false, false, false, true,
 		true, 1, 0x0FFFFF,
 		false, nil, nil,
@@ -651,7 +673,7 @@ local tableCategories = {
 		true, 0, 4,
 		false, nil, nil,
 		false, nil, nil,
-		"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	}
+	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	}
 }
 
 
@@ -686,23 +708,23 @@ end
 
 local function task(text, mode)
 	if (mode == TASK_ERROR_PERM)
-	then
+		then
 		log(text, 1)
 	elseif (mode ~= TASK_SUCCESS)
-	then
+		then
 		log(text, 2)
 	else
 		log(text)
 	end
 	if (mode == TASK_ERROR_PERM)
-	then
+		then
 		taskHandle = luup.task(text, TASK_ERROR, "RFXtrx", taskHandle)
 	else
 		taskHandle = luup.task(text, mode, "RFXtrx", taskHandle)
 
 		-- Clear the previous error, since they're all transient
 		if (mode ~= TASK_SUCCESS)
-		then
+			then
 			luup.call_delay("clearTask", 15, "", false)
 		end
 	end
@@ -718,13 +740,13 @@ local function GetStringPart( psString, piStart, piLen )
 	local lsResult = ""
 
 	if ( psString ~= nil )
-	then
+		then
 		local liStringLength = 1 + #psString
 		for teller = piStart, (piStart + piLen - 1)
-		do
+			do
 			-- if not beyond string length
 			if ( liStringLength > teller )
-			then
+				then
 				lsResult = lsResult .. string.sub(psString, teller, teller)
 			end
 		end
@@ -737,9 +759,9 @@ local function formattohex(dataBuf)
 
 	local resultstr = ""
 	if (dataBuf ~= nil)
-	then
+		then
 		for idx = 1, string.len(dataBuf)
-		do
+			do
 			resultstr = resultstr .. string.format("%02X ", string.byte(dataBuf, idx) )
 		end
 	end
@@ -751,9 +773,9 @@ local function searchInStringTable(table, value)
 
 	local idx = 0
 	for i, v in ipairs(table)
-	do
+		do
 		if (v == value)
-		then
+			then
 			idx = i
 			break
 		end
@@ -766,9 +788,9 @@ local function searchInTable(table, searchIndex, value)
 
 	local idx = 0
 	for i, v in ipairs(table)
-	do
+		do
 		if (v[searchIndex] == value)
-		then
+			then
 			idx = i
 			break
 		end
@@ -781,9 +803,9 @@ local function searchInTable2(table, searchIndex1, value1, searchIndex2, value2)
 
 	local idx = 0
 	for i, v in ipairs(table)
-	do
+		do
 		if (v[searchIndex1] == value1 and v[searchIndex2] == value2)
-		then
+			then
 			idx = i
 			break
 		end
@@ -796,9 +818,9 @@ local function searchInKeyTable(table, searchIndex, value)
 
 	local key = nil
 	for k, v in pairs(table)
-	do
+		do
 		if (v[searchIndex] == value)
-		then
+			then
 			key = k
 			break
 		end
@@ -811,9 +833,9 @@ local function searchInKeyTable2(table, searchIndex1, value1, searchIndex2, valu
 
 	local key = nil
 	for k, v in pairs(table)
-	do
+		do
 		if (v[searchIndex1] == value1 and v[searchIndex2] == value2)
-		then
+			then
 			key = k
 			break
 		end
@@ -824,7 +846,7 @@ end
 
 local function setDefaultValue(device, variable, value)
 	if (variable ~= nil and value ~= nil and luup.variable_get(variable[1], variable[2], device) == nil)
-	then
+		then
 		debug("SET " .. variable[2] .. " with default value " .. value)
 		luup.variable_set(variable[1], variable[2], value, device)
 	end
@@ -833,7 +855,7 @@ end
 local function getVariable(device, variable)
 	local value = nil
 	if (variable ~= nil)
-	then
+		then
 		value = luup.variable_get(variable[1], variable[2], device)
 	end
 	return value
@@ -841,29 +863,29 @@ end
 
 local function setVariable(device, variable, value)
 	if (variable ~= nil and value ~= nil)
-	then
-		if (type(value) == "number")
 		then
+		if (type(value) == "number")
+			then
 			value = tostring(value)
 		end
 		local doChange = true
 		if ((luup.devices[device].device_type == tableDeviceTypes.MOTION[1]
-				or luup.devices[device].device_type == tableDeviceTypes.DOOR[1]
-				or luup.devices[device].device_type == tableDeviceTypes.SMOKE[1])
+			or luup.devices[device].device_type == tableDeviceTypes.DOOR[1]
+			or luup.devices[device].device_type == tableDeviceTypes.SMOKE[1])
 			and variable == tabVars.VAR_TRIPPED
 			and luup.variable_get(variable[1], variable[2], device) == value
 			and luup.variable_get(tabVars.VAR_REPEAT_EVENT[1], tabVars.VAR_REPEAT_EVENT[2], device) == "0")
-		then
+			then
 			doChange = false
 		elseif (luup.devices[device].device_type == tableDeviceTypes.LIGHT[1]
 			and variable == tabVars.VAR_LIGHT
 			and luup.variable_get(variable[1], variable[2], device) == value
 			and luup.variable_get(tabVars.VAR_REPEAT_EVENT[1], tabVars.VAR_REPEAT_EVENT[2], device) == "1")
-		then
+			then
 			luup.variable_set(variable[1], variable[2], -1, device)
 		elseif (luup.variable_get(variable[1], variable[2], device) == value
 			and variable[5] == true)
-		then
+			then
 			doChange = false
 		end
 
@@ -872,10 +894,10 @@ local function setVariable(device, variable, value)
 		end
 
 		if (variable == tabVars.VAR_TRIPPED and value == "1")
-		then
+			then
 			setVariable(device, tabVars.VAR_LAST_TRIP, os.time())
 		elseif (variable == tabVars.VAR_BATTERY_LEVEL)
-		then
+			then
 			setVariable(device, tabVars.VAR_BATTERY_DATE, os.time())
 		end
 	end
@@ -892,18 +914,18 @@ local function initStateVariables()
 	-- convert them to their "strongly recommended" values of "0" or "1".
 	--
 	for k, v in pairs(tabVars)
-	do
+		do
 		if (v[1] == "upnp-rfxcom-com:serviceId:rfxtrx1" and v[3] == true)
-		then
+			then
 			local value = getVariable(THIS_DEVICE, v)
 			if (value == "0" or value == "1")
-			then
+				then
 				-- Do nothing, value is correct
 			elseif ((value == nil) or (value == "true") or (value == "yes"))
-			then
+				then
 				setVariable(THIS_DEVICE, v, "1")
 			elseif ((value == "false") or (value == "no"))
-			then
+				then
 				setVariable(THIS_DEVICE, v, "0")
 			else
 				-- For all other values, silently default to 1
@@ -919,9 +941,9 @@ local function encodeCommandsInString(tableCmds)
 
 	local str = ""
 	if ((tableCmds ~= nil) and (#tableCmds > 0))
-	then
+		then
 		for i, v in ipairs(tableCmds)
-		do
+			do
 			str = str .. v[1] .. "#" .. v[2] .. "#" .. (v[3] or "nil") .. "\n"
 		end
 	end
@@ -934,18 +956,18 @@ local function decodeCommandsFromString(data)
 	local tableCmds = {}
 	local i = 0
 	while true
-	do
+		do
 		local j = string.find(data, "\n", i+1)
 		if (j == nil)
-		then
+			then
 			break
 		end
 		local cmd = string.sub(data, i+1, j-1)
 		--debug("cmd=" .. cmd)
 		for id, cmd, value in string.gmatch(cmd, "([%u%d/.]+)#([%a%d]+)#([%a%d/. ]+)")
-		do
+			do
 			if (value == "nil")
-			then
+				then
 				value = nil
 			end
 			--debug("id=" .. (id or "nil") .. " cmd=" .. (cmd or "nil") .. " value=" .. (value or "nil"))
@@ -978,61 +1000,61 @@ local function logDevices()
 	local countRM = 0
 	local countLL = 0
 	for i, v in ipairs(tableDevices)
-	do
+		do
 		local key = v[2]
 		if (key == "DOOR")
-		then
+			then
 			countDS = countDS + 1
 		elseif (key == "MOTION")
-		then
+			then
 			countMS = countMS + 1
 		elseif (key == "LIGHT")
-		then
+			then
 			countLS = countLS + 1
 		elseif (key == "DIMMER")
-		then
+			then
 			countDL = countDL + 1
 		elseif (key == "COVER")
-		then
+			then
 			countWC = countWC + 1
 		elseif (key == "TEMP")
-		then
+			then
 			countTS = countTS + 1
 		elseif (key == "HUM")
-		then
+			then
 			countHS = countHS + 1
 		elseif (key == "BARO")
-		then
+			then
 			countBS = countBS + 1
 		elseif (key == "WIND")
-		then
+			then
 			countWS = countWS + 1
 		elseif (key == "RAIN")
-		then
+			then
 			countRS = countRS + 1
 		elseif (key == "POWER")
-		then
+			then
 			countPM = countPM + 1
 		elseif (key == "UV")
-		then
+			then
 			countUV = countUV + 1
 		elseif (key == "WEIGHT")
-		then
+			then
 			countWT = countWT + 1
 		elseif (key == "ALARM")
-		then
+			then
 			countSR = countSR + 1
 		elseif (key == "REMOTE")
-		then
+			then
 			countRC = countRC + 1
 		elseif (key == "HEATER")
-		then
+			then
 			countHT = countHT + 1
 		elseif (key == "RFXMETER")
-		then
+			then
 			countRM = countRM + 1
 		elseif (key == "LIGHT_LEVEL")
-		then
+			then
 			countLL = countLL + 1
 		end
 	end
@@ -1062,12 +1084,12 @@ local function logCmds(title, tableCmds)
 
 	local str = title .. ":"
 	if (tableCmds ~= nil and #tableCmds > 0)
-	then
+		then
 		for i, v in ipairs(tableCmds)
-		do
+			do
 			str = str .. " " .. (v[1] or "") .. " " .. (v[2] or "") .. " " .. (v[3] or "")
 			if (v[4] > 0)
-			then
+				then
 				str = str .. " delayed " .. v[4] .. "s"
 			end
 		end
@@ -1079,12 +1101,12 @@ end
 local function findStrInStringList(list, str)
 
 	if (list ~= nil)
-	then
+		then
 		for value in string.gmatch(list, "[%u%d/.]+")
-		do
+			do
 			--debug("value = " .. value)
 			if (value == str)
-			then
+				then
 				return true
 			end
 		end
@@ -1106,14 +1128,14 @@ local function findChild(parentDevice, label, deviceType)
 	local foundAssoc = nil
 
 	for k, v in pairs(luup.devices)
-	do
+		do
 		if ((deviceType == nil) or (v.device_type == deviceType))
-		then
-			if (v.device_num_parent == parentDevice and string.find(v.id, label .. "$", 4) == 4)
 			then
+			if (v.device_num_parent == parentDevice and string.find(v.id, label .. "$", 4) == 4)
+				then
 				return k
 			elseif (findAssociation(k, label) == true)
-			then
+				then
 				foundAssoc = k
 			end
 		end
@@ -1127,7 +1149,7 @@ end
 local function sendCommand(packetType, packetSubType, packetData, tableCmds)
 
 	if (tableCmds ~= nil and #tableCmds > 0)
-	then
+		then
 		table.insert(tableMsgSent, { sequenceNum, tableCmds })
 	end
 
@@ -1136,7 +1158,7 @@ local function sendCommand(packetType, packetSubType, packetData, tableCmds)
 	debug("Sending command: " .. formattohex(cmd))
 
 	if (luup.io.write(cmd) == false)
-	then
+		then
 		task("Cannot send command - communications error", TASK_ERROR)
 		luup.set_failure(true)
 		return false
@@ -1151,9 +1173,9 @@ end
 local function sendRepeatCommand(packetType, packetSubType, packetData, nbRTimes, tableCmds)
 
 	for i=1, nbRTimes
-	do
+		do
 		if (i == 1)
-		then
+			then
 			sendCommand(packetType, packetSubType, packetData, tableCmds)
 		else
 			sendCommand(packetType, packetSubType, packetData, { { "", "", nil, 0 } })
@@ -1173,9 +1195,9 @@ local function disableDevice(id)
 
 	local disabledDevices = getVariable(THIS_DEVICE, tabVars.VAR_DISABLED_DEVICES)
 	if (findStrInStringList(disabledDevices, id) == false)
-	then
-		if (disabledDevices == nil or disabledDevices == "")
 		then
+		if (disabledDevices == nil or disabledDevices == "")
+			then
 			disabledDevices = id
 		else
 			disabledDevices = disabledDevices .. "," .. id
@@ -1185,22 +1207,234 @@ local function disableDevice(id)
 
 end
 
+-- Extract the battery level from the data string sent by the device
+-- byte1 is the location of the byte containing the battery level in the data string
+-- Battery level should never be greater than 9?
+local function decodeBatteryLevel( dataString, byte1 )
+	-- it's always the lower 4 bits
+	local battery = bitw.band(string.byte(dataString, byte1), 0x0F)
+	if (battery <= 9)
+		then
+		battery = (battery + 1) * 10
+	else
+		battery = 99
+	end
+	return battery
+end
+
+
 -- Decode bytes received from a device that contain the measured temperature
 -- dataString is the string received from the sensor
 -- byte1 is the first byte of temperature data. The second byte of data always
 -- follows the first
 local function decodeTemperature( dataString, byte1 )
 	local temp = (bitw.band(string.byte(dataString, byte1), 0x7F) * 256 + string.byte(dataString, byte1 + 1)) / 10
-		if (bitw.band(string.byte(dataString, byte1), 0x80) == 0x80)
+	if (bitw.band(string.byte(dataString, byte1), 0x80) == 0x80)
 		then
-			temp = -temp
-		end
-		if (getVariable(THIS_DEVICE, tabVars.VAR_TEMP_UNIT) == "0")
+		temp = -temp
+	end
+	if (getVariable(THIS_DEVICE, tabVars.VAR_TEMP_UNIT) == "0")
 		then
-			-- Convert degree celcius to degree fahrenheit
-			temp = math.floor((temp * 1.8 + 32) * 10 + 0.5) / 10
-		end
+		-- Convert degree celcius to degree fahrenheit
+		temp = math.floor((temp * 1.8 + 32) * 10 + 0.5) / 10
+	end
 	return temp
+end
+
+
+-- Create an new max min table of 24 given max and min values
+local function createMaxMinTable( maxVal, minVal )
+	local maxval = tonumber(maxVal)
+	local minval = tonumber(minVal)
+	if((maxval == nil) or (minval == nil))
+	then return nil end
+	local newMaxMinTable = {}
+	for i=1, 24
+		do
+		newMaxMinTable[i] = { maxval, minval }
+	end
+	return newMaxMinTable
+end
+
+
+-- Put all of the max and min values from a table into a single string
+local function stringifyMaxMinTable(tableMaxMin)
+	local tempData = ''
+	if((tableMaxMin == nil) or (#tableMaxMin == 0))
+		then
+		debug("Empty or NIL MaxMin Table")
+	else
+		local tempTable = {}
+		for i=1, #tableMaxMin
+			do
+			tempTable[i]= table.concat(tableMaxMin[i],',')
+		end
+		tempData = table.concat(tempTable, ',')
+	end
+	return tempData
+end
+
+-- Recreate a table of max min values from a string containing the data
+local function recreateMaxMinTable(tableDataString)
+	local newHourlyMaxMin = {}
+	for k, v in string.gmatch(tableDataString, "(-?%d+%.?%d*)%,(-?%d+%.?%d*)") do
+		newHourlyMaxMin[#newHourlyMaxMin + 1] = {tonumber(k),tonumber(v)}
+	end
+	return newHourlyMaxMin
+end
+
+-- Update if necessary the max or min values detected for a temperature sensor device
+local function checkMaxMinTemp( altid, tableCmds, temp )
+	local maxMinString = ''
+	local maxMinTable = {}
+	local tableModified = false
+	-- Get the current hour. Add 1 so that our table index starts at 1
+	local thisHour = tonumber(os.date("%H", os.time())) + 1
+	local prevHour
+	local maxval
+	local minval
+	-- Determine the device number of the temperature sensor
+	local device = findChild(THIS_DEVICE, altid, tableDeviceTypes.TEMP[1])
+	if (device ~= nil)
+		then
+		-- Update the maximum temperature if necessary
+		maxval = tonumber(getVariable(device, tabVars.VAR_TEMPMAX))
+		if (maxval == nil or temp > maxval)
+			then
+			table.insert(tableCmds, { altid, tableCommands.CMD_TEMPMAX[1], temp, 0 } )
+		end
+		-- Update the minimum temperature if necessary
+		minval = tonumber(getVariable(device, tabVars.VAR_TEMPMIN))
+		if (minval == nil or temp < minval)
+			then
+			table.insert(tableCmds, { altid, tableCommands.CMD_TEMPMIN[1], temp, 0 } )
+		end
+		-- Get the string of max and min temperature values for the last 24 hours
+		maxMinString = getVariable(device, tabVars.VAR_TEMPMAXMIN)
+		-- If the string is empty create a new table of values
+		if((maxMinString == nil) or (#maxMinString == 0))
+			then
+			maxMinTable = createMaxMinTable( -20, 150 )
+			tableModified = true
+		else
+			-- Get the table values from the string
+			maxMinTable = recreateMaxMinTable(maxMinString)
+		end
+		-- Update the table values if necessary
+		-- Get the hour of the previous sensor input
+		prevHour = tonumber(os.date("%H", getVariable(device, tabVars.VAR_BATTERY_DATE))) + 1
+		-- If they're different save the new temp as the max and min for the current hour
+		if( prevHour ~= thisHour)
+			then
+			maxMinTable[thisHour] = { temp, temp }
+			tableModified = true
+		else
+			-- Otherwise see if the new temp is greater than the current max or less than the current min for this hour
+			if(maxMinTable[thisHour][1] < temp)
+				then
+				maxMinTable[thisHour][1] = temp
+				tableModified = true
+			end
+			if(maxMinTable[thisHour][2] > temp)
+				then
+				maxMinTable[thisHour][2] = temp
+				tableModified = true
+			end
+		end
+
+		if(tableModified)
+			then
+			-- Find the max and min temps in the last 24 hours
+			maxval = -20.0
+			minval = 150.0
+			for i = 1, #maxMinTable
+				do
+				maxval = math.max(maxMinTable[i][1], maxval)
+				minval = math.min(maxMinTable[i][2], minval)
+			end
+			table.insert(tableCmds, { altid, tableCommands.CMD_TEMPMAX24HR[1], maxval, 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_TEMPMIN24HR[1], minval, 0 } )
+			maxMinString = stringifyMaxMinTable(maxMinTable)
+			table.insert(tableCmds, { altid, tableCommands.CMD_TEMPTABLE[1], maxMinString, 0 } )
+		end
+	end
+end
+
+-- Update if necessary the max or min values detected for a humidity sensor device
+local function checkMaxMinHum( altid, tableCmds, hum )
+	local maxMinString = ''
+	local maxMinTable = {}
+	local tableModified = false
+	-- Get the current hour. Add 1 so that our table index starts at 1
+	local thisHour = tonumber(os.date("%H", os.time())) + 1
+	local prevHour
+	local maxval
+	local minval
+	-- Determine the device number of the temperature sensor
+	local device = findChild(THIS_DEVICE, altid, tableDeviceTypes.HUM[1])
+	if (device ~= nil)
+		then
+		-- Update the maximum temperature if necessary
+		maxval = tonumber(getVariable(device, tabVars.VAR_HUMMAX))
+		if (maxval == nil or hum > maxval)
+			then
+			table.insert(tableCmds, { altid, tableCommands.CMD_HUMMAX[1], hum, 0 } )
+		end
+		-- Update the minimum temperature if necessary
+		minval = tonumber(getVariable(device, tabVars.VAR_HUMMIN))
+		if (minval == nil or hum < minval)
+			then
+			table.insert(tableCmds, { altid, tableCommands.CMD_HUMMIN[1], hum, 0 } )
+		end
+		-- Get the string of max and min temperature values for the last 24 hours
+		maxMinString = getVariable(device, tabVars.VAR_HUMMAXMIN)
+		-- If the string is empty create a new table of values
+		if((maxMinString == nil) or (#maxMinString == 0))
+			then
+			maxMinTable = createMaxMinTable( 0, 100 )
+			tableModified = true
+		else
+			-- Get the table values from the string
+			maxMinTable = recreateMaxMinTable(maxMinString)
+		end
+		-- Update the table values if necessary
+		-- Get the hour of the previous sensor input
+		prevHour = tonumber(os.date("%H", getVariable(device, tabVars.VAR_BATTERY_DATE))) + 1
+		-- If they're different save the new hum as the max and min for the current hour
+		if( prevHour ~= thisHour)
+			then
+			maxMinTable[thisHour] = { hum, hum }
+			tableModified = true
+		else
+			-- Otherwise see if the new hum is greater than the current max or less than the current min for this hour
+			if(maxMinTable[thisHour][1] < hum)
+				then
+				maxMinTable[thisHour][1] = hum
+				tableModified = true
+			end
+			if(maxMinTable[thisHour][2] > hum)
+				then
+				maxMinTable[thisHour][2] = hum
+				tableModified = true
+			end
+		end
+
+		if(tableModified)
+			then
+			-- Find the max and min temps in the last 24 hours
+			maxval = 0
+			minval = 100
+			for i = 1, #maxMinTable
+				do
+				maxval = math.max(maxMinTable[i][1], maxval)
+				minval = math.min(maxMinTable[i][2], minval)
+			end
+			table.insert(tableCmds, { altid, tableCommands.CMD_HUMMAX24HR[1], maxval, 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_HUMMIN24HR[1], minval, 0 } )
+			maxMinString = stringifyMaxMinTable(maxMinTable)
+			table.insert(tableCmds, { altid, tableCommands.CMD_HUMTABLE[1], maxMinString, 0 } )
+		end
+	end
 end
 
 
@@ -1212,33 +1446,33 @@ local function checkExistingDevices(lul_device)
 	-- Check all devices if they are childeren. If so, register in
 	-- the correct array based on the device type
 	for k, v in pairs(luup.devices)
-	do
+		do
 		-- Look for devices with this device as parent
 		if (v.device_num_parent == lul_device)
-		then
+			then
 			debug( "Found child device id " .. tostring(v.id) .. " of type " .. tostring(v.device_type))
 			nbr = nbr + 1
 
 			local key = searchInKeyTable2(tableDeviceTypes, 1, tostring(v.device_type), 4, string.sub(v.id, 1, 3))
 			if (key ~= nil)
-			then
+				then
 				local associations = getVariable(k, tabVars.VAR_ASSOCIATION)
 				table.insert(tableDevices, { v.id, key, associations, v.description })
 				if (tableDeviceTypes[key][6] == true)
-				then
+					then
 					setDefaultValue(k, tabVars.VAR_RFY_MODE, "STANDARD")
 				end
 				if (tableDeviceTypes[key][7] == true)
-				then
+					then
 					setDefaultValue(k, tabVars.VAR_ADJUST_MULTIPLIER, "")
 					setDefaultValue(k, tabVars.VAR_ADJUST_CONSTANT, "")
 					setDefaultValue(k, tabVars.VAR_ADJUST_CONSTANT2, "")
 				end
 				if (key == "LIGHT")
-				then
+					then
 					setDefaultValue(k, tabVars.VAR_REPEAT_EVENT, "0")
 				elseif (key == "MOTION" or key == "DOOR" or key == "SMOKE")
-				then
+					then
 					setDefaultValue(k, tabVars.VAR_REPEAT_EVENT, "1")
 				end
 			end
@@ -1256,14 +1490,14 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 	if (( (tableNewDevices ~= nil) and (#tableNewDevices > 0) )
 		or ( (tableConversions ~= nil) and (#tableConversions > 0) )
 		or ( (tableDeletedDevices ~= nil) and (#tableDeletedDevices > 0) ))
-	then
+		then
 		local child_devices = luup.chdev.start(THIS_DEVICE);
 
 		-----------------------------------------------------------------------------------
 		-- First add or convert all 'old' children to the three
 		-----------------------------------------------------------------------------------
 		for i, v in ipairs(tableDevices)
-		do
+			do
 			local id = v[1]
 			local subId = string.sub(id, 4, #id)
 			local deviceType = tableDeviceTypes[v[2]]
@@ -1273,11 +1507,11 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 			local toBeDeleted = false
 
 			if ((tableDeletedDevices ~= nil) and (#tableDeletedDevices > 0))
-			then
+				then
 				for i2, v2 in ipairs(tableDeletedDevices)
-				do
+					do
 					if (v2 == id)
-					then
+						then
 						toBeDeleted = true
 						break
 					end
@@ -1289,11 +1523,11 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 			local devType = nil
 
 			if ((tableConversions ~= nil) and (#tableConversions > 0))
-			then
+				then
 				for i2, v2 in ipairs(tableConversions)
-				do
+					do
 					if ((subId == v2[3]) or (findStrInStringList(associations, v2[3]) == true))
-					then
+						then
 						name = v2[1]
 						room = v2[2]
 						deviceId = v2[3]
@@ -1304,74 +1538,74 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 			end
 
 			if (deviceId ~= nil and devType ~= nil)
-			then
+				then
 				debug("Converting " .. name .. "...")
 
 				local newDeviceType = tableDeviceTypes[devType]
 
 				if (newDeviceType[1] ~= deviceType[1])
-				then
+					then
 					local parameters = ""
 					if (newDeviceType[5] == true)
-					then
-						if (parameters ~= "")
 						then
+						if (parameters ~= "")
+							then
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_ASSOCIATION[1] .. "," .. tabVars.VAR_ASSOCIATION[2] .. "="
 						if (associations ~= nil)
-						then
+							then
 							parameters = parameters .. associations
 						end
 					end
 					if (newDeviceType == tableDeviceTypes.LIGHT)
-					then
-						if (parameters ~= "")
 						then
+						if (parameters ~= "")
+							then
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_LIGHT[1] .. "," .. tabVars.VAR_LIGHT[2] .. "=0"
 						parameters = parameters .. "\n"
 						parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=0"
 					elseif (newDeviceType == tableDeviceTypes.DIMMER
-							or newDeviceType == tableDeviceTypes.COVER)
-					then
-						if (parameters ~= "")
+						or newDeviceType == tableDeviceTypes.COVER)
 						then
+						if (parameters ~= "")
+							then
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_DIMMER[1] .. "," .. tabVars.VAR_DIMMER[2] .. "=0"
 						parameters = parameters .. "\n"
 						parameters = parameters .. tabVars.VAR_LIGHT[1] .. "," .. tabVars.VAR_LIGHT[2] .. "=0"
 					elseif (newDeviceType == tableDeviceTypes.MOTION
-							or newDeviceType == tableDeviceTypes.DOOR)
-					then
-						if (parameters ~= "")
+						or newDeviceType == tableDeviceTypes.DOOR)
 						then
+						if (parameters ~= "")
+							then
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 						parameters = parameters .. "\n"
 						parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
 					elseif (newDeviceType == tableDeviceTypes.LIGHT_LEVEL)
-					then
-						if (parameters ~= "")
 						then
+						if (parameters ~= "")
+							then
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_LIGHT_LEVEL[1] .. "," .. tabVars.VAR_LIGHT_LEVEL[2] .. "=0"
 					end
 					luup.chdev.append(THIS_DEVICE, child_devices, newDeviceType[4] .. subId, name,
-										newDeviceType[1], newDeviceType[2], "", parameters, false)
+					newDeviceType[1], newDeviceType[2], "", parameters, false)
 					tableDevices[i] = { newDeviceType[4] .. subId, devType, associations, name }
 				else
 					luup.chdev.append(THIS_DEVICE, child_devices, id, name,
-										deviceType[1], deviceType[2], "", "", false)
+					deviceType[1], deviceType[2], "", "", false)
 				end
 			elseif (not toBeDeleted)
-			then
+				then
 				luup.chdev.append(THIS_DEVICE, child_devices, id, name,
-									deviceType[1], deviceType[2], "", "", false)
+				deviceType[1], deviceType[2], "", "", false)
 			end
 		end
 
@@ -1380,9 +1614,9 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 		------------------------------------------------------------------------------------
 
 		if ((tableNewDevices ~= nil) and (#tableNewDevices > 0))
-		then
+			then
 			for i, v in ipairs(tableNewDevices)
-			do
+				do
 				local name = v[1]
 				local room = v[2]
 				local deviceId = v[3]
@@ -1392,25 +1626,25 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 				debug("Creating child device id " .. deviceType[4] .. deviceId .. " of type " .. deviceType[1])
 				local parameters = ""
 				if (deviceType[5] == true)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_ASSOCIATION[1] .. "," .. tabVars.VAR_ASSOCIATION[2] .. "="
 				end
 				if (deviceType[6] == true)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_RFY_MODE[1] .. "," .. tabVars.VAR_RFY_MODE[2] .. "=STANDARD"
 				end
 				if (deviceType[7] == true)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_ADJUST_MULTIPLIER[1] .. "," .. tabVars.VAR_ADJUST_MULTIPLIER[2] .. "="
@@ -1420,52 +1654,52 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 					parameters = parameters .. tabVars.VAR_ADJUST_CONSTANT2[1] .. "," .. tabVars.VAR_ADJUST_CONSTANT2[2] .. "="
 				end
 				if (deviceType == tableDeviceTypes.LIGHT)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_LIGHT[1] .. "," .. tabVars.VAR_LIGHT[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=0"
 				elseif (deviceType == tableDeviceTypes.DIMMER
-						or deviceType == tableDeviceTypes.COVER)
-				then
-					if (parameters ~= "")
+					or deviceType == tableDeviceTypes.COVER)
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_DIMMER[1] .. "," .. tabVars.VAR_DIMMER[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_LIGHT[1] .. "," .. tabVars.VAR_LIGHT[2] .. "=0"
 				elseif (deviceType == tableDeviceTypes.MOTION
-						or deviceType == tableDeviceTypes.DOOR
-						or deviceType == tableDeviceTypes.SMOKE)
-				then
-					if (parameters ~= "")
+					or deviceType == tableDeviceTypes.DOOR
+					or deviceType == tableDeviceTypes.SMOKE)
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
 				elseif (deviceType == tableDeviceTypes.ALARM)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_EXIT_DELAY[1] .. "," .. tabVars.VAR_EXIT_DELAY[2] .. "=0"
 				elseif (deviceType == tableDeviceTypes.LIGHT_LEVEL)
-				then
-					if (parameters ~= "")
 					then
+					if (parameters ~= "")
+						then
 						parameters = parameters .. "\n"
 					end
 					parameters = parameters .. tabVars.VAR_LIGHT_LEVEL[1] .. "," .. tabVars.VAR_LIGHT_LEVEL[2] .. "=0"
 				end
 				luup.chdev.append(THIS_DEVICE, child_devices, deviceType[4] .. deviceId, name,
-								deviceType[1], deviceType[2], "", parameters, false)
+				deviceType[1], deviceType[2], "", parameters, false)
 				table.insert(tableDevices, { deviceType[4] .. deviceId, devType, nil, name })
 			end
 		end
@@ -1485,7 +1719,7 @@ local function actOnMessage(tableCmds)
 	logCmds("cmds", tableCmds)
 
 	if ((tableCmds == nil) or (#tableCmds == 0))
-	then
+		then
 		return
 	end
 
@@ -1505,20 +1739,20 @@ local function actOnMessage(tableCmds)
 	local tableNewDevices = {}
 	local tableConversions = {}
 	for i, v in ipairs(tableCmds)
-	do
+		do
 		deviceId = v[1]
 		cmd = v[2]
 		cmdType = nil
 		key = searchInKeyTable(tableCommands, 1, cmd)
 		if (key ~= nil)
-		then
+			then
 			cmdType = tableCommands[key][2]
 		end
 		if ((#deviceId > 0) and (deviceId ~= "parent")
-				and (cmdType ~= nil)
-				and (searchInTable2(tableNewDevices, 3, deviceId, 4, cmdType) == 0)
-				and (searchInTable(tableConversions, 3, deviceId) == 0))
-		then
+			and (cmdType ~= nil)
+			and (searchInTable2(tableNewDevices, 3, deviceId, 4, cmdType) == 0)
+			and (searchInTable(tableConversions, 3, deviceId) == 0))
+			then
 			-- Check if child exists but conversion is required
 			local dev = nil
 			if (cmd == tableCommands.CMD_OPEN[1]
@@ -1527,27 +1761,27 @@ local function actOnMessage(tableCmds)
 				or cmd == tableCommands.CMD_ON[1]
 				or cmd == tableCommands.CMD_OFF[1]
 				or cmd == tableCommands.CMD_DIM[1])
-			then
+				then
 				dev = findChild(THIS_DEVICE, deviceId, nil)
 				if (dev ~= nil)
-				then
-					if ((cmd == tableCommands.CMD_OPEN[1]
-							or cmd == tableCommands.CMD_CLOSE[1]
-							or cmd == tableCommands.CMD_STOP[1])
-						and (luup.devices[dev].device_type == tableDeviceTypes.LIGHT[1]
-							or luup.devices[dev].device_type == tableDeviceTypes.DIMMER[1]))
 					then
+					if ((cmd == tableCommands.CMD_OPEN[1]
+						or cmd == tableCommands.CMD_CLOSE[1]
+						or cmd == tableCommands.CMD_STOP[1])
+						and (luup.devices[dev].device_type == tableDeviceTypes.LIGHT[1]
+						or luup.devices[dev].device_type == tableDeviceTypes.DIMMER[1]))
+						then
 						table.insert(tableConversions, { luup.devices[dev].description,
-														luup.devices[dev].room_num,
-														deviceId,
-														"COVER" })
+							luup.devices[dev].room_num,
+							deviceId,
+						"COVER" })
 					elseif (cmd == tableCommands.CMD_DIM[1]
 						and luup.devices[dev].device_type == tableDeviceTypes.LIGHT[1])
-					then
+						then
 						table.insert(tableConversions, { luup.devices[dev].description,
-														luup.devices[dev].room_num,
-														deviceId,
-														"DIMMER" })
+							luup.devices[dev].room_num,
+							deviceId,
+						"DIMMER" })
 					end
 				end
 			end
@@ -1555,13 +1789,13 @@ local function actOnMessage(tableCmds)
 				and (autoCreate == true)
 				and (findChild(THIS_DEVICE, deviceId, tableDeviceTypes[cmdType][1]) == nil)
 				and (isDisabledDevice(tableDeviceTypes[cmdType][4] .. deviceId) == false))
-			then
+				then
 				table.insert(tableNewDevices, { nil, nil, deviceId, cmdType })
 			end
 		end
 	end
 	if ((#tableNewDevices > 0) or (#tableConversions > 0))
-	then
+		then
 		updateManagedDevices(tableNewDevices, tableConversions, nil)
 		return
 	end
@@ -1571,24 +1805,24 @@ local function actOnMessage(tableCmds)
 	local tableDelays = {}
 	local delay
 	for i, v in ipairs(tableCmds)
-	do
+		do
 		if (v[4] == 0)
-		then
+			then
 			table.insert(tableImmediateCmds, { v[1], v[2], v[3], 0 } )
 		elseif (searchInStringTable(tableDelays, v[4]) == 0)
-		then
+			then
 			table.insert(tableDelays, v[4])
 		end
 	end
 	--logCmds("immediate cmds", tableImmediateCmds)
 	-- Plan delayed commands
 	for i, delay in ipairs(tableDelays)
-	do
+		do
 		local tableDelayedCmds = {}
 		for i2, v in ipairs(tableCmds)
-		do
+			do
 			if (v[4] == delay)
-			then
+				then
 				table.insert(tableDelayedCmds, { v[1], v[2], v[3], 0 } )
 			end
 		end
@@ -1598,7 +1832,7 @@ local function actOnMessage(tableCmds)
 
 	-- Exit if there is no immediate commands
 	if (tableImmediateCmds == nil or #tableImmediateCmds == 0)
-	then
+		then
 		return
 	end
 
@@ -1607,18 +1841,18 @@ local function actOnMessage(tableCmds)
 	------------------------------------------------------------------------------
 
 	for i, v in ipairs(tableImmediateCmds)
-	do
+		do
 		deviceId = v[1]
 		cmd = v[2]
 		value = v[3]
 		variable = nil
 		if (deviceId == "parent")
-		then
+			then
 			key = searchInKeyTable(tableCommands, 1, cmd)
 			if (key ~= nil)
-			then
-				if (tableCommands[key][3] ~= nil)
 				then
+				if (tableCommands[key][3] ~= nil)
+					then
 					variable = tabVars[tableCommands[key][3]]
 				end
 			end
@@ -1633,131 +1867,131 @@ local function actOnMessage(tableCmds)
 	for device, v in pairs(luup.devices) do
 		-- Check if we have a device with the correct parent (THIS_DEVICE)
 		if (v.device_num_parent == THIS_DEVICE)
-		then
---			debug("Device Number: " .. device ..
---					 " v.device_type: " .. tostring(v.device_type) ..
---					 " v.device_num_parent: " .. tostring(v.device_num_parent) ..
---					 " v.id: " .. tostring(v.id)
---			)
+			then
+			--			debug("Device Number: " .. device ..
+			--					 " v.device_type: " .. tostring(v.device_type) ..
+			--					 " v.device_num_parent: " .. tostring(v.device_num_parent) ..
+			--					 " v.id: " .. tostring(v.id)
+			--			)
 			for i, v2 in ipairs(tableImmediateCmds)
-			do
+				do
 				deviceId = v2[1]
 				cmd = v2[2]
 				value = v2[3]
 
 				if ((#deviceId > 0)
-						and (deviceId ~= "parent")
-						and ((string.find(v.id, deviceId .. "$", 4) == 4)
-								or (findAssociation(device, deviceId) == true)))
-				then
-					if (cmd == tableCommands.CMD_OFF[1])
+					and (deviceId ~= "parent")
+					and ((string.find(v.id, deviceId .. "$", 4) == 4)
+					or (findAssociation(device, deviceId) == true)))
 					then
+					if (cmd == tableCommands.CMD_OFF[1])
+						then
 						value = "0"
 					elseif (cmd == tableCommands.CMD_ON[1])
-					then
+						then
 						value = "1"
 					end
 					deviceType = nil
 					variable = nil
 					key = searchInKeyTable(tableCommands, 1, cmd)
 					if (key ~= nil)
-					then
-						if (tableCommands[key][2] ~= nil)
 						then
+						if (tableCommands[key][2] ~= nil)
+							then
 							deviceType = tableDeviceTypes[tableCommands[key][2]]
 						end
 						if (tableCommands[key][3] ~= nil)
-						then
+							then
 							variable = tabVars[tableCommands[key][3]]
 						end
 					end
 					if ((deviceType == nil or v.device_type == deviceType[1]) and variable ~= nil and value ~= nil)
-					then
-						if (deviceType ~= nil and deviceType[7] == true and variable[4] == true)
 						then
+						if (deviceType ~= nil and deviceType[7] == true and variable[4] == true)
+							then
 							value = tonumber(value)
 							local adjust = getVariable(device, tabVars.VAR_ADJUST_CONSTANT2)
 							if (adjust ~= nil and adjust ~= "")
-							then
+								then
 								value = value + tonumber(adjust)
 							end
 							adjust = getVariable(device, tabVars.VAR_ADJUST_MULTIPLIER)
 							if (adjust ~= nil and adjust ~= "")
-							then
+								then
 								value = value * tonumber(adjust)
 							end
 							adjust = getVariable(device, tabVars.VAR_ADJUST_CONSTANT)
 							if (adjust ~= nil and adjust ~= "")
-							then
+								then
 								value = value + tonumber(adjust)
 							end
 						end
 						setVariable(device, variable, value)
 					end
 					if (v.device_type == tableDeviceTypes.DIMMER[1]
-							or v.device_type == tableDeviceTypes.COVER[1])
-					then
+						or v.device_type == tableDeviceTypes.COVER[1])
+						then
 						variable = nil
 						variable2 = nil
 						if (v.device_type == tableDeviceTypes.COVER[1] and cmd == tableCommands.CMD_DIM[1])
-						then
+							then
 							variable = tabVars.VAR_DIMMER
 						end
 						if (cmd == tableCommands.CMD_OFF[1] or cmd == tableCommands.CMD_CLOSE[1])
-						then
+							then
 							variable = tabVars.VAR_DIMMER
 							value = 0
 							variable2 = tabVars.VAR_LIGHT
 							value2 = "0"
 						elseif (cmd == tableCommands.CMD_ON[1] or cmd == tableCommands.CMD_OPEN[1])
-						then
+							then
 							variable = tabVars.VAR_DIMMER
 							value = 100
 							variable2 = tabVars.VAR_LIGHT
 							value2 = "1"
 						elseif (cmd == tableCommands.CMD_DIM[1] and tonumber(value) == 0)
-						then
+							then
 							variable2 = tabVars.VAR_LIGHT
 							value2 = "0"
 						elseif (cmd == tableCommands.CMD_DIM[1] and tonumber(value) > 0)
-						then
+							then
 							variable2 = tabVars.VAR_LIGHT
 							value2 = "1"
 						end
 						setVariable(device, variable, value)
 						setVariable(device, variable2, value2)
 					elseif (v.device_type == tableDeviceTypes.MOTION[1]
-							or v.device_type == tableDeviceTypes.DOOR[1])
-					then
+						or v.device_type == tableDeviceTypes.DOOR[1])
+						then
 						value = nil
 						if (cmd == tableCommands.CMD_OFF[1])
-						then
+							then
 							value = "0"
 						elseif (cmd == tableCommands.CMD_ON[1])
-						then
+							then
 							value = "1"
 						end
 						setVariable(device, tabVars.VAR_TRIPPED, value)
 					elseif (v.device_type == tableDeviceTypes.LIGHT_LEVEL[1])
-					then
+						then
 						value = nil
 						if (cmd == tableCommands.CMD_OFF[1])
-						then
+							then
 							value = "100"
 						elseif (cmd == tableCommands.CMD_ON[1])
-						then
+							then
 							value = "0"
 						end
 						setVariable(device, tabVars.VAR_LIGHT_LEVEL, value)
 					elseif (v.device_type == tableDeviceTypes.SMOKE[1])
-					then
+						then
 						value = nil
 						if (cmd == tableCommands.CMD_SMOKE_OFF[1])
-						then
+							then
 							local last = getVariable(device, tabVars.VAR_LAST_TRIP)
 							if (getVariable(device, tabVars.VAR_TRIPPED) == "1"
 								and last ~= nil and (os.time() - last) >= 25)
-							then
+								then
 								value = "0"
 							end
 						end
@@ -1789,11 +2023,11 @@ local function decodeMessage(message )
 
 	local tableCmds = {}
 	for k,v in pairs(tableMsgTypes)
-	do
+		do
 		if (v[1] == type and v[2] == subType and v[3] == packetLength)
-		then
-			if (v[4] ~= nil)
 			then
+			if (v[4] ~= nil)
+				then
 				tableCmds = v[4](subType, data, seqNum)
 			end
 			break
@@ -1801,7 +2035,7 @@ local function decodeMessage(message )
 	end
 
 	if (tableCmds == nil or #tableCmds == 0)
-	then
+		then
 		warning("Decoding not yet implemented for message " .. formattohex(message))
 	else
 		actOnMessage(tableCmds)
@@ -1814,15 +2048,15 @@ local function decodeResponse(subType, data, seqNum)
 	local tableCmds = {}
 
 	if (subType == tableMsgTypes.TRANSMITTER_RESPONSE[2])
-	then
+		then
 		tableCmds = { { "", "", nil, 0 } }
 		local idx = searchInTable(tableMsgSent, 1, seqNum)
 		if (idx > 0)
-		then
+			then
 			-- debug("Found sent command " .. seqNum .. " at index " .. idx)
 			local msg = string.byte(data, 1)
 			if (msg == 0x0 or msg == 0x1)
-			then
+				then
 				-- debug("Transmitter response " .. msg .. " ACK")
 				tableCmds = tableMsgSent[idx][2]
 			else
@@ -1839,49 +2073,48 @@ local function decodeResponse(subType, data, seqNum)
 end
 
 local function decodeResponseMode(subType, data, seqNum)
-
 	local tableCmds = {}
 
 	if (subType == tableMsgTypes.RESPONSE_MODE_COMMAND[2])
-	then
+		then
 		local cmd = string.byte(data, 1)
 		-- if result of Get Status or Set Mode commands
 		if (cmd == 0x2 or cmd == 0x3)
-		then
+			then
 			debug("Response to a Get Status command or Set Mode command")
 			typeRFX = string.byte(data, 2)
 			if (typeRFX == 0x50)
-			then
+				then
 				log("RFXtrx315 at 310 MHz")
 			elseif (typeRFX == 0x51)
-			then
+				then
 				log("RFXtrx315 at 315 MHz")
 			elseif (typeRFX == 0x52)
-			then
+				then
 				log("RFXrec433 at 433.92 MHz")
 			elseif (typeRFX == 0x53)
-			then
+				then
 				log("RFXtrx433e at 433.92 MHz")
 			elseif (typeRFX == 0x55)
-			then
+				then
 				log("RFXtrx868 at 868.00 MHz")
 			elseif (typeRFX == 0x56)
-			then
+				then
 				log("RFXtrx868 at 868.00 MHz FSK")
 			elseif (typeRFX == 0x57)
-			then
+				then
 				log("RFXtrx868 at 868.30 MHz")
 			elseif (typeRFX == 0x58)
-			then
+				then
 				log("RFXtrx868 at 868.30 MHz FSK")
 			elseif (typeRFX == 0x59)
-			then
+				then
 				log("RFXtrx868 at 868.35 MHz")
 			elseif (typeRFX == 0x5A)
-			then
+				then
 				log("RFXtrx868 at 868.35 MHz FSK")
 			elseif (typeRFX == 0x5B)
-			then
+				then
 				log("RFXtrx868 at 868.95 MHz")
 			end
 
@@ -1894,19 +2127,19 @@ local function decodeResponseMode(subType, data, seqNum)
 			-- Get the firmware type
 			local typeFirmware = string.byte(data, 11)
 			if (typeFirmware == 1)
-			then
+				then
 				log("Firmware type: Type1")
 				firmtype = "Type1"
 			elseif (typeFirmware == 2)
-			then
+				then
 				log("Firmware type: Type2")
 				firmtype = "Type2"
 			elseif (typeFirmware == 3)
-			then
+				then
 				log("Firmware type: Ext")
 				firmtype = "Ext"
 			elseif (typeFirmware == 4)
-			then
+				then
 				log("Firmware type: Ext2")
 				firmtype = "Ext2"
 			else
@@ -1915,6 +2148,22 @@ local function decodeResponseMode(subType, data, seqNum)
 			end
 			setVariable(THIS_DEVICE, tabVars.VAR_FIRMWARE_TYPE, firmtype)
 
+			if (firmtype ~= '')
+				then
+				-- Determine if the JSON file matches the firmware type
+				local currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
+				log("Current JSON file: " .. currentJsonFilename)
+				local properJsonFilename = "D_RFXtrx" .. firmtype .. ".json"
+				log("Proper JSON file: " .. properJsonFilename)
+				if (currentJsonFilename ~= properJsonFilename)
+					then
+					log("Setting device_json to " .. properJsonFilename)
+					luup.attr_set("device_json", properJsonFilename, THIS_DEVICE)
+					currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
+					log("Current JSON file: " .. currentJsonFilename)
+					luup.reload()
+				end
+			end
 			-- Get the hardware version ;
 			--  the major and minor versions
 			hardware = string.byte(data, 8) .. "." .. string.byte(data, 9)
@@ -1928,56 +2177,56 @@ local function decodeResponseMode(subType, data, seqNum)
 			local msg6 = string.byte(data, 7)
 
 			if (bitw.band(msg3, 0x80) == 0x80)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_UNDECODED_RECEIVING, "1")
 				log("   - Undecoded")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_UNDECODED_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x40) == 0x40)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_IMAGINTRONIX_RECEIVING, "1")
 				log("   - Byron SX")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_IMAGINTRONIX_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x20) == 0x20)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_BYRONSX_RECEIVING, "1")
 				log("   - Byron SX")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_BYRONSX_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x10) == 0x10)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_RSL_RECEIVING, "1")
 				log("   - RSL")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_RSL_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x08) == 0x08)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_LIGHTING4_RECEIVING, "1")
 				log("   - Lighting4")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_LIGHTING4_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x04) == 0x04)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_FINEOFFSET_RECEIVING, "1")
 				log("   - FineOffset / Viking")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_FINEOFFSET_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x02) == 0x02)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_RUBICSON_RECEIVING, "1")
 				log("   - Rubicson")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_RUBICSON_RECEIVING, "0")
 			end
 			if (bitw.band(msg3, 0x01) == 0x01)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_AE_RECEIVING, "1")
 				log("   - AE (Blyss)")
 			else
@@ -1985,126 +2234,126 @@ local function decodeResponseMode(subType, data, seqNum)
 			end
 
 			if (bitw.band(msg4, 0x80) == 0x80)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_BLINDST1_RECEIVING, "1")
 				log("   - Hasta (old) / A-OK / Raex / Media Mount")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_BLINDST1_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x40) == 0x40)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_BLINDST0_RECEIVING, "1")
 				log("   - RollerTrol / Hasta (new)")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_BLINDST0_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x20) == 0x20)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_PROGUARD_RECEIVING, "1")
 				log("   - ProGuard")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_PROGUARD_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x10) == 0x10)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_FS20_RECEIVING, "1")
 				log("   - FS20")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_FS20_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x08) == 0x08)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_LACROSSE_RECEIVING, "1")
 				log("   - La Crosse")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_LACROSSE_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x04) == 0x04)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_HIDEKI_RECEIVING, "1")
 				log("   - Hideki / UPM")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_HIDEKI_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x02) == 0x02)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_AD_RECEIVING, "1")
 				log("   - AD (LightwaveRF)")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_AD_RECEIVING, "0")
 			end
 			if (bitw.band(msg4, 0x01) == 0x01)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_MERTIK_RECEIVING, "1")
 				log("   - Mertik")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_MERTIK_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x80) == 0x80)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_VISONIC_RECEIVING, "1")
 				log("   - Visonic")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_VISONIC_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x40) == 0x40)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_ATI_RECEIVING, "1")
 				log("   - ATI")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_ATI_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x20) == 0x20)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_OREGON_RECEIVING, "1")
 				log("   - Oregon Scientific")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_OREGON_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x10) == 0x10)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_MEIANTECH_RECEIVING, "1")
 				log("   - Meiantech")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_MEIANTECH_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x08) == 0x08)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_HEU_RECEIVING, "1")
 				log("   - HomeEasy EU")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_HEU_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x04) == 0x04)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_AC_RECEIVING, "1")
 				log("   - AC")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_AC_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x02) == 0x02)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_ARC_RECEIVING, "1")
 				log("   - ARC")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_ARC_RECEIVING, "0")
 			end
 			if (bitw.band(msg5, 0x01) == 0x01)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_X10_RECEIVING, "1")
 				log("   - X10")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_X10_RECEIVING, "0")
 			end
 			if (bitw.band(msg6, 0x02) == 0x02)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_HOMECONFORT_RECEIVING, "1")
 				log("   - Homeconfort")
 			else
 				setVariable(THIS_DEVICE, tabVars.VAR_HOMECONFORT_RECEIVING, "0")
 			end
 			if (bitw.band(msg6, 0x01) == 0x01)
-			then
+				then
 				setVariable(THIS_DEVICE, tabVars.VAR_KEELOQ_RECEIVING, "1")
 				log("   - Keeloq")
 			else
@@ -2112,18 +2361,18 @@ local function decodeResponseMode(subType, data, seqNum)
 			end
 			tableCmds = { { "", "", nil, 0 } }
 		elseif (cmd == 0x6)
-		then
+			then
 			debug("Receiving modes saved in non-volatile memory")
 			tableCmds = { { "", "", nil, 0 } }
 		else
 			error("Response to an unexpected mode command: " .. cmd)
 		end
 	elseif (subType == tableMsgTypes.UNKNOWN_RTS_REMOTE[2])
-	then
+		then
 		warning("Unknown RTS remote")
 		tableCmds = { { "", "", nil, 0 } }
 	elseif (subType == tableMsgTypes.WRONG_COMMAND[2])
-	then
+		then
 		warning("Wrong command received")
 		tableCmds = { { "", "", nil, 0 } }
 	else
@@ -2142,39 +2391,39 @@ local function decodeLighting1(subType, data)
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 3)
 	if (cmdCode == 0)
-	then
+		then
 		-- OFF => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 		if (subType == 0 or subType == 1 or subType == 7 or subType == 8)
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], string.byte(data, 2), 0 } )
 		end
 	elseif (cmdCode == 1)
-	then
+		then
 		-- ON => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 		if (subType == 0 or subType == 1 or subType == 7 or subType == 8)
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 2), 0 } )
 		end
 	elseif (cmdCode == 2)
-	then
+		then
 		-- DIM => scene number 102
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 102, 0 } )
 	elseif (cmdCode == 3)
-	then
+		then
 		-- BRIGHT => scene number 103
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 103, 0 } )
 	elseif (cmdCode == 5)
-	then
+		then
 		-- GROUP OFF => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], 100, 0 } )
 	elseif (cmdCode == 6)
-	then
+		then
 		-- GROUP ON => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 100, 0 } )
 	elseif (cmdCode == 7)
-	then
+		then
 		-- CHIME => scene number from 131 to 146
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 2) + 130, 0 } )
 	else
@@ -2188,39 +2437,39 @@ end
 local function decodeLighting2(subType, data)
 
 	local altid2 = "L2." .. subType .. "/"
-						.. string.format("%X", bitw.band(string.byte(data, 1), 0x03))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
-						.. string.format("%02X", string.byte(data, 4))
+	.. string.format("%X", bitw.band(string.byte(data, 1), 0x03))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 4))
 	local altid = altid2 .. "/" .. string.format("%02d", string.byte(data, 5))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 6)
 	if (cmdCode == 0)
-	then
+		then
 		-- OFF => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], string.byte(data, 5), 0 } )
 	elseif (cmdCode == 1)
-	then
+		then
 		-- ON => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 5), 0 } )
 	elseif (cmdCode == 2)
-	then
+		then
 		-- SET LEVEL => scene number from 17 to 32
 		table.insert(tableCmds, { altid, tableCommands.CMD_DIM[1], math.floor((string.byte(data, 7) + 1) * 100 / 0x10 + 0.5), 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 5) + 16, 0 } )
 	elseif (cmdCode == 3)
-	then
+		then
 		-- GROUP OFF => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], 100, 0 } )
 	elseif (cmdCode == 4)
-	then
+		then
 		-- GROUP ON => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 100, 0 } )
 	elseif (cmdCode == 5)
-	then
+		then
 		-- GROUP LEVEL => scene number 101
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 101, 0 } )
 	else
@@ -2235,45 +2484,45 @@ local function decodeLighting3(subType, data)
 
 	local ids = {}
 	local altid = "L3." .. subType .. "/"
-						.. string.format("%X", bitw.band(string.byte(data, 1), 0x0F))
+	.. string.format("%X", bitw.band(string.byte(data, 1), 0x0F))
 	if (bitw.band(string.byte(data, 2), 0x01) ~= 0)
-	then
+		then
 		table.insert(ids, 1)
 	end
 	if (bitw.band(string.byte(data, 2), 0x02) ~= 0)
-	then
+		then
 		table.insert(ids, 2)
 	end
 	if (bitw.band(string.byte(data, 2), 0x04) ~= 0)
-	then
+		then
 		table.insert(ids, 3)
 	end
 	if (bitw.band(string.byte(data, 2), 0x08) ~= 0)
-	then
+		then
 		table.insert(ids, 4)
 	end
 	if (bitw.band(string.byte(data, 2), 0x10) ~= 0)
-	then
+		then
 		table.insert(ids, 5)
 	end
 	if (bitw.band(string.byte(data, 2), 0x20) ~= 0)
-	then
+		then
 		table.insert(ids, 6)
 	end
 	if (bitw.band(string.byte(data, 2), 0x40) ~= 0)
-	then
+		then
 		table.insert(ids, 7)
 	end
 	if (bitw.band(string.byte(data, 2), 0x80) ~= 0)
-	then
+		then
 		table.insert(ids, 8)
 	end
 	if (bitw.band(string.byte(data, 3), 0x01) ~= 0)
-	then
+		then
 		table.insert(ids, 9)
 	end
 	if (bitw.band(string.byte(data, 3), 0x02) ~= 0)
-	then
+		then
 		table.insert(ids, 10)
 	end
 
@@ -2283,13 +2532,13 @@ local function decodeLighting3(subType, data)
 	local cmdCode = string.byte(data, 4)
 	--debug("Koppla message received with command code: " .. cmdCode)
 	if (cmdCode == 0x1A)
-	then
+		then
 		cmd = tableCommands.CMD_OFF[1]
 	elseif (cmdCode == 0x10)
-	then
+		then
 		cmd = tableCommands.CMD_ON[1]
 	elseif (cmdCode >= 0x11 and cmdCode <= 0x19)
-	then
+		then
 		cmd = tableCommands.CMD_DIM[1]
 		cmdValue = (cmdCode - 0x10) * 10
 	else
@@ -2297,11 +2546,11 @@ local function decodeLighting3(subType, data)
 	end
 
 	if (ids ~= nil and #ids > 0)
-	then
+		then
 		for i, v in ipairs(ids)
-		do
+			do
 			if (cmd ~= nil)
-			then
+				then
 				table.insert(tableCmds, { altid .. string.format("%02d", v), cmd, cmdValue, 0 } )
 			end
 		end
@@ -2314,101 +2563,101 @@ end
 local function decodeLighting5(subType, data)
 
 	local altid2 = "L5." .. subType .. "/"
-						.. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
 	local altid = altid2 .. "/" .. string.format("%02d", string.byte(data, 4))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 5)
 	if (cmdCode == 0)
-	then
+		then
 		-- OFF => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_OFF[1], string.byte(data, 4), 0 } )
 		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], string.byte(data, 4), 0 } )
 		end
 	elseif (cmdCode == 1)
-	then
+		then
 		-- ON => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4), 0 } )
 		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 4), 0 } )
 		end
 	elseif (cmdCode == 2)
-	then
+		then
 		-- GROUP OFF => scene number 100
 		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_OFF[1], 100, 0 } )
 		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
-		then
+			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], 100, 0 } )
 		end
 	elseif (cmdCode == 3)
-	then
-		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
 		then
+		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+			then
 			-- MOOD1 => scene number 111
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 111, 0 } )
 		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
-		then
+			then
 			-- GROUP ON => scene number 100
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 100, 0 } )
 		end
 	elseif (cmdCode == 4)
-	then
+		then
 		-- MOOD2 => scene number 112
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 112, 0 } )
 	elseif (cmdCode == 5)
-	then
+		then
 		-- MOOD3 => scene number 113
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 113, 0 } )
 	elseif (cmdCode == 6)
-	then
+		then
 		-- MOOD4 => scene number 114
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 114, 0 } )
 	elseif (cmdCode == 7)
-	then
+		then
 		-- MOOD5 => scene number 115
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 115, 0 } )
 	elseif (cmdCode == 0x0A)
-	then
+		then
 		-- UNLOCK => scene number from 33 to 48
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_OFF[1], string.byte(data, 4) + 32, 0 } )
 	elseif (cmdCode == 0x0B)
-	then
+		then
 		-- LOCK => scene number from 33 to 48
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4) + 32, 0 } )
 	elseif (cmdCode == 0x0C)
-	then
+		then
 		-- ALL LOCK => scene number 105
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 105, 0 } )
 	elseif (cmdCode == 0x0F)
-	then
+		then
 		-- OPEN => scene number from 49 to 64
 		table.insert(tableCmds, { altid, tableCommands.CMD_OPEN[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4) + 48, 0 } )
 	elseif (cmdCode == 0x0D)
-	then
+		then
 		-- CLOSE => scene number from 65 to 80
 		table.insert(tableCmds, { altid, tableCommands.CMD_CLOSE[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4) + 64, 0 } )
 	elseif (cmdCode == 0x0E)
-	then
+		then
 		-- STOP => scene number from 81 to 96
 		table.insert(tableCmds, { altid, tableCommands.CMD_STOP[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4) + 80, 0 } )
 	elseif (cmdCode == 0x10)
-	then
+		then
 		-- SET LEVEL => scene number from 17 to 32
 		table.insert(tableCmds, { altid, tableCommands.CMD_DIM[1], math.floor((string.byte(data, 6) + 1) * 100 / 0x20 + 0.5), 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4) + 16, 0 } )
@@ -2423,29 +2672,29 @@ end
 local function decodeLighting6(subType, data)
 
 	local altid2 = "L6." .. subType .. "/"
-						.. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. "/" .. string.sub(data, 3, 3)
+	.. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. "/" .. string.sub(data, 3, 3)
 	local altid = altid2 .. string.byte(data, 4)
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 5)
 	if (cmdCode == 0)
-	then
+		then
 		-- ON => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 4), 0 } )
 	elseif (cmdCode == 1)
-	then
+		then
 		-- OFF => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], string.byte(data, 4), 0 } )
 	elseif (cmdCode == 2)
-	then
+		then
 		-- GROUP ON => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 100, 0 } )
 	elseif (cmdCode == 3)
-	then
+		then
 		-- GROUP OFF => scene number 100
 		table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], 100, 0 } )
 	else
@@ -2458,26 +2707,24 @@ end
 
 local function decodeCurtain(subType, data)
 
-	local altid = "C" .. subType .. "/"
-					.. string.sub(data, 1, 1) .. string.format("%02d", string.byte(data, 2))
-
+	local altid = "C" .. subType .. "/"	.. string.sub(data, 1, 1) .. string.format("%02d", string.byte(data, 2))
 	local tableCmds = {}
 	local cmd = nil
 	local cmdCode = string.byte(data, 3)
 	if (cmdCode == 0)
-	then
+		then
 		cmd = tableCommands.CMD_OPEN[1]
 	elseif (cmdCode == 1)
-	then
+		then
 		cmd = tableCommands.CMD_CLOSE[1]
 	elseif (cmdCode == 2)
-	then
+		then
 		cmd = tableCommands.CMD_STOP[1]
 	else
 		warning("Curtain command not yet implemented: " .. cmdCode)
 	end
 	if (cmd ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, cmd, nil, 0 } )
 	end
 
@@ -2488,11 +2735,11 @@ end
 local function decodeBlind(subType, data)
 
 	local altid = "B" .. subType .. "/"
-						.. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
 	if (subType == tableMsgTypes.BLIND_T6[2] or subType == tableMsgTypes.BLIND_T7[2])
-	then
+		then
 		altid = altid .. string.format("%X", bitw.rshift(string.byte(data, 4), 4))
 	end
 	altid = altid .. "/" .. string.format("%02d", bitw.band(string.byte(data, 4), 0x0F))
@@ -2501,19 +2748,19 @@ local function decodeBlind(subType, data)
 	local cmd = nil
 	local cmdCode = string.byte(data, 5)
 	if (cmdCode == 0)
-	then
+		then
 		cmd = tableCommands.CMD_OPEN[1]
 	elseif (cmdCode == 1)
-	then
+		then
 		cmd = tableCommands.CMD_CLOSE[1]
 	elseif (cmdCode == 2)
-	then
+		then
 		cmd = tableCommands.CMD_STOP[1]
 	else
 		warning("Blind command not yet implemented: " .. cmdCode)
 	end
 	if (cmd ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, cmd, nil, 0 } )
 	end
 
@@ -2524,46 +2771,46 @@ end
 local function decodeThermostat3(subType, data)
 
 	local altid = "HT3." .. subType .. "/"
-						.. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 4)
 
 	-- 0: "Off", 1: "On", 2: "Up", 3: "Down", 4: "Run Up/2nd Off", 5: "Run Down/2nd On", 6: "Stop"
 	if (cmdCode == 0x00)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_SW[1], 0, 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER[1], "Off", 0 } )
 	elseif (cmdCode == 0x01)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_SW[1], 1, 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER[1], "HeatOn", 0 } )
 	elseif (cmdCode == 0x02)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_UP[1], nil, 0 } )
 	elseif (cmdCode == 0x03)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_DOWN[1], nil, 0 } )
 	elseif (cmdCode == 0x04)
-	then
-		if (subType == 0x00)
 		then
+		if (subType == 0x00)
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_HEATER[1], "HeatOn", 0 } )
 		else
 			--table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_2NDOFF[1], 0, 0 } )
 		end
 	elseif (cmdCode == 0x05)
-	then
-		if (subType == 0x00)
 		then
+		if (subType == 0x00)
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_HEATER[1], "Off", 0 } )
 		else
 			--table.insert(tableCmds, { altid, tableCommands.CMD_HEATER_2NDON[1], 0, 0 } )
 		end
 	elseif (cmdCode == 0x06) and (subType == 0x00)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_HEATER[1], "Off", 0 } )
 	else
 		warning("Thermostat3 command not yet implemented: " .. cmdCode)
@@ -2582,14 +2829,14 @@ local function decodeTemp(subType, data)
 	local temp = decodeTemperature( data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
-	-- local strength = bitw.rshift(string.byte(data, 5), 4)
+	-- Update if necessary the max and min temperatures detected by this device
+	checkMaxMinTemp( altid, tableCmds, temp )
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local strength = bitw.rshift(string.byte(data, 5), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2605,14 +2852,14 @@ local function decodeHum(subType, data)
 	local hum = string.byte(data, 3)
 	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
 
-	-- local strength = bitw.rshift(string.byte(data, 5), 4)
+	-- Update if necessary the max and min humidity detected by this device
+	checkMaxMinHum( altid, tableCmds, hum )
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local strength = bitw.rshift(string.byte(data, 5), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2628,17 +2875,21 @@ local function decodeTempHum(subType, data)
 	local temp = decodeTemperature( data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
+	-- Update if necessary the max and min temperatures detected by this device
+	checkMaxMinTemp( altid, tableCmds, temp )
+
+	-- Now handle the humidity data
 	local hum = string.byte(data, 5)
 	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
 
-	-- local strength = bitw.rshift(string.byte(data, 7), 4)
+	-- Update if necessary the max and min humidity detected by this device
+	checkMaxMinHum( altid, tableCmds, hum )
 
-	local battery = bitw.band(string.byte(data, 7), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local strength = bitw.rshift(string.byte(data, 7), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+
+	local battery = decodeBatteryLevel(data, 7)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2657,31 +2908,28 @@ local function decodeBaro(subType, data)
 	local forecast = string.byte(data, 5)
 	local strForecast = nil
 	if (forecast == 1)
-	then
+		then
 		strForecast = "sunny"
 	elseif (forecast == 2)
-	then
+		then
 		strForecast = "partly cloudy"
 	elseif (forecast == 3)
-	then
+		then
 		strForecast = "cloudy"
 	elseif (forecast == 4)
-	then
+		then
 		strForecast = "rain"
 	end
 	if (strForecast ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_FORECAST[1], strForecast, 0 } )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 6), 4)
+	local strength = bitw.rshift(string.byte(data, 6), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 6), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 6)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2697,8 +2945,14 @@ local function decodeTempHumBaro(subType, data)
 	local temp = decodeTemperature( data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
+	-- Update if necessary the max and min temperatures detected by this device
+	checkMaxMinTemp( altid, tableCmds, temp )
+
 	local hum = string.byte(data, 5)
 	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
+
+	-- Update if necessary the max and min humidity detected by this device
+	checkMaxMinHum( altid, tableCmds, hum )
 
 	local baro = string.byte(data, 7) * 256 + string.byte(data, 8)
 	table.insert(tableCmds, { altid, tableCommands.CMD_PRESSURE[1], baro, 0 } )
@@ -2706,31 +2960,28 @@ local function decodeTempHumBaro(subType, data)
 	local forecast = string.byte(data, 9)
 	local strForecast = nil
 	if (forecast == 1)
-	then
+		then
 		strForecast = "sunny"
 	elseif (forecast == 2)
-	then
+		then
 		strForecast = "partly cloudy"
 	elseif (forecast == 3)
-	then
+		then
 		strForecast = "cloudy"
 	elseif (forecast == 4)
-	then
+		then
 		strForecast = "rain"
 	end
 	if (strForecast ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_FORECAST[1], strForecast, 0 } )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 10), 4)
+	local strength = bitw.rshift(string.byte(data, 10), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 10), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 10)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2748,25 +2999,22 @@ local function decodeRain(subType, data)
 
 	local rate = nil
 	if (subType == tableMsgTypes.RAIN1[2])
-	then
+		then
 		rate = string.byte(data, 3) * 256 + string.byte(data, 4)
 	elseif (subType == tableMsgTypes.RAIN2[2])
-	then
+		then
 		rate = (string.byte(data, 3) * 256 + string.byte(data, 4)) / 100
 	end
 	if (rate ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], rate, 0 } )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 8), 4)
+	local strength = bitw.rshift(string.byte(data, 8), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 8), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 8)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2782,17 +3030,17 @@ local function decodeTempRain(subType, data)
 	local temp = decodeTemperature( data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
+	-- Update if necessary the max and min temperatures detected by this device
+	checkMaxMinTemp( altid, tableCmds, temp )
+
 	local total = (string.byte(data, 5) * 256 + string.byte(data, 6)) / 10
 	table.insert(tableCmds, { altid, tableCommands.CMD_RAIN[1], total, 0 } )
 
-	-- local strength = bitw.rshift(string.byte(data, 7), 4)
+	local strength = bitw.rshift(string.byte(data, 7), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 7), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 7)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2811,11 +3059,11 @@ local function decodeWind(subType, data)
 	table.insert(tableCmds, { altid, tableCommands.CMD_DIRECTION[1], direction, 0 } )
 
 	if (subType ~= tableMsgTypes.WIND5[2])
-	then
+		then
 		local avgSpeed = (string.byte(data, 5) * 256 + string.byte(data, 6)) / 10
 		-- Convert m/s to km/h or mph and keep an integer
 		if (unitKmh == true)
-		then
+			then
 			avgSpeed = math.floor(avgSpeed * 3.6 + 0.5)
 		else
 			avgSpeed = math.floor(avgSpeed * 3.6 * 0.62137 + 0.5)
@@ -2826,7 +3074,7 @@ local function decodeWind(subType, data)
 	local gust = (string.byte(data, 7) * 256 + string.byte(data, 8)) / 10
 	-- Convert m/s to km/h or mph and keep an integer
 	if (unitKmh == true)
-	then
+		then
 		gust = math.floor(gust * 3.6 + 0.5)
 	else
 		gust = math.floor(gust * 3.6 * 0.62137 + 0.5)
@@ -2834,19 +3082,18 @@ local function decodeWind(subType, data)
 	table.insert(tableCmds, { altid, tableCommands.CMD_GUST[1], gust, 0 } )
 
 	if (subType == tableMsgTypes.WIND4[2])
-	then
+		then
 		local temp = decodeTemperature( data, 9 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
+		-- Update if necessary the max and min temperatures detected by this device
+		checkMaxMinTemp( altid, tableCmds, temp )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 13), 4)
+	local strength = bitw.rshift(string.byte(data, 13), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 13), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 13)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2863,19 +3110,18 @@ local function decodeUV(subType, data)
 	table.insert(tableCmds, { altid, tableCommands.CMD_UV[1], uv, 0 } )
 
 	if (subType == tableMsgTypes.UV3[2])
-	then
+		then
 		local temp = decodeTemperature( data, 4 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
+		-- Update if necessary the max and min temperatures detected by this device
+		checkMaxMinTemp( altid, tableCmds, temp )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 6), 4)
+	local strength = bitw.rshift(string.byte(data, 6), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = bitw.band(string.byte(data, 6), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 6)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2893,21 +3139,17 @@ local function decodeWeight(subType, data)
 
 	local impedance = nil
 
--- Impedance is not supported by the current RFXtrx firmware (v50)
+	-- Impedance is not supported by the current RFXtrx firmware (v50)
 
 	if (impedance ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_IMPEDANCE[1], impedance, 0 } )
 	end
 
 	-- local strength = bitw.rshift(string.byte(data, 5), 4)
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2916,8 +3158,8 @@ end
 local function decodeSecurityDS(subType, data)
 
 	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
 
 	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
 
@@ -2927,32 +3169,28 @@ local function decodeSecurityDS(subType, data)
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
 
 	if (cmdCode == 0x00 or cmdCode == 0x01)
-	then
+		then
 		cmd = tableCommands.CMD_DOOR[1]
 		cmdValue = "0"
 	elseif (cmdCode == 0x02 or cmdCode == 0x03)
-	then
+		then
 		cmd = tableCommands.CMD_DOOR[1]
 		cmdValue = "1"
 	else
 		if (cmdCode ~= nil)
-		then
+			then
 			warning("decodeSecurityDS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
 		else
 			warning("decodeSecurityDS command not yet implemented")
 		end
 	end
 	if (cmd ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
 	end
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -2961,8 +3199,8 @@ end
 local function decodeSecurityMS(subType, data)
 
 	local altid = "M/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
 
 	debug("decodeSecurityMS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
 
@@ -2972,32 +3210,28 @@ local function decodeSecurityMS(subType, data)
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
 
 	if (cmdCode == 0x04)
-	then
+		then
 		cmd = tableCommands.CMD_MOTION[1]
 		cmdValue = "1"
 	elseif (cmdCode == 0x05)
-	then
+		then
 		cmd = tableCommands.CMD_MOTION[1]
 		cmdValue = "0"
 	else
 		if (cmdCode ~= nil)
-		then
+			then
 			warning("decodeSecurityMS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
 		else
 			warning("decodeSecurityMS command not yet implemented")
 		end
 	end
 	if (cmd ~= nil)
-	then
+		then
 		table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
 	end
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -3011,208 +3245,204 @@ local function decodeSecurityRemote(subType, data)
 
 	local exitDelay = 0
 
-	local battery = bitw.band(string.byte(data, 5), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-	end
+	local battery = decodeBatteryLevel(data, 5)
 
 	if (subType == tableMsgTypes.SECURITY_X10SR[2])
-	then
+		then
 		altid = "X10/SR/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 
 		local device = findChild(THIS_DEVICE, altid, tableDeviceTypes.ALARM[1])
 		if (device ~= nil)
-		then
+			then
 			exitDelay = tonumber(getVariable(device, tabVars.VAR_EXIT_DELAY) or "0")
 		end
 	elseif (subType == tableMsgTypes.SECURITY_MEISR[2])
-	then
+		then
 		altid = "MEI/SR/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 	elseif (subType == tableMsgTypes.KD101[2])
-	then
+		then
 		altid = "KD1/SR/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 
 		battery = -1
 	elseif (subType == tableMsgTypes.SA30[2])
-	then
+		then
 		altid = "S30/SR/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 
 		battery = -1
 	end
 
 	if ((cmd == 0x09 or cmd == 0x0A) and exitDelay > 0)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "ExitDelay", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE[1], "Armed", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "Armed", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE_NUM[1], "1", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 121, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 	elseif ((cmd == 0x09 or cmd == 0x0A) and exitDelay == 0)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE_NUM[1], "1", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 121, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 	elseif ((cmd == 0x0B or cmd == 0x0C) and exitDelay > 0)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "ExitDelay", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE[1], "Armed", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "Stay", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE_NUM[1], "1", exitDelay } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 122, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 	elseif ((cmd == 0x0B or cmd == 0x0C) and exitDelay == 0)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "Stay", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE_NUM[1], "1", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 122, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 	elseif (cmd == 0x0D)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE[1], "Disarmed", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_DETAILED_ARM_MODE[1], "Disarmed", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ARM_MODE_NUM[1], "0", 0 } )
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 123, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 	elseif (cmd == 0x06)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 120, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
-		then
-			if (subType == tableMsgTypes.KD101[2])
 			then
+			if (subType == tableMsgTypes.KD101[2])
+				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			else
 				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, { altid, tableCommands.CMD_SMOKE[1], "1", 0 } )
 			table.insert(tableCmds, { altid, tableCommands.CMD_SMOKE_OFF[1], nil, 30 } )
 			if (battery >= 0 and battery <= 100)
-			then
+				then
 				table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 			end
 		end
 	elseif (cmd == 0x07)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_OFF[1], 120, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
-		then
-			if (subType == tableMsgTypes.KD101[2])
 			then
+			if (subType == tableMsgTypes.KD101[2])
+				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			else
 				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, { altid, tableCommands.CMD_SMOKE[1], "0", 0 } )
 			if (battery >= 0 and battery <= 100)
-			then
+				then
 				table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 			end
 		end
 	elseif (cmd == 0x10)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_OFF[1], 1, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		altid = "X10/L1/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 	elseif (cmd == 0x11)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 1, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		altid = "X10/L1/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 	elseif (cmd == 0x12)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_OFF[1], 2, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		altid = "X10/L2/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
 	elseif (cmd == 0x13)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 2, 0 } )
 		if (battery >= 0 and battery <= 100)
-		then
+			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
 		altid = "X10/L2/" .. string.format("%02X", string.byte(data, 1))
-						.. string.format("%02X", string.byte(data, 2))
-						.. string.format("%02X", string.byte(data, 3))
+		.. string.format("%02X", string.byte(data, 2))
+		.. string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
 	elseif (cmd == 0x16)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 	elseif (cmd == 0x17)
-	then
+		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 124, 0 } )
 		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
-		then
-			if (subType == tableMsgTypes.KD101[2])
 			then
+			if (subType == tableMsgTypes.KD101[2])
+				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			else
 				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-								.. string.format("%02X", string.byte(data, 2))
-								.. string.format("%02X", string.byte(data, 3))
+				.. string.format("%02X", string.byte(data, 2))
+				.. string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, { altid, tableCommands.CMD_SMOKE[1], "0", 0 } )
 		end
@@ -3229,10 +3459,10 @@ local function decodeSecurityMeiantech(subType, data)
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
 
 	if (cmdCode == 0x00 or cmdCode == 0x02)
-	then
+		then
 		return decodeSecurityDS(subType, data)
 	elseif (cmdCode == 0x04 or cmdCode == 0x05)
-	then
+		then
 		return decodeSecurityMS(subType, data)
 	else
 		return decodeSecurityRemote(subType, data)
@@ -3277,12 +3507,8 @@ local function decodeElec1(subType, data)
 
 	-- local strength = bitw.rshift(string.byte(data, 10), 4)
 
-	local battery = bitw.band(string.byte(data, 10), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 10)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -3297,25 +3523,21 @@ local function decodeElec2Elec3(subType, data)
 	local tableCmds = {}
 
 	local instant = string.byte(data, 4) * math.pow(2, 24) + string.byte(data, 5) * math.pow(2, 16)
-				+ string.byte(data, 6) * math.pow(2, 8) + string.byte(data, 7)
+	+ string.byte(data, 6) * math.pow(2, 8) + string.byte(data, 7)
 	table.insert(tableCmds, { altid, tableCommands.CMD_WATT[1], instant, 0 } )
 
 	if ((num == 2) or (string.byte(data, 3) == 0))
-	then
+		then
 		local kwh = math.floor((string.byte(data, 8) * math.pow(2, 40) + string.byte(data, 9) * math.pow(2, 32)
-					+ string.byte(data, 10) * math.pow(2, 24) + string.byte(data, 11) * math.pow(2, 16)
-					+ string.byte(data, 12) * math.pow(2, 8) + string.byte(data, 13)) / 223666 + 0.5)
+		+ string.byte(data, 10) * math.pow(2, 24) + string.byte(data, 11) * math.pow(2, 16)
+		+ string.byte(data, 12) * math.pow(2, 8) + string.byte(data, 13)) / 223666 + 0.5)
 		table.insert(tableCmds, { altid, tableCommands.CMD_KWH[1], kwh, 0 } )
 	end
 
 	-- local strength = bitw.rshift(string.byte(data, 14), 4)
 
-	local battery = bitw.band(string.byte(data, 14), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 14)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -3346,21 +3568,17 @@ local function decodeElec4(subType, data)
 	table.insert(tableCmds, { altid, tableCommands.CMD_WATT[1], watt, 0 } )
 
 	if (string.byte(data, 3) == 0)
-	then
+		then
 		local kwh = math.floor((string.byte(data, 10) * math.pow(2, 40) + string.byte(data, 11) * math.pow(2, 32)
-				+ string.byte(data, 12) * math.pow(2, 24) + string.byte(data, 13) * math.pow(2, 16)
-				+ string.byte(data, 14) * math.pow(2, 8) + string.byte(data, 15)) / 223666 + 0.5)
+		+ string.byte(data, 12) * math.pow(2, 24) + string.byte(data, 13) * math.pow(2, 16)
+		+ string.byte(data, 14) * math.pow(2, 8) + string.byte(data, 15)) / 223666 + 0.5)
 		table.insert(tableCmds, { altid, tableCommands.CMD_KWH[1], kwh, 0 } )
 	end
 
 	-- local strength = bitw.rshift(string.byte(data, 16), 4)
 
-	local battery = bitw.band(string.byte(data, 16), 0x0F)
-	if (battery <= 9)
-	then
-		battery = (battery + 1) * 10
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
-	end
+	local battery = decodeBatteryLevel(data, 16)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
@@ -3373,9 +3591,13 @@ local function decodeRFXSensor(subType, data)
 	local tableCmds = {}
 
 	if (subType == tableMsgTypes.RFXSENSOR_T[2])
-	then
+		then
 		local temp = decodeTemperature( data, 2 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
+		-- Update if necessary the max and min temperatures detected by this device
+		checkMaxMinTemp( altid, tableCmds, temp )
+		local strength = bitw.rshift(string.byte(data, 4), 4)
+		table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 	else
 		warning("RFXSensor subtype not yet implemented: " .. subType)
 	end
@@ -3396,22 +3618,22 @@ local function decodeRFXMeter(subType, data)
 
 	local device = findChild(THIS_DEVICE, altid, tableDeviceTypes.RFXMETER[1])
 	if (device ~= nil)
-	then
+		then
 		waarde = getVariable(device, tabVars.VAR_OFFSET)
 		if (waarde == nil)
-		then
-			 waarde = 0
+			then
+			waarde = 0
 		end
 
 		multiplier = getVariable(device, tabVars.VAR_MULT)
 		if ((multiplier == nil) or (multiplier == 0))
-		then
+			then
 			multiplier = 1
 		end
 	end
 
 	instant = (string.byte(data, 3) * math.pow(2, 24) + string.byte(data, 4) * math.pow(2, 16)
-				+ string.byte(data, 5) * math.pow(2, 8) + string.byte(data, 6) + waarde)/multiplier
+	+ string.byte(data, 5) * math.pow(2, 8) + string.byte(data, 6) + waarde)/multiplier
 
 	table.insert(tableCmds, { altid, tableCommands.CMD_PULSEN[1], instant, 0 } )
 	table.insert(tableCmds, { altid, tableCommands.CMD_OFFSET[1], waarde, 0 } )
@@ -3548,10 +3770,10 @@ function startup(lul_device)
 
 	local ipAddress = luup.devices[lul_device].ip or ""
 	if (ipAddress == "")
-	then
+		then
 		local IOdevice = getVariable(lul_device, tabVars.VAR_IO_DEVICE)
 		if ((luup.io.is_connected(lul_device) == false) or (IOdevice == nil))
-		then
+			then
 			error("Serial port not connected. First choose the seial port and restart the lua engine.")
 			task("Choose the Serial Port", TASK_ERROR_PERM)
 			return false
@@ -3562,7 +3784,7 @@ function startup(lul_device)
 		-- Check serial settings
 		local baud = getVariable(tonumber(IOdevice), tabVars.VAR_BAUD)
 		if ((baud == nil) or (baud ~= "38400"))
-		then
+			then
 			error("Incorrect setup of the serial port. Select 38400 bauds.")
 			task("Select 38400 bauds for the Serial Port", TASK_ERROR_PERM)
 			return false
@@ -3574,7 +3796,7 @@ function startup(lul_device)
 		luup.io.open(lul_device, ipAddress, 10000)
 
 		if (luup.io.is_connected(lul_device) == false)
-		then
+			then
 			error("Remote connection failed. First connect the LAN RFXtrx to the LAN or start the virtual serial port emulator on the remote machine where the USB RFXtrx is attached.")
 			task("Connect the RFXtrx to the LAN", TASK_ERROR_PERM)
 			return false
@@ -3622,7 +3844,7 @@ end
 function incomingData(lul_device, lul_data)
 
 	if (buffering == false)
-	then
+		then
 		return
 	end
 
@@ -3630,7 +3852,7 @@ function incomingData(lul_device, lul_data)
 	local data = tostring(lul_data)
 	local val = string.byte(data, 1)
 	if (#buffer == 0 and (val < 4 or val > 40))
-	then
+		then
 		warning("Bad starting message; ignore byte " .. string.format("%02X", val))
 		return
 	end
@@ -3639,14 +3861,14 @@ function incomingData(lul_device, lul_data)
 
 	local packetLength = string.byte(buffer, 1)
 	if (#buffer > packetLength)
-	then
+		then
 		local message = GetStringPart(buffer, 1, packetLength + 1)
 		buffer = GetStringPart(buffer, packetLength + 2, #buffer)
 
 		debug("Received message: " .. formattohex(message))
 		setVariable(THIS_DEVICE, tabVars.VAR_LAST_RECEIVED_MSG, formattohex(message))
 		if (getVariable(THIS_DEVICE, tabVars.VAR_COMM_FAILURE) ~= "0")
-		then
+			then
 			luup.set_failure(false)
 		end
 
@@ -3670,31 +3892,31 @@ function switchPower(device, newTargetValue)
 
 	local category
 	if ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-	then
+		then
 		category = tonumber(string.sub(id, 5, 5))
 	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "LS/X10/L") and (string.sub(id, 10, 10) == "/"))
-	then
+		then
 		category = 7
 	elseif ((string.len(id) == 15) and (string.sub(id, 1, 5) == "HT/HT") and (string.sub(id, 7, 7) == ".")  and (string.sub(id, 9, 9) == "/"))
-	then
+		then
 		category = 8
 	else
 		warning("Unexpected device id " .. id .. ". Switch Power command not sent")
@@ -3710,61 +3932,61 @@ function switchPower(device, newTargetValue)
 	local nbTimes = 1
 	local cmd = tableCommands.CMD_OFF[1]
 	if (newTargetValue == "1")
-	then
+		then
 		cmd = tableCommands.CMD_ON[1]
 	end
 	local data = nil
 
 	if (category == 0)
-	then
-		if (cmd == tableCommands.CMD_ON[1])
 		then
+		if (cmd == tableCommands.CMD_ON[1])
+			then
 			windowCovering(device, "Up")
 		elseif (cmd == tableCommands.CMD_OFF[1])
-		then
+			then
 			windowCovering(device, "Down")
 		end
 	elseif (category == 1)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_ARC[1]
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		if (cmd == tableCommands.CMD_ON[1])
-		then
+			then
 			cmdCode = 1
 		elseif (cmd == tableCommands.CMD_OFF[1])
-		then
+			then
 			cmdCode = 0
 		end
 		housecode = string.sub(id, 9, 9)
 		unitcode = tonumber(string.sub(id, 10, 11))
 		data = housecode .. string.char(unitcode, cmdCode, 0)
 	elseif (category == 2)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_AC[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
-		then
+			then
 			cmdCode = 1
 		elseif (cmd == tableCommands.CMD_OFF[1])
-		then
+			then
 			cmdCode = 0
 		end
 		remoteId = string.sub(id, 9, 18)
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-							tonumber(string.sub(remoteId, 2, 3), 16),
-							tonumber(string.sub(remoteId, 4, 5), 16),
-							tonumber(string.sub(remoteId, 6, 7), 16),
-							tonumber(string.sub(remoteId, 9, 10)),
-							cmdCode, 0, 0)
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		tonumber(string.sub(remoteId, 6, 7), 16),
+		tonumber(string.sub(remoteId, 9, 10)),
+		cmdCode, 0, 0)
 	elseif (category == 3)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_KOPPLA[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
-		then
+			then
 			cmdCode = 0x10
 		elseif (cmd == tableCommands.CMD_OFF[1])
-		then
+			then
 			cmdCode = 0x1A
 		end
 		remoteId = tonumber(string.sub(id, 9, 9), 16)
@@ -3772,145 +3994,145 @@ function switchPower(device, newTargetValue)
 		local channel1 = 0
 		local channel2 = 0
 		if (unitcode >= 1 and unitcode <= 8)
-		then
+			then
 			channel1 = 1
 			if (unitcode > 1)
-			then
+				then
 				channel1 = bitw.lshift(channel1, unitcode-1)
 			end
 		elseif (unitcode >= 9 and unitcode <= 10)
-		then
+			then
 			channel2 = 1
 			if (unitcode > 9)
-			then
+				then
 				channel2 = bitw.lshift(channel2, unitcode-9)
 			end
 		end
 		data = string.char(remoteId, channel1, channel2, cmdCode, 0)
 	elseif (category == 5)
-	then
-		if (luup.devices[device].device_type == tableDeviceTypes.COVER[1])
 		then
-			if (cmd == tableCommands.CMD_ON[1])
+		if (luup.devices[device].device_type == tableDeviceTypes.COVER[1])
 			then
+			if (cmd == tableCommands.CMD_ON[1])
+				then
 				windowCovering(device, "Up")
 			elseif (cmd == tableCommands.CMD_OFF[1])
-			then
+				then
 				windowCovering(device, "Down")
 			end
 		else
 			type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
 			subType = tonumber(string.sub(id, 7, 7))
 			if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
-			then
+				then
 				-- Livolo
 				if (luup.devices[device].device_type == tableDeviceTypes.LIGHT[1])
-				then
-					if (cmd == tableCommands.CMD_ON[1])
 					then
+					if (cmd == tableCommands.CMD_ON[1])
+						then
 						remoteId = string.sub(id, 9, 16)
 						cmdCode = tonumber(string.sub(remoteId, 8, 8))
 						data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-											tonumber(string.sub(remoteId, 3, 4), 16),
-											tonumber(string.sub(remoteId, 5, 6), 16),
-											0,
-											cmdCode, 0, 0)
+						tonumber(string.sub(remoteId, 3, 4), 16),
+						tonumber(string.sub(remoteId, 5, 6), 16),
+						0,
+						cmdCode, 0, 0)
 						if (tonumber(getVariable(device, tabVars.VAR_LIGHT) or "0") == 1)
-						then
+							then
 							cmd = tableCommands.CMD_OFF[1]
 						end
 					elseif (cmd == tableCommands.CMD_OFF[1])
-					then
+						then
 						groupOff(device)
 					end
 				elseif (luup.devices[device].device_type == tableDeviceTypes.DIMMER[1])
-				then
-					if (cmd == tableCommands.CMD_ON[1])
 					then
+					if (cmd == tableCommands.CMD_ON[1])
+						then
 						cmdCode = 0x2
 					elseif (cmd == tableCommands.CMD_OFF[1])
-					then
+						then
 						cmdCode = 0x3
 					end
 					nbTimes = 6
 					remoteId = string.sub(id, 9, 16)
 					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-										tonumber(string.sub(remoteId, 3, 4), 16),
-										tonumber(string.sub(remoteId, 5, 6), 16),
-										0,
-										cmdCode, 0, 0)
+					tonumber(string.sub(remoteId, 3, 4), 16),
+					tonumber(string.sub(remoteId, 5, 6), 16),
+					0,
+					cmdCode, 0, 0)
 				end
 			else
 				if (cmd == tableCommands.CMD_ON[1])
-				then
+					then
 					cmdCode = 1
 				elseif (cmd == tableCommands.CMD_OFF[1])
-				then
+					then
 					cmdCode = 0
 				end
 				remoteId = string.sub(id, 9, 17)
 				data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-									tonumber(string.sub(remoteId, 3, 4), 16),
-									tonumber(string.sub(remoteId, 5, 6), 16),
-									tonumber(string.sub(remoteId, 8, 9)),
-									cmdCode, 0, 0)
+				tonumber(string.sub(remoteId, 3, 4), 16),
+				tonumber(string.sub(remoteId, 5, 6), 16),
+				tonumber(string.sub(remoteId, 8, 9)),
+				cmdCode, 0, 0)
 			end
 		end
 	elseif (category == 6)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_BLYSS[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
-		then
+			then
 			cmdCode = 0
 		elseif (cmd == tableCommands.CMD_OFF[1])
-		then
+			then
 			cmdCode = 1
 		end
 		remoteId = string.sub(id, 9, 12)
 		housecode = string.sub(id, 14, 14)
 		unitcode = tonumber(string.sub(id, 15, 15))
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16))
-						.. housecode
-						.. string.char(unitcode, cmdCode, 1, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16))
+		.. housecode
+		.. string.char(unitcode, cmdCode, 1, 0, 0)
 	elseif (category == 7)
-	then
+		then
 		type = tableMsgTypes.SECURITY_X10SR[1]
 		subType = tableMsgTypes.SECURITY_X10SR[2]
 		local light_num = string.sub(id, 9, 9)
 		if (cmd == tableCommands.CMD_ON[1] and light_num == "1")
-		then
+			then
 			cmdCode = 0x11
 		elseif (cmd == tableCommands.CMD_ON[1] and light_num == "2")
-		then
+			then
 			cmdCode = 0x13
 		elseif (cmd == tableCommands.CMD_OFF[1] and light_num == "1")
-		then
+			then
 			cmdCode = 0x10
 		elseif (cmd == tableCommands.CMD_OFF[1] and light_num == "2")
-		then
+			then
 			cmdCode = 0x12
 		else
 			cmdCode = nil
 		end
 		if (cmdCode ~= nil)
-		then
+			then
 			remoteId = string.sub(id, 11, 16)
 			data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-								tonumber(string.sub(remoteId, 3, 4), 16),
-								tonumber(string.sub(remoteId, 5, 6), 16),
-								cmdCode, 0)
+			tonumber(string.sub(remoteId, 3, 4), 16),
+			tonumber(string.sub(remoteId, 5, 6), 16),
+			cmdCode, 0)
 		end
-	-- elseif (category == 8)
-	-- then
+		-- elseif (category == 8)
+		-- then
 		-- TODO: Mertik
 	else
 		warning("Unimpemented lighting type " .. category .. ". Switch Power command not sent")
 	end
 
 	if (data ~= nil)
-	then
+		then
 		local tableCmds = {}
 		table.insert(tableCmds, { string.sub(id, 4), cmd, nil, 0 })
 		sendRepeatCommand(type, subType, data, nbTimes, tableCmds)
@@ -3926,25 +4148,25 @@ function setDimLevel(device, newLoadlevelTarget)
 
 	local category
 	if ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-	then
+		then
 		category = tonumber(string.sub(id, 5, 5))
 	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-	then
+		then
 		category = 0
 	else
 		warning("Unexpected device id " .. id .. ". Set level command not sent")
@@ -3963,17 +4185,17 @@ function setDimLevel(device, newLoadlevelTarget)
 	local data = nil
 
 	if (category == 0)
-	then
-		if (tonumber(newLoadlevelTarget) == 0)
 		then
+		if (tonumber(newLoadlevelTarget) == 0)
+			then
 			windowCovering(device, "Down")
 		else
 			windowCovering(device, "Up")
 		end
 	elseif (category == 2)
-	then
-		if (tonumber(newLoadlevelTarget) == 0)
 		then
+		if (tonumber(newLoadlevelTarget) == 0)
+			then
 			switchPower(device, "0")
 		else
 			type = tableMsgTypes.LIGHTING_AC[1]
@@ -3982,20 +4204,20 @@ function setDimLevel(device, newLoadlevelTarget)
 			cmdCode = 0x2
 			level = math.floor(newLoadlevelTarget * 0x0F / 100 + 0.5)
 			data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-								tonumber(string.sub(remoteId, 2, 3), 16),
-								tonumber(string.sub(remoteId, 4, 5), 16),
-								tonumber(string.sub(remoteId, 6, 7), 16),
-								tonumber(string.sub(remoteId, 9, 10)),
-								cmdCode, level, 0)
+			tonumber(string.sub(remoteId, 2, 3), 16),
+			tonumber(string.sub(remoteId, 4, 5), 16),
+			tonumber(string.sub(remoteId, 6, 7), 16),
+			tonumber(string.sub(remoteId, 9, 10)),
+			cmdCode, level, 0)
 		end
 	elseif (category == 3)
-	then
+		then
 		level = math.floor(newLoadlevelTarget / 10 + 0.5)
 		if (level == 0)
-		then
+			then
 			switchPower(device, "0")
 		elseif (level == 10)
-		then
+			then
 			switchPower(device, "1")
 		else
 			type = tableMsgTypes.LIGHTING_KOPPLA[1]
@@ -4005,17 +4227,17 @@ function setDimLevel(device, newLoadlevelTarget)
 			local channel1 = 0
 			local channel2 = 0
 			if (unitcode >= 1 and unitcode <= 8)
-			then
+				then
 				channel1 = 1
 				if (unitcode > 1)
-				then
+					then
 					channel1 = bitw.lshift(channel1, unitcode-1)
 				end
 			elseif (unitcode >= 9 and unitcode <= 10)
-			then
+				then
 				channel2 = 1
 				if (unitcode > 9)
-				then
+					then
 					channel2 = bitw.lshift(channel2, unitcode-9)
 				end
 			end
@@ -4023,23 +4245,23 @@ function setDimLevel(device, newLoadlevelTarget)
 			data = string.char(remoteId, channel1, channel2, cmdCode, 0)
 		end
 	elseif (category == 5)
-	then
-		if (luup.devices[device].device_type == tableDeviceTypes.COVER[1] and tonumber(newLoadlevelTarget) > 0)
 		then
+		if (luup.devices[device].device_type == tableDeviceTypes.COVER[1] and tonumber(newLoadlevelTarget) > 0)
+			then
 			newLoadlevelTarget = "100"
 		end
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		newLoadlevelTarget = tonumber(newLoadlevelTarget)
 		if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
-		then
+			then
 			-- Livolo
 			local curLevel = tonumber(getVariable(device, tabVars.VAR_DIMMER) or "0") or 0
 			if (newLoadlevelTarget == 0)
-			then
+				then
 				switchPower(device, "0")
 			elseif (newLoadlevelTarget == 100)
-			then
+				then
 				switchPower(device, "1")
 			else
 				local tableLevels = { 0, 17, 33, 50, 67, 83, 100 }
@@ -4047,23 +4269,23 @@ function setDimLevel(device, newLoadlevelTarget)
 				local delta = 100
 				local diff
 				for i = 1, #tableLevels
-				do
+					do
 					diff = math.abs(curLevel - tableLevels[i])
 					if (diff < delta)
-					then
+						then
 						delta = diff
 						idx1 = i
 					end
 				end
 				if (newLoadlevelTarget < curLevel)
-				then
+					then
 					local idx2 = 1
 					delta = 100
 					for i = 1, (idx1-1)
-					do
+						do
 						diff = math.abs(newLoadlevelTarget - tableLevels[i])
 						if (diff < delta)
-						then
+							then
 							delta = diff
 							idx2 = i
 						end
@@ -4073,19 +4295,19 @@ function setDimLevel(device, newLoadlevelTarget)
 					cmdCode = 0x3
 					remoteId = string.sub(id, 9, 16)
 					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-										tonumber(string.sub(remoteId, 3, 4), 16),
-										tonumber(string.sub(remoteId, 5, 6), 16),
-										0,
-										cmdCode, 0, 0)
+					tonumber(string.sub(remoteId, 3, 4), 16),
+					tonumber(string.sub(remoteId, 5, 6), 16),
+					0,
+					cmdCode, 0, 0)
 				elseif (newLoadlevelTarget > curLevel)
-				then
+					then
 					local idx2 = 7
 					delta = 100
 					for i = (idx1+1), #tableLevels
-					do
+						do
 						diff = math.abs(newLoadlevelTarget - tableLevels[i])
 						if (diff < delta)
-						then
+							then
 							delta = diff
 							idx2 = i
 						end
@@ -4095,25 +4317,25 @@ function setDimLevel(device, newLoadlevelTarget)
 					cmdCode = 0x2
 					remoteId = string.sub(id, 9, 16)
 					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-										tonumber(string.sub(remoteId, 3, 4), 16),
-										tonumber(string.sub(remoteId, 5, 6), 16),
-										0,
-										cmdCode, 0, 0)
+					tonumber(string.sub(remoteId, 3, 4), 16),
+					tonumber(string.sub(remoteId, 5, 6), 16),
+					0,
+					cmdCode, 0, 0)
 				end
 			end
 		else
 			if (newLoadlevelTarget == 0)
-			then
+				then
 				switchPower(device, "0")
 			else
 				remoteId = string.sub(id, 9, 17)
 				cmdCode = 0x10
 				level = math.floor(newLoadlevelTarget * 0x1F / 100 + 0.5)
 				data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-									tonumber(string.sub(remoteId, 3, 4), 16),
-									tonumber(string.sub(remoteId, 5, 6), 16),
-									tonumber(string.sub(remoteId, 8, 9)),
-									cmdCode, level, 0)
+				tonumber(string.sub(remoteId, 3, 4), 16),
+				tonumber(string.sub(remoteId, 5, 6), 16),
+				tonumber(string.sub(remoteId, 8, 9)),
+				cmdCode, level, 0)
 			end
 		end
 	else
@@ -4121,7 +4343,7 @@ function setDimLevel(device, newLoadlevelTarget)
 	end
 
 	if (data ~= nil)
-	then
+		then
 		local tableCmds = {}
 		table.insert(tableCmds, { string.sub(id, 4), cmd, newLoadlevelTarget, 0 })
 		sendRepeatCommand(type, subType, data, nbTimes, tableCmds)
@@ -4136,13 +4358,13 @@ function windowCovering(device, action)
 
 	local cmd = nil
 	if (action == "Up")
-	then
+		then
 		cmd = tableCommands.CMD_OPEN[1]
 	elseif (action == "Down")
-	then
+		then
 		cmd = tableCommands.CMD_CLOSE[1]
 	elseif (action == "Stop")
-	then
+		then
 		cmd = tableCommands.CMD_STOP[1]
 	else
 		warning("windowCovering: unexpected value for action parameter")
@@ -4151,25 +4373,25 @@ function windowCovering(device, action)
 
 	local category
 	if ((string.len(id) >= 9) and (string.sub(id, 3, 6) == "/L5.") and (string.sub(id, 8, 8) == "/"))
-	then
+		then
 		category = 5
 	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 0
 	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-	then
+		then
 		category = 6
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-	then
+		then
 		category = 6
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-	then
+		then
 		category = 6
 	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-	then
+		then
 		category = 7
 	elseif ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-	then
+		then
 		category = 2
 	else
 		warning("Unexpected device id " .. id .. ". " .. action .. " command not sent")
@@ -4186,26 +4408,26 @@ function windowCovering(device, action)
 	local data = nil
 
 	if (category == 0)
-	then
+		then
 		type = tableMsgTypes.CURTAIN_HARRISON[1]
 		subType = tonumber(string.sub(id, 5, 5))
 		if (cmd == tableCommands.CMD_OPEN[1])
-		then
+			then
 			cmdCode = 0
 		elseif (cmd == tableCommands.CMD_CLOSE[1])
-		then
+			then
 			cmdCode = 1
 		elseif (cmd == tableCommands.CMD_STOP[1])
-		then
+			then
 			cmdCode = 2
 		end
 		housecode = string.sub(id, 7, 7)
 		unitcode = tonumber(string.sub(id, 8, 9))
 		data = housecode .. string.char(unitcode, cmdCode, 0)
 	elseif (category == 2)
-	then
-		if (cmd == tableCommands.CMD_STOP[1])
 		then
+		if (cmd == tableCommands.CMD_STOP[1])
+			then
 			windowCovering(device, "Up")
 			luup.sleep(1000)
 			windowCovering(device, "Down")
@@ -4216,56 +4438,56 @@ function windowCovering(device, action)
 			subType = tonumber(string.sub(id, 7, 7))
 			remoteId = string.sub(id, 9, 18)
 			if (cmd == tableCommands.CMD_OPEN[1])
-			then
+				then
 				cmdCode = 1
 			elseif (cmd == tableCommands.CMD_CLOSE[1])
-			then
+				then
 				cmdCode = 0
 			end
 			data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-								tonumber(string.sub(remoteId, 2, 3), 16),
-								tonumber(string.sub(remoteId, 4, 5), 16),
-								tonumber(string.sub(remoteId, 6, 7), 16),
-								tonumber(string.sub(remoteId, 9, 10)),
-								cmdCode, 0, 0)
+			tonumber(string.sub(remoteId, 2, 3), 16),
+			tonumber(string.sub(remoteId, 4, 5), 16),
+			tonumber(string.sub(remoteId, 6, 7), 16),
+			tonumber(string.sub(remoteId, 9, 10)),
+			cmdCode, 0, 0)
 		end
 	elseif (category == 5)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_OPEN[1])
-		then
+			then
 			cmdCode = 0x0F
 		elseif (cmd == tableCommands.CMD_CLOSE[1])
-		then
+			then
 			cmdCode = 0x0D
 		elseif (cmd == tableCommands.CMD_STOP[1])
-		then
+			then
 			cmdCode = 0x0E
 		end
 		remoteId = string.sub(id, 9, 17)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							tonumber(string.sub(remoteId, 8, 9)),
-							cmdCode, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		tonumber(string.sub(remoteId, 8, 9)),
+		cmdCode, 0, 0)
 	elseif (category == 6)
-	then
+		then
 		type = tableMsgTypes.BLIND_T0[1]
 		subType = tonumber(string.sub(id, 5, 5))
 		if (cmd == tableCommands.CMD_OPEN[1])
-		then
+			then
 			cmdCode = 0
 		elseif (cmd == tableCommands.CMD_CLOSE[1])
-		then
+			then
 			cmdCode = 1
 		elseif (cmd == tableCommands.CMD_STOP[1])
-		then
+			then
 			cmdCode = 2
 		end
 		remoteId = string.sub(id, 7, 12)
 		if (subType == tableMsgTypes.BLIND_T6[2] or subType == tableMsgTypes.BLIND_T7[2])
-		then
+			then
 			id4 = tonumber(string.sub(id, 13, 13), 16)
 			unitcode = tonumber(string.sub(id, 15, 16)) % 16
 		else
@@ -4273,50 +4495,50 @@ function windowCovering(device, action)
 			unitcode = tonumber(string.sub(id, 14, 15)) % 16
 		end
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							id4 * 16 + unitcode, cmdCode, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		id4 * 16 + unitcode, cmdCode, 0)
 	elseif (category == 7)
-	then
+		then
 		local mode = getVariable(device, tabVars.VAR_RFY_MODE) or ""
 		type = tableMsgTypes.RFY0[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_OPEN[1])
-		then
-			if (mode == "VENETIAN_US")
 			then
+			if (mode == "VENETIAN_US")
+				then
 				cmdCode = 0x0F
 			elseif (mode == "VENETIAN_EU")
-			then
+				then
 				cmdCode = 0x11
 			else
 				cmdCode = 0x01
 			end
 		elseif (cmd == tableCommands.CMD_CLOSE[1])
-		then
-			if (mode == "VENETIAN_US")
 			then
+			if (mode == "VENETIAN_US")
+				then
 				cmdCode = 0x10
 			elseif (mode == "VENETIAN_EU")
-			then
+				then
 				cmdCode = 0x12
 			else
 				cmdCode = 0x03
 			end
 		elseif (cmd == tableCommands.CMD_STOP[1])
-		then
+			then
 			cmdCode = 0
 		end
 		remoteId = string.sub(id, 9, 13)
 		unitcode = tonumber(string.sub(id, 15, 16))
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-							tonumber(string.sub(remoteId, 2, 3), 16),
-							tonumber(string.sub(remoteId, 4, 5), 16),
-							unitcode, cmdCode, 0, 0, 0, 0)
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		unitcode, cmdCode, 0, 0, 0, 0)
 	end
 
 	if (data ~= nil)
-	then
+		then
 		local tableCmds = {}
 		table.insert(tableCmds, { string.sub(id, 4), cmd, nil, 0 })
 		sendCommand(type, subType, data, tableCmds)
@@ -4347,7 +4569,7 @@ function requestQuickArmMode(device, state)
 	debug("requestQuickArmMode " .. id .. " state " .. state)
 
 	if ((string.len(id) ~= 16) or (string.sub(id, 1, 10) ~= "SR/X10/SR/" and string.sub(id, 1, 10) ~= "SR/MEI/SR/"))
-	then
+		then
 		warning("Unexpected device id " .. id .. ". Quick Arm Mode command not sent")
 		return
 	end
@@ -4356,12 +4578,12 @@ function requestQuickArmMode(device, state)
 	local subType = nil
 	local exitDelay = 0
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
-	then
+		then
 		type = tableMsgTypes.SECURITY_X10SR[1]
 		subType = tableMsgTypes.SECURITY_X10SR[2]
 		exitDelay = tonumber(getVariable(device, tabVars.VAR_EXIT_DELAY) or "0")
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
-	then
+		then
 		type = tableMsgTypes.SECURITY_MEISR[1]
 		subType = tableMsgTypes.SECURITY_MEISR[2]
 	end
@@ -4371,7 +4593,7 @@ function requestQuickArmMode(device, state)
 	local tableCmds = {}
 
 	if ((state == "Armed" or state == "ArmedInstant") and exitDelay > 0)
-	then
+		then
 		cmdCode = 0x0A
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_DETAILED_ARM_MODE[1], "ExitDelay", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE[1], "Armed", exitDelay } )
@@ -4379,14 +4601,14 @@ function requestQuickArmMode(device, state)
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE_NUM[1], "1", exitDelay } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 121, 0 } )
 	elseif ((state == "Armed" or state == "ArmedInstant") and exitDelay == 0)
-	then
+		then
 		cmdCode = 0x09
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_DETAILED_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE_NUM[1], "1", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 121, 0 } )
 	elseif ((state == "Stay" or state == "StayInstant") and exitDelay > 0)
-	then
+		then
 		cmdCode = 0x0C
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_DETAILED_ARM_MODE[1], "ExitDelay", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE[1], "Armed", exitDelay } )
@@ -4394,14 +4616,14 @@ function requestQuickArmMode(device, state)
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE_NUM[1], "1", exitDelay } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 122, 0 } )
 	elseif ((state == "Stay" or state == "StayInstant") and exitDelay == 0)
-	then
+		then
 		cmdCode = 0x0B
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE[1], "Armed", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_DETAILED_ARM_MODE[1], "Stay", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE_NUM[1], "1", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 122, 0 } )
 	elseif (state == "Disarmed")
-	then
+		then
 		cmdCode = 0x0D
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ARM_MODE[1], "Disarmed", 0 } )
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_DETAILED_ARM_MODE[1], "Disarmed", 0 } )
@@ -4412,12 +4634,12 @@ function requestQuickArmMode(device, state)
 		warning("Unimpemented state " .. state .. ". Quick Arm Mode command not sent")
 	end
 	if (cmdCode ~= nil)
-	then
+		then
 		local remoteId = string.sub(id, 11, 16)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							cmdCode, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		cmdCode, 0)
 		sendCommand(type, subType, data, tableCmds)
 	end
 
@@ -4429,10 +4651,10 @@ function requestPanicMode(device, state)
 	debug("requestPanicMode " .. id .. " state " .. state)
 
 	if ((string.len(id) ~= 16) or (string.sub(id, 1, 10) ~= "SR/X10/SR/"
-			and string.sub(id, 1, 10) ~= "SR/MEI/SR/"
-			and string.sub(id, 1, 10) ~= "SR/KD1/SR/"
-			and string.sub(id, 1, 10) ~= "SR/S30/SR/"))
-	then
+		and string.sub(id, 1, 10) ~= "SR/MEI/SR/"
+		and string.sub(id, 1, 10) ~= "SR/KD1/SR/"
+		and string.sub(id, 1, 10) ~= "SR/S30/SR/"))
+		then
 		warning("Unexpected device id " .. id .. ". Panic Mode command not sent")
 		return
 	end
@@ -4440,42 +4662,42 @@ function requestPanicMode(device, state)
 	local type = nil
 	local subType = nil
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
-	then
+		then
 		type = tableMsgTypes.SECURITY_X10SR[1]
 		subType = tableMsgTypes.SECURITY_X10SR[2]
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
-	then
+		then
 		type = tableMsgTypes.SECURITY_MEISR[1]
 		subType = tableMsgTypes.SECURITY_MEISR[2]
 	elseif (string.sub(id, 1, 9) == "SR/KD1/SR")
-	then
+		then
 		type = tableMsgTypes.KD101[1]
 		subType = tableMsgTypes.KD101[2]
 	elseif (string.sub(id, 1, 9) == "SR/S30/SR")
-	then
+		then
 		type = tableMsgTypes.SA30[1]
 		subType = tableMsgTypes.SA30[2]
 	end
 
 	local remoteId = string.sub(id, 11, 16)
 	local data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-						tonumber(string.sub(remoteId, 3, 4), 16),
-						tonumber(string.sub(remoteId, 5, 6), 16),
-						0x06, 0)
+	tonumber(string.sub(remoteId, 3, 4), 16),
+	tonumber(string.sub(remoteId, 5, 6), 16),
+	0x06, 0)
 	local tableCmds = {}
 	table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 120, 0 })
 	if (type == tableMsgTypes.KD101[1])
-	then
+		then
 		id = "KD1/SS/" .. string.sub(remoteId, 1, 2)
-						.. string.sub(remoteId, 3, 4)
-						.. string.sub(remoteId, 5, 6)
+		.. string.sub(remoteId, 3, 4)
+		.. string.sub(remoteId, 5, 6)
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE[1], "1", 0 } )
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE_OFF[1], nil, 30 } )
 	elseif (type == tableMsgTypes.SA30[1])
-	then
+		then
 		id = "S30/SS/" .. string.sub(remoteId, 1, 2)
-						.. string.sub(remoteId, 3, 4)
-						.. string.sub(remoteId, 5, 6)
+		.. string.sub(remoteId, 3, 4)
+		.. string.sub(remoteId, 5, 6)
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE[1], "1", 0 } )
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE_OFF[1], nil, 30 } )
 	end
@@ -4489,7 +4711,7 @@ function setExitDelay(device, newValue)
 	debug("setExitDelay " .. id .. " new value " .. (newValue or ""))
 
 	if ((string.len(id) ~= 16) or string.sub(id, 1, 10) ~= "SR/X10/SR/")
-	then
+		then
 		task("Exit delay is not relevant for device id " .. id, TASK_ERROR)
 		return
 	end
@@ -4504,7 +4726,7 @@ function dim(device)
 	debug("dim " .. id)
 
 	if ((string.len(id) ~= 9) or (string.sub(id, 1, 8) ~= "RC/L1.0/"))
-	then
+		then
 		task("Dim command is not relevant for device " .. id, TASK_ERROR)
 		return
 	end
@@ -4523,7 +4745,7 @@ function bright(device)
 	debug("bright " .. id)
 
 	if ((string.len(id) ~= 9) or (string.sub(id, 1, 8) ~= "RC/L1.0/"))
-	then
+		then
 		task("Bright command is not relevant for device " .. id, TASK_ERROR)
 		return
 	end
@@ -4543,7 +4765,7 @@ function groupOff(device)
 
 	local category
 	if ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-	then
+		then
 		category = tonumber(string.sub(id, 5, 5))
 	else
 		task("Group Off command is not relevant for device " .. id, TASK_ERROR)
@@ -4563,15 +4785,15 @@ function groupOff(device)
 	local tableCmds = {}
 
 	if (category == 1)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
 		type = tableMsgTypes.LIGHTING_ARC[1]
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s%02d"
@@ -4580,15 +4802,15 @@ function groupOff(device)
 		end
 		data = string.sub(id, 9, 9) .. string.char(0, 0x05, 0)
 	elseif (category == 2)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
 		type = tableMsgTypes.LIGHTING_AC[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s/%02d"
@@ -4597,17 +4819,17 @@ function groupOff(device)
 		end
 		remoteId = string.sub(id, 9, 15)
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-							tonumber(string.sub(remoteId, 2, 3), 16),
-							tonumber(string.sub(remoteId, 4, 5), 16),
-							tonumber(string.sub(remoteId, 6, 7), 16),
-							0, 0x03, 0, 0)
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		tonumber(string.sub(remoteId, 6, 7), 16),
+		0, 0x03, 0, 0)
 	elseif (category == 5)
-	then
+		then
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		cmdCode = 0x02
 		if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
-		then
+			then
 			-- Livolo
 			unitCodeMin = 1
 			unitCodeMax = 3
@@ -4616,16 +4838,16 @@ function groupOff(device)
 			cmdCode = 0
 		else
 			if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
-			then
+				then
 				cmd = tableCommands.CMD_LWRF_SCENE_OFF[1]
 			else
 				cmd = tableCommands.CMD_SCENE_OFF[1]
 			end
 			table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 			for k, v in pairs(tableCategories)
-			do
+				do
 				if (string.find(id, v[26]) == 4)
-				then
+					then
 					unitCodeMin = v[18]
 					unitCodeMax = v[19]
 					formatAltid = "%s/%02d"
@@ -4635,19 +4857,19 @@ function groupOff(device)
 		end
 		remoteId = string.sub(id, 9, 14)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							0, cmdCode, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		0, cmdCode, 0, 0)
 	elseif (category == 6)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
 		type = tableMsgTypes.LIGHTING_BLYSS[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s%d"
@@ -4656,23 +4878,23 @@ function groupOff(device)
 		end
 		remoteId = string.sub(id, 9, 12)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16))
-						.. string.sub(id, 14, 14)
-						.. string.char(0, 0x03, 1, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16))
+		.. string.sub(id, 14, 14)
+		.. string.char(0, 0x03, 1, 0, 0)
 	else
 		task("Unimpemented lighting type " .. category .. ". Group Off command not sent", TASK_ERROR)
 	end
 
 	if (data ~= nil)
-	then
-		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
 		then
+		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
+			then
 			for i = unitCodeMin, unitCodeMax
-			do
+				do
 				altid = string.format(formatAltid, string.sub(id, 4), i)
 				device2 = findChild(THIS_DEVICE, altid, nil)
 				if (device2 ~= nil)
-				then
+					then
 					table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 })
 				end
 			end
@@ -4689,7 +4911,7 @@ function groupOn(device)
 
 	local category
 	if ((string.len(id) >= 9) and (string.sub(id, 1, 4) == "RC/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-	then
+		then
 		category = tonumber(string.sub(id, 5, 5))
 	else
 		task("Group On command is not relevant for device " .. id, TASK_ERROR)
@@ -4708,15 +4930,15 @@ function groupOn(device)
 	local tableCmds = {}
 
 	if (category == 1)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
 		type = tableMsgTypes.LIGHTING_ARC[1]
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s%02d"
@@ -4725,15 +4947,15 @@ function groupOn(device)
 		end
 		data = string.sub(id, 9, 9) .. string.char(0, 0x06, 0)
 	elseif (category == 2)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
 		type = tableMsgTypes.LIGHTING_AC[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s/%02d"
@@ -4742,20 +4964,20 @@ function groupOn(device)
 		end
 		remoteId = string.sub(id, 9, 15)
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-							tonumber(string.sub(remoteId, 2, 3), 16),
-							tonumber(string.sub(remoteId, 4, 5), 16),
-							tonumber(string.sub(remoteId, 6, 7), 16),
-							0, 0x04, 0, 0)
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		tonumber(string.sub(remoteId, 6, 7), 16),
+		0, 0x04, 0, 0)
 	elseif (category == 5)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s/%02d"
@@ -4764,19 +4986,19 @@ function groupOn(device)
 		end
 		remoteId = string.sub(id, 9, 14)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							0, 0x03, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		0, 0x03, 0, 0)
 	elseif (category == 6)
-	then
+		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
 		type = tableMsgTypes.LIGHTING_BLYSS[1]
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
-		do
+			do
 			if (string.find(id, v[26]) == 4)
-			then
+				then
 				unitCodeMin = v[18]
 				unitCodeMax = v[19]
 				formatAltid = "%s%d"
@@ -4785,23 +5007,23 @@ function groupOn(device)
 		end
 		remoteId = string.sub(id, 9, 12)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16))
-						.. string.sub(id, 14, 14)
-						.. string.char(0, 0x02, 1, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16))
+		.. string.sub(id, 14, 14)
+		.. string.char(0, 0x02, 1, 0, 0)
 	else
 		task("Unimpemented lighting type " .. category .. ". Group On command not sent", TASK_ERROR)
 	end
 
 	if (data ~= nil)
-	then
-		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
 		then
+		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
+			then
 			for i = unitCodeMin, unitCodeMax
-			do
+				do
 				altid = string.format(formatAltid, string.sub(id, 4), i)
 				device2 = findChild(THIS_DEVICE, altid, nil)
 				if (device2 ~= nil)
-				then
+					then
 					table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 })
 				end
 			end
@@ -4817,7 +5039,7 @@ function mood(device, param)
 	debug("mood" .. param .. " " .. id)
 
 	if ((string.len(id) ~= 14) or (string.sub(id, 1, 8) ~= "RC/L5.0/"))
-	then
+		then
 		task("Mood command is not relevant for device " .. id, TASK_ERROR)
 		return
 	end
@@ -4826,19 +5048,19 @@ function mood(device, param)
 
 	local value = tonumber(param)
 	if (value == 1)
-	then
+		then
 		cmdCode = 0x03
 	elseif (value == 2)
-	then
+		then
 		cmdCode = 0x04
 	elseif (value == 3)
-	then
+		then
 		cmdCode = 0x05
 	elseif (value == 4)
-	then
+		then
 		cmdCode = 0x06
 	elseif (value == 5)
-	then
+		then
 		cmdCode = 0x07
 	else
 		task("action Mood: unexpected value for argument", TASK_ERROR)
@@ -4846,15 +5068,15 @@ function mood(device, param)
 	end
 
 	if (cmdCode ~= nil)
-	then
+		then
 		local tableCmds = {}
 		table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_LWRF_SCENE_ON[1], 110+value, 0 })
 
 		local remoteId = string.sub(id, 9, 14)
 		local data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							0, cmdCode, 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		0, cmdCode, 0, 0)
 		sendCommand(tableMsgTypes.LIGHTING_LIGHTWARERF[1], tableMsgTypes.LIGHTING_LIGHTWARERF[2], data, tableCmds)
 	end
 
@@ -4866,13 +5088,13 @@ function sendATICode(device, code)
 	debug("sendATICode " .. id .. " code " .. code)
 
 	if ((string.len(id) ~= 9) or (string.sub(id, 1, 5) ~= "RC/RC") or (string.sub(id, 7, 7) ~= "/"))
-	then
+		then
 		task("Send code is not relevant for device " .. id, TASK_ERROR)
 		return
 	end
 	local subType = tonumber(string.sub(id, 6, 6))
 	if (subType >= 0x4)
-	then
+		then
 		task("Send code is not relevant for device " .. id, TASK_ERROR)
 		return
 	end
@@ -4892,7 +5114,7 @@ function setModeTarget(device, NewModeTarget)
 
 	local category
 	if ((string.len(id) == 15) and (string.sub(id, 1, 5) == "HT/HT") and (string.sub(id, 7, 7) == ".")  and (string.sub(id, 9, 9) == "/"))
-	then
+		then
 		category = 3
 	else
 		warning("Unexpected device id " .. id .. ". Set Mode command not sent")
@@ -4905,16 +5127,16 @@ function setModeTarget(device, NewModeTarget)
 	local data = nil
 
 	if (category == 3) -- Mertik
-	then
+		then
 		type = tableMsgTypes.HEATER3_MERTIK1[1]
 		subType = tonumber(string.sub(id, 8, 8))
 		local cmdCode = nil
 		local currentState = getVariable(device, tabVars.VAR_HEATER) or "Off"
 		local currentSwState = getVariable(device, tabVars.VAR_HEATER_SW) or "0"
 		if (NewModeTarget == "HeatOn")
-		then
-			if (currentSwState == "0")
 			then
+			if (currentSwState == "0")
+				then
 				cmdCode = 0x01 -- Turn on
 				table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_HEATER_SW[1], 1, 0 })
 				table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_HEATER[1], "HeatOn", 0 })
@@ -4923,9 +5145,9 @@ function setModeTarget(device, NewModeTarget)
 				table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_HEATER[1], "HeatOn", 0 })
 			end
 		elseif (NewModeTarget == "Off")
-		then
-			if (currentState == "Off")
 			then
+			if (currentState == "Off")
+				then
 				cmdCode = 0x00 -- Turn off
 				table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_HEATER_SW[1], 0, 0 })
 				table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_HEATER[1], "Off", 0 })
@@ -4939,13 +5161,13 @@ function setModeTarget(device, NewModeTarget)
 		end
 		local remoteId = string.sub(id, 10, 15)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							cmdCode, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		cmdCode, 0)
 	end
 
 	if (data ~= nil)
-	then
+		then
 		sendCommand(type, subType, data, tableCmds)
 	end
 
@@ -4956,22 +5178,22 @@ function toggleState(device)
 
 	-- Only implemented for Light Switches and HeaTers so far
 	if (devType == "LS")
-	then
+		then
 		local curStat = getVariable(device, tabVars.VAR_LIGHT) or "0"
 		local newTargetState
 		if (curStat == "0")
-		then
+			then
 			newTargetState = "1"
 		else
 			newTargetState = "0"
 		end
 		switchPower(device, newTargetState)
 	elseif (devType == "HT")
-	then
+		then
 		local curStat = getVariable(device, tabVars.VAR_HEATER) or "Off"
 		local NewModeTarget
 		if (curStat == "Off")
-		then
+			then
 			NewModeTarget = "HeatOn"
 		else
 			NewModeTarget = "Off"
@@ -4984,7 +5206,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 	debug("createNewDevice " .. (category or "nil") .. " " .. (deviceType or "nil"))
 
 	if (category == nil or tableCategories[category] == nil)
-	then
+		then
 		warning("action CreateNewDevice: invalid value for the Category argument")
 		task("CreateNewDevice: invalid arguments", TASK_ERROR)
 		return
@@ -4994,217 +5216,217 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 	local params = {}
 
 	if (deviceType == nil)
-	then
+		then
 		warning("action CreateNewDevice: missing value for the DeviceType argument")
 		valid = false
 	elseif (deviceType ~= "SWITCH_LIGHT" and deviceType ~= "DIMMABLE_LIGHT"
-			and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
-			and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
-	then
+		and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
+		and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
+		then
 		warning("action CreateNewDevice: invalid value for the DeviceType argument")
 		valid = false
 	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category][2])
-			or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
-			or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
-			or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
-			or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
-			or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
-	then
+		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
+		or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
+		or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
+		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
+		or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
+		then
 		warning("action CreateNewDevice: DeviceType value not accepted for this category")
 		valid = false
 	end
 
 	if (tableCategories[category][8])
-	then
-		if (id == nil)
 		then
+		if (id == nil)
+			then
 			warning("action CreateNewDevice: missing value for the Id argument")
 			valid = false
 		elseif (tonumber(id) == nil)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the Id argument")
 			valid = false
 		elseif (tableCategories[category][9] ~= nil and tableCategories[category][10] ~= nil
-				and (tonumber(id) < tableCategories[category][9]
-					or tonumber(id) > tableCategories[category][10]))
-		then
+			and (tonumber(id) < tableCategories[category][9]
+			or tonumber(id) > tableCategories[category][10]))
+			then
 			warning(string.format("action CreateNewDevice: value for the Id argument must be in range %d - %d",
-								tableCategories[category][9],
-								tableCategories[category][10]))
+			tableCategories[category][9],
+			tableCategories[category][10]))
 			valid = false
 		else
 			table.insert(params, tonumber(id))
 		end
 	end
 	if (tableCategories[category][11])
-	then
-		if (houseCode == nil)
 		then
+		if (houseCode == nil)
+			then
 			warning("action CreateNewDevice: missing value for the HouseCode argument")
 			valid = false
 		elseif (#houseCode ~= 1)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the HouseCode argument")
 			valid = false
 		elseif (tableCategories[category][12] ~= nil and tableCategories[category][13] ~= nil
-				and (string.byte(houseCode) < tableCategories[category][12]
-					or string.byte(houseCode) > tableCategories[category][13]))
-		then
+			and (string.byte(houseCode) < tableCategories[category][12]
+			or string.byte(houseCode) > tableCategories[category][13]))
+			then
 			warning(string.format("action CreateNewDevice: value for the HouseCode argument must be in range %s - %s",
-								string.char(tableCategories[category][12]),
-								string.char(tableCategories[category][13])))
+			string.char(tableCategories[category][12]),
+			string.char(tableCategories[category][13])))
 			valid = false
 		else
 			table.insert(params, houseCode)
 		end
 	end
 	if (tableCategories[category][14])
-	then
-		if (groupCode == nil)
 		then
+		if (groupCode == nil)
+			then
 			warning("action CreateNewDevice: missing value for the GroupCode argument")
 			valid = false
 		elseif (#groupCode ~= 1)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the GroupCode argument")
 			valid = false
 		elseif (tableCategories[category][15] ~= nil and tableCategories[category][16] ~= nil
-				and (string.byte(groupCode) < tableCategories[category][15]
-					or string.byte(groupCode) > tableCategories[category][16]))
-		then
+			and (string.byte(groupCode) < tableCategories[category][15]
+			or string.byte(groupCode) > tableCategories[category][16]))
+			then
 			warning(string.format("action CreateNewDevice: value for the GroupCode argument must be in range %s - %s",
-								string.char(tableCategories[category][15]),
-								string.char(tableCategories[category][16])))
+			string.char(tableCategories[category][15]),
+			string.char(tableCategories[category][16])))
 			valid = false
 		else
 			table.insert(params, groupCode)
 		end
 	end
 	if (tableCategories[category][17])
-	then
-		if (unitCode == nil)
 		then
+		if (unitCode == nil)
+			then
 			warning("action CreateNewDevice: missing value for the UnitCode argument")
 			valid = false
 		elseif (tonumber(unitCode) == nil)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the UnitCode argument")
 			valid = false
 		elseif (tableCategories[category][18] ~= nil and tableCategories[category][19] ~= nil
-				and (tonumber(unitCode) < tableCategories[category][18]
-					or tonumber(unitCode) > tableCategories[category][19]))
-		then
+			and (tonumber(unitCode) < tableCategories[category][18]
+			or tonumber(unitCode) > tableCategories[category][19]))
+			then
 			warning(string.format("action CreateNewDevice: value for the UnitCode argument must be in range %d - %d",
-								tableCategories[category][18],
-								tableCategories[category][19]))
+			tableCategories[category][18],
+			tableCategories[category][19]))
 			valid = false
 		else
 			table.insert(params, unitCode)
 		end
 	end
 	if (tableCategories[category][20])
-	then
-		if (systemCode == nil)
 		then
+		if (systemCode == nil)
+			then
 			warning("action CreateNewDevice: missing value for the SystemCode argument")
 			valid = false
 		elseif (tonumber(systemCode) == nil)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the SystemCode argument")
 			valid = false
 		elseif (tableCategories[category][21] ~= nil and tableCategories[category][22] ~= nil
-				and (tonumber(systemCode) < tableCategories[category][21]
-					or tonumber(systemCode) > tableCategories[category][22]))
-		then
+			and (tonumber(systemCode) < tableCategories[category][21]
+			or tonumber(systemCode) > tableCategories[category][22]))
+			then
 			warning(string.format("action CreateNewDevice: value for the SystemCode argument must be in range %d - %d",
-								tableCategories[category][21],
-								tableCategories[category][22]))
+			tableCategories[category][21],
+			tableCategories[category][22]))
 			valid = false
 		else
 			table.insert(params, tonumber(systemCode-1))
 		end
 	end
 	if (tableCategories[category][23])
-	then
-		if (channel == nil)
 		then
+		if (channel == nil)
+			then
 			warning("action CreateNewDevice: missing value for the Channel argument")
 			valid = false
 		elseif (tonumber(channel) == nil)
-		then
+			then
 			warning("action CreateNewDevice: invalid value for the Channel argument")
 			valid = false
 		elseif (tableCategories[category][24] ~= nil and tableCategories[category][25] ~= nil
-				and (tonumber(channel) < tableCategories[category][24]
-					or tonumber(channel) > tableCategories[category][25]))
-		then
+			and (tonumber(channel) < tableCategories[category][24]
+			or tonumber(channel) > tableCategories[category][25]))
+			then
 			warning(string.format("action CreateNewDevice: value for the Channel argument must be in range %d - %d",
-								tableCategories[category][24],
-								tableCategories[category][25]))
+			tableCategories[category][24],
+			tableCategories[category][25]))
 			valid = false
 		else
 			table.insert(params, tonumber(channel))
 		end
 	end
 	if (not valid)
-	then
+		then
 		task("CreateNewDevice: invalid arguments", TASK_ERROR)
 		return
 	end
 
 	while (#params < 3)
-	do
+		do
 		table.insert(params, "")
 	end
 
 	local devType
 	if (deviceType == "SWITCH_LIGHT")
-	then
+		then
 		devType = "LIGHT"
 	elseif (deviceType == "DIMMABLE_LIGHT")
-	then
+		then
 		devType = "DIMMER"
 	elseif (deviceType == "MOTION_SENSOR")
-	then
+		then
 		devType = "MOTION"
 	elseif (deviceType == "DOOR_SENSOR")
-	then
+		then
 		devType = "DOOR"
 	elseif (deviceType == "LIGHT_SENSOR")
-	then
+		then
 		devType = "LIGHT_LEVEL"
 	elseif (deviceType == "WINDOW_COVERING")
-	then
+		then
 		devType = "COVER"
 	end
 
 	local devices = {}
 	local altid = string.format(tableCategories[category][27], tableCategories[category][26],
-								params[1], params[2], params[3])
+	params[1], params[2], params[3])
 	if (findChild(THIS_DEVICE, altid, nil) == nil)
-	then
+		then
 		table.insert(devices, { name, nil, altid, devType })
 	end
 	if (tableCategories[category][28] ~= nil and tableCategories[category][29] ~= nil)
-	then
-		altid = string.format(tableCategories[category][29], tableCategories[category][26],
-								params[1], params[2], params[3])
-		if (findChild(THIS_DEVICE, altid, nil) == nil)
 		then
+		altid = string.format(tableCategories[category][29], tableCategories[category][26],
+		params[1], params[2], params[3])
+		if (findChild(THIS_DEVICE, altid, nil) == nil)
+			then
 			table.insert(devices, { name, nil, altid, tableCategories[category][28] })
 		end
 	end
 	if (tableCategories[category][30] ~= nil and tableCategories[category][31] ~= nil)
-	then
-		altid = string.format(tableCategories[category][31], tableCategories[category][26],
-								params[1], params[2], params[3])
-		if (findChild(THIS_DEVICE, altid, nil) == nil)
 		then
+		altid = string.format(tableCategories[category][31], tableCategories[category][26],
+		params[1], params[2], params[3])
+		if (findChild(THIS_DEVICE, altid, nil) == nil)
+			then
 			table.insert(devices, { name, nil, altid, tableCategories[category][30] })
 		end
 	end
 	if (#devices > 0)
-	then
+		then
 		updateManagedDevices(devices, nil, nil)
 	else
 		task("CreateNewDevice: device already exists", TASK_ERROR)
@@ -5216,17 +5438,17 @@ function changeDeviceType(deviceId, deviceType, name)
 	debug("changeDeviceType " .. (deviceId or "nil") .. " " .. (deviceType or "nil"))
 
 	if (deviceId ~= nil)
-	then
+		then
 		deviceId = tonumber(deviceId)
 	end
 
 	if (deviceId == nil)
-	then
+		then
 		warning("action ChangeDeviceType: missing value for the DeviceId argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
 	elseif (luup.devices[deviceId] == nil)
-	then
+		then
 		warning("action ChangeDeviceType: the device " .. deviceId .. " does not exist")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
@@ -5236,15 +5458,15 @@ function changeDeviceType(deviceId, deviceType, name)
 
 	local category = nil
 	for k, v in pairs(tableCategories)
-	do
+		do
 		if (string.find(altid, v[26]) == 1)
-		then
+			then
 			category = k
 			break
 		end
 	end
 	if (category == nil)
-	then
+		then
 		warning("action ChangeDeviceType: invalid altid for the device " .. deviceId)
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
@@ -5252,44 +5474,44 @@ function changeDeviceType(deviceId, deviceType, name)
 
 	local currentType = nil
 	for k, v in pairs(tableDeviceTypes)
-	do
+		do
 		if (string.find(luup.devices[deviceId].id, v[4], 1) == 1)
-		then
+			then
 			currentType = v
 			break
 		end
 	end
 	if (currentType == nil or currentType[8] == nil)
-	then
+		then
 		warning("action ChangeDeviceType: the device type cannot be changed for the device " .. deviceId)
 		task("ChangeDeviceType: forbidden for this device", TASK_ERROR)
 		return
 	elseif (deviceType == currentType[8] and luup.devices[deviceId].device_type == currentType[1])
-	then
+		then
 		warning("action ChangeDeviceType: the device " .. deviceId .. " has already the requested type")
 		task("ChangeDeviceType: type is ok", TASK_ERROR)
 		return
 	end
 
 	if (deviceType == nil)
-	then
+		then
 		warning("action ChangeDeviceType: missing value for the DeviceType argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
 	elseif (deviceType ~= "SWITCH_LIGHT" and deviceType ~= "DIMMABLE_LIGHT"
-			and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
-			and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
-	then
+		and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
+		and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
+		then
 		warning("action ChangeDeviceType: invalid value for the DeviceType argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
 	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category][2])
-			or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
-			or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
-			or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
-			or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
-			or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
-	then
+		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
+		or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
+		or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
+		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
+		or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
+		then
 		warning("action ChangeDeviceType: DeviceType value not accepted for the device " .. deviceId)
 		task("ChangeDeviceType: new type forbidden for this device", TASK_ERROR)
 		return
@@ -5297,37 +5519,37 @@ function changeDeviceType(deviceId, deviceType, name)
 
 	local devType
 	if (deviceType == "SWITCH_LIGHT")
-	then
+		then
 		devType = "LIGHT"
 	elseif (deviceType == "DIMMABLE_LIGHT")
-	then
+		then
 		devType = "DIMMER"
 	elseif (deviceType == "MOTION_SENSOR")
-	then
+		then
 		devType = "MOTION"
 	elseif (deviceType == "DOOR_SENSOR")
-	then
+		then
 		devType = "DOOR"
 	elseif (deviceType == "LIGHT_SENSOR")
-	then
+		then
 		devType = "LIGHT_LEVEL"
 	elseif (deviceType == "WINDOW_COVERING")
-	then
+		then
 		devType = "COVER"
 	end
 
 	local newName = luup.devices[deviceId].description
 	if (name ~= nil and name ~= "")
-	then
+		then
 		newName = name
 	end
 	debug("changeDeviceType " .. altid .. " " .. devType .. " "  .. newName)
 	updateManagedDevices(nil,
-						 { { newName,
-							 luup.devices[deviceId].room_num,
-							 altid,
-							 devType } },
-						 nil)
+		{ { newName,
+			luup.devices[deviceId].room_num,
+			altid,
+	devType } },
+	nil)
 
 end
 
@@ -5337,12 +5559,12 @@ function deleteDevices(listDevices, disableCreation)
 
 	local tableDeletion = {}
 	if (listDevices ~= nil)
-	then
+		then
 		for value in string.gmatch(listDevices, "[%u%d/.]+")
-		do
+			do
 			table.insert(tableDeletion, value)
 			if (disableCreation == "true" or disableCreation == "yes" or disableCreation == "1")
-			then
+				then
 				disableDevice(value)
 			end
 		end
@@ -5357,17 +5579,17 @@ function sendUnusualCommand(deviceId, commandType)
 	debug("sendUnusualCommand " .. (deviceId or "nil") .. " " .. (commandType or "nil"))
 
 	if (deviceId ~= nil)
-	then
+		then
 		deviceId = tonumber(deviceId)
 	end
 
 	if (deviceId == nil)
-	then
+		then
 		warning("action SendCommand: missing value for the DeviceId argument")
 		task("SendCommand: invalid arguments", TASK_ERROR)
 		return
 	elseif (luup.devices[deviceId] == nil)
-	then
+		then
 		warning("action SendCommand: the device " .. deviceId .. " does not exist")
 		task("SendCommand: invalid arguments", TASK_ERROR)
 		return
@@ -5399,15 +5621,15 @@ function sendUnusualCommand(deviceId, commandType)
 
 	local idxCmd = nil
 	for k, v in pairs(tableCommands)
-	do
+		do
 		if ((string.find(id, v[1], 4) == 4) and (commandType == v[2]))
-		then
+			then
 			idxCmd = k
 			break
 		end
 	end
 	if (idxCmd == nil)
-	then
+		then
 		warning("action SendCommand: invalid command for the device " .. deviceId)
 		task("SendCommand: invalid arguments", TASK_ERROR)
 		return
@@ -5422,45 +5644,45 @@ function sendUnusualCommand(deviceId, commandType)
 	local data = nil
 
 	if (idxCmd == 1)
-	then
+		then
 		remoteId = string.sub(id, 9, 17)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							tonumber(string.sub(remoteId, 8, 9)),
-							tableCommands[idxCmd][5], 0, 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		tonumber(string.sub(remoteId, 8, 9)),
+		tableCommands[idxCmd][5], 0, 0)
 	elseif (idxCmd == 2)
-	then
+		then
 		remoteId = tonumber(string.sub(id, 9, 9), 16)
 		unitcode = tonumber(string.sub(id, 10, 11))
 		local channel1 = 0
 		local channel2 = 0
 		if (unitcode >= 1 and unitcode <= 8)
-		then
+			then
 			channel1 = 1
 			if (unitcode > 1)
-			then
+				then
 				channel1 = bitw.lshift(channel1, unitcode-1)
 			end
 		elseif (unitcode >= 9 and unitcode <= 10)
-		then
+			then
 			channel2 = 1
 			if (unitcode > 9)
-			then
+				then
 				channel2 = bitw.lshift(channel2, unitcode-9)
 			end
 		end
 		data = string.char(remoteId, channel1, channel2, tableCommands[idxCmd][5], 0)
 	elseif (idxCmd == 3)
-	then
+		then
 		housecode = string.sub(id, 7, 7)
 		unitcode = tonumber(string.sub(id, 8, 9))
 		data = housecode .. string.char(unitcode, tableCommands[idxCmd][5], 0)
 	elseif (idxCmd >= 4 and idxCmd <= 10)
-	then
+		then
 		remoteId = string.sub(id, 7, 12)
 		if (tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T6[2] or tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T7[2])
-		then
+			then
 			id4 = tonumber(string.sub(id, 13, 13), 16)
 			unitcode = tonumber(string.sub(id, 15, 16)) % 16
 		else
@@ -5468,21 +5690,21 @@ function sendUnusualCommand(deviceId, commandType)
 			unitcode = tonumber(string.sub(id, 14, 15)) % 16
 		end
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-							tonumber(string.sub(remoteId, 3, 4), 16),
-							tonumber(string.sub(remoteId, 5, 6), 16),
-							id4 * 16 + unitcode, tableCommands[idxCmd][5], 0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		id4 * 16 + unitcode, tableCommands[idxCmd][5], 0)
 	elseif (idxCmd >= 11 and idxCmd <= 19)
-	then
+		then
 		remoteId = string.sub(id, 9, 13)
 		unitcode = tonumber(string.sub(id, 15, 16))
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-							tonumber(string.sub(remoteId, 2, 3), 16),
-							tonumber(string.sub(remoteId, 4, 5), 16),
-							unitcode, tableCommands[idxCmd][5], 0, 0, 0, 0)
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		unitcode, tableCommands[idxCmd][5], 0, 0, 0, 0)
 	end
 
 	if (data ~= nil)
-	then
+		then
 		local tableCmds = {}
 		table.insert(tableCmds, { string.sub(id, 4), "", nil, 0 })
 		sendCommand(tableCommands[idxCmd][3], tableCommands[idxCmd][4], data, tableCmds)
@@ -5493,7 +5715,7 @@ end
 function receiveMessage(message)
 
 	if (#message < 10)
-	then
+		then
 		warning("Action ReceiveMessage: invalid message")
 		return
 	end
@@ -5502,7 +5724,7 @@ function receiveMessage(message)
 
 	local msg = ""
 	for i = 1, #message / 2
-	do
+		do
 		msg = msg .. string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
 	end
 
@@ -5513,7 +5735,7 @@ end
 function sendMessage(message)
 
 	if (#message < 10)
-	then
+		then
 		warning("Action SendMessage: invalid message")
 		return
 	end
@@ -5522,7 +5744,7 @@ function sendMessage(message)
 
 	local msg = ""
 	for i = 1, #message / 2
-	do
+		do
 		msg = msg .. string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
 	end
 
@@ -5539,14 +5761,14 @@ function setTemperatureUnit(unit)
 	debug("setTemperatureUnit " .. (unit or "nil"))
 
 	if (unit ~= "CELCIUS" and unit ~= "FAHRENHEIT")
-	then
+		then
 		task("SetTemperatureUnit: invalid argument", TASK_ERROR)
 		return
 	end
 
 	local value = 1
 	if (unit == "FAHRENHEIT")
-	then
+		then
 		value = 0
 	end
 	setVariable(THIS_DEVICE, tabVars.VAR_TEMP_UNIT, value)
@@ -5558,14 +5780,14 @@ function setSpeedUnit(unit)
 	debug("setSpeedUnit " .. (unit or "nil"))
 
 	if (unit ~= "KMH" and unit ~= "MPH")
-	then
+		then
 		task("SetSpeedUnit: invalid argument", TASK_ERROR)
 		return
 	end
 
 	local value = 1
 	if (unit == "MPH")
-	then
+		then
 		value = 0
 	end
 	setVariable(THIS_DEVICE, tabVars.VAR_SPEED_UNIT, value)
@@ -5585,14 +5807,14 @@ function setAutoCreate(enable)
 	debug("setAutoCreate " .. (enable or "nil"))
 
 	if ((enable == "true") or (enable == "yes"))
-	then
+		then
 		enable = "1"
 	elseif ((enable == "false") or (enable == "no"))
-	then
+		then
 		enable = "0"
 	end
 	if ((enable ~= "0") and (enable ~= "1"))
-	then
+		then
 		task("SetAutoCreate: invalid argument", TASK_ERROR)
 		return
 	end
@@ -5606,21 +5828,21 @@ function setDebugLogs(enable)
 	debug("setDebugLogs " .. (enable or "nil"))
 
 	if ((enable == "true") or (enable == "yes"))
-	then
+		then
 		enable = "1"
 	elseif ((enable == "false") or (enable == "no"))
-	then
+		then
 		enable = "0"
 	end
 	if ((enable ~= "0") and (enable ~= "1"))
-	then
+		then
 		task("SetDebugLogs: invalid argument", TASK_ERROR)
 		return
 	end
 
 	setVariable(THIS_DEVICE, tabVars.VAR_DEBUG_LOGS, enable)
 	if (enable == "1")
-	then
+		then
 		DEBUG_MODE = true
 	else
 		DEBUG_MODE = false
@@ -5632,113 +5854,113 @@ local function setMode()
 
 	local msg3 = 0
 	if (getVariable(THIS_DEVICE, tabVars.VAR_UNDECODED_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x80
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_IMAGINTRONIX_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x40
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_BYRONSX_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x20
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_RSL_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x10
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_LIGHTING4_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x08
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_FINEOFFSET_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x04
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_RUBICSON_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x02
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_AE_RECEIVING) == "1")
-	then
+		then
 		msg3 = msg3 + 0x01
 	end
 
 	local msg4 = 0
 	if (getVariable(THIS_DEVICE, tabVars.VAR_BLINDST1_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x80
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_BLINDST0_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x40
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_PROGUARD_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x20
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_FS20_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x10
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_LACROSSE_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x08
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_HIDEKI_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x04
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_AD_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x02
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_MERTIK_RECEIVING) == "1")
-	then
+		then
 		msg4 = msg4 + 0x01
 	end
 
 	local msg5 = 0
 	if (getVariable(THIS_DEVICE, tabVars.VAR_VISONIC_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x80
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_ATI_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x40
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_OREGON_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x20
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_MEIANTECH_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x10
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_HEU_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x08
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_AC_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x04
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_ARC_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x02
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_X10_RECEIVING) == "1")
-	then
+		then
 		msg5 = msg5 + 0x01
 	end
 
 	local msg6 = 0
 	if (getVariable(THIS_DEVICE, tabVars.VAR_HOMECONFORT_RECEIVING) == "1")
-	then
+		then
 		msg6 = msg6 + 0x02
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_KEELOQ_RECEIVING) == "1")
-	then
+		then
 		msg6 = msg6 + 0x01
 	end
 
@@ -5783,26 +6005,26 @@ function setupReceiving(protocol, enable)
 	local valid = true
 
 	if (protocol == nil or tabProtocols[protocol] == nil)
-	then
+		then
 		warning("SetupReceiving: unexpected value for first argument")
 		valid = false
 	end
 
 	if ((enable == "true") or (enable == "yes"))
-	then
+		then
 		enable = "1"
 	elseif ((enable == "false") or (enable == "no"))
-	then
+		then
 		enable = "0"
 	end
 	if ((enable ~= "0") and (enable ~= "1"))
-	then
+		then
 		warning("SetupReceiving: unexpected value for second argument")
 		valid = false
 	end
 
 	if (not valid)
-	then
+		then
 		task("SetupReceiving: invalid arguments", TASK_ERROR)
 		return
 	end
