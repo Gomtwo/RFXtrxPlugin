@@ -1081,6 +1081,14 @@ function RFX_showHelp(device)
 	if (firmware == undefined) {
 		firmware = '';
 	}
+	var firmtype = get_device_state(device, RFX.SID2, "FirmwareType", 1);
+	if (firmtype == undefined) {
+		firmtype = '';
+	}
+	var hardware = get_device_state(device, RFX.SID2, "HardwareVersion", 1);
+	if (hardware == undefined) {
+		hardware = '';
+	}
 
 	var html = '';
 
@@ -1092,6 +1100,14 @@ function RFX_showHelp(device)
 	html += '<tr>';
 	html += '<td>RFXtrx firmware:</td>';
 	html += '<td>' + firmware + '</td>';
+	html += '</tr>';
+	html += '<tr>';
+	html += '<td>RFXtrx firmware type:</td>';
+	html += '<td>' + firmtype + '</td>';
+	html += '</tr>';
+	html += '<tr>';
+	html += '<td>RFXtrx hardware:</td>';
+	html += '<td>' + hardware + '</td>';
 	html += '</tr>';
 	html += '<tr>';
 	html += '<td>Wiki:</td>';
