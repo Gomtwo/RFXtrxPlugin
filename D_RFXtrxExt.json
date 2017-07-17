@@ -1,0 +1,1790 @@
+{
+	"default_icon": "RFXtrx433E.png",
+	"imgIconBody": "",
+	"imgIconDimmable": "",
+	"imgIconTurnable": "",
+	"imgIconMin": "",
+	"imgIconMax": "",
+	"halloIconsDir": "pics/hallo",
+	"inScene": "0",
+	"DisplayStatus": {},
+	"doc_url": {
+		"doc_language": 1,
+		"doc_manual": 1,
+		"doc_version": 1,
+		"doc_platform": 0,
+		"doc_page": "sensors"
+	},
+	"ToggleButton": 1,
+	"Tabs": [{
+			"Label": {
+				"lang_tag": "tabname_rfxtrx_settings",
+				"text": "RFXtrx settings"
+			},
+			"Position": "0",
+			"TabType": "flash",
+			"ControlGroup": [{
+				"id": "1",
+				"scenegroup": "1"
+			}],
+			"SceneGroup": [{
+				"id": "1",
+				"top": "1.5",
+				"left": "0.25",
+				"x": "1.5",
+				"y": "2"
+			}],
+			"Control": [{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "protocol_receiving",
+						"text": "RECEIVING PROTOCOLS"
+					},
+					"Display": {
+						"Top": 8,
+						"Left": 30,
+						"Width": 150,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "firm_type",
+						"text": "Firmware Type:"
+					},
+					"Display": {
+						"Top": 8,
+						"Left": 180,
+						"Width": 150,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "variable",
+					"Display": {
+						"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+						"Variable": "FirmwareType",
+						"Top": 8,
+						"Left": 270,
+						"Width": 50,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "firm_ver",
+						"text": "Firmware Version:"
+					},
+					"Display": {
+						"Top": 8,
+						"Left": 375,
+						"Width": 150,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "variable",
+					"Display": {
+						"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+						"Variable": "FirmwareVersion",
+						"Top": 8,
+						"Left": 480,
+						"Width": 50,
+						"Height": 20
+					}
+				},
+
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "ad_receiving",
+						"text": "AD / LightwaveRF"
+					},
+					"Display": {
+						"Top": 45,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 35,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "ad_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ADReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LIGHTWAVERF"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "ad_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "ad_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ADReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LIGHTWAVERF"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "ad_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "byron_receiving",
+						"text": "Byron SX / SelectPlus"
+					},
+					"Display": {
+						"Top": 80,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 70,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "byron_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ByronSXReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "BYRON_SX"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "byron_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "byron_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ByronSXReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "BYRON_SX"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "byron_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "fineoffset_receiving",
+						"text": "FineOffset / Viking"
+					},
+					"Display": {
+						"Top": 115,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 105,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "fineoffset_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "FineOffsetReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "FINEOFFSET_VIKING"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "fineoffset_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "fineoffset_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "FineOffsetReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "FINEOFFSET_VIKING"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "fineoffset_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"top": "0",
+					"left": "0",
+					"text_align": "left",
+					"Label": {
+						"lang_tag": "imagintronix_label",
+						"text": "Imagintronix / Opus"
+					},
+					"Display": {
+						"Top": 150,
+						"Left": 10
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 140,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "imagintronix_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ImagintronixReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "IMAGINTRONIX"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "imagintronix_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "imagintronix_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ImagintronixReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "IMAGINTRONIX"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "imagintronix_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "meiantech_receiving",
+						"text": "Meiantech / Atlantic"
+					},
+					"Display": {
+						"Top": 185,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 175,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "meiantech_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "MeiantechReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "MEIANTECH"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "meiantech_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "meiantech_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "MeiantechReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "MEIANTECH"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "meiantech_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "fs20_receiving",
+						"text": "Legrand CAD"
+					},
+					"Display": {
+						"Top": 220,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 210,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "FS20_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "FS20Receiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "FS20"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "FS20_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "FS20_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "FS20Receiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "FS20"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "FS20_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "rubicson_receiving",
+						"text": "Rubicson/Alecto/Banggood"
+					},
+					"Display": {
+						"Top": 255,
+						"Left": 10,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 245,
+						"Left": 160
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "rubicson_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "RubicsonReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "RUBICSON"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "rubicson_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "rubicson_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "RubicsonReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "RUBICSON"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "rubicson_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "arc_receiving",
+						"text": "ARC"
+					},
+					"Display": {
+						"Top": 45,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 35,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "arc_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ARCReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "ARC"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "arc_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "arc_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ARCReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "ARC"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "arc_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "lacrosse_receiving",
+						"text": "La Crosse"
+					},
+					"Display": {
+						"Top": 80,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 70,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "lacrosse_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "LaCrosseReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LACROSSE"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "lacrosse_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "lacrosse_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "LaCrosseReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LACROSSE"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "lacrosse_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "mertik_receiving",
+						"text": "Mertik"
+					},
+					"Display": {
+						"Top": 115,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 105,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "mertik_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "MertikReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "MERTIK"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "mertik_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "mertik_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "MertikReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "MERTIK"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "mertik_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "visonic_receiving",
+						"text": "Visonic"
+					},
+					"Display": {
+						"Top": 150,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 140,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "visonic_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "VisonicReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "VISONIC"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "visonic_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "visonic_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "VisonicReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "VISONIC"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "visonic_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "x10_receiving",
+						"text": "X10"
+					},
+					"Display": {
+						"Top": 185,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 175,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "x10_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "X10Receiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "X10"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "x10_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "x10_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "X10Receiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "X10"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "x10_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "keeloq_receiving",
+						"text": "Keeloq"
+					},
+					"Display": {
+						"Top": 220,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 210,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "keeloq_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "KeeloqReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "KEELOQ"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "keeloq_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "keeloq_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "KeeloqReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "KEELOQ"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "keeloq_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "ae_receiving",
+						"text": "AE / Blyss"
+					},
+					"Display": {
+						"Top": 255,
+						"Left": 260,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 245,
+						"Left": 345
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "ae_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "AEReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "BLYSS"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "ae_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "ae_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "AEReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "BLYSS"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "ae_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "ac_receiving",
+						"text": "AC / ANSLUT"
+					},
+					"Display": {
+						"Top": 45,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 35,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "ac_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ACReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "AC"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "ac_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "ac_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "ACReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "AC"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "ac_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "hideki_receiving",
+						"text": "Hideki / UPM"
+					},
+					"Display": {
+						"Top": 80,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 70,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "hideki_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HidekiReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HIDEKI_UPM"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "hideki_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "hideki_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HidekiReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HIDEKI_UPM"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "hideki_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "heu_receiving",
+						"text": "HomeEasy EU"
+					},
+					"Display": {
+						"Top": 115,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 105,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "heu_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HEUReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HOMEEASY_EU"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "heu_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "heu_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HEUReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HOMEEASY_EU"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "heu_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "lighting4_receiving",
+						"text": "Lighting4"
+					},
+					"Display": {
+						"Top": 150,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 140,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "lighting4_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "Lighting4Receiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LIGHTING4"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "lighting4_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "lighting4_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "Lighting4Receiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "LIGHTING4"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "lighting4_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "oregon_receiving",
+						"text": "Oregon Scientific"
+					},
+					"Display": {
+						"Top": 185,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 175,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "oregon_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "OregonReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "OREGON"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "oregon_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "oregon_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "OregonReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "OREGON"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "oregon_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "homeconfort_receiving",
+						"text": "Homeconfort"
+					},
+					"Display": {
+						"Top": 220,
+						"Left": 440,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 210,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "homeconfort_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HomeconfortReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HOMECONFORT"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "homeconfort_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "homeconfort_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "HomeconfortReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "HOMECONFORT"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "homeconfort_off"
+						}
+					]
+				},
+				{
+					"ControlType": "label",
+					"top": "0",
+					"left": "0",
+					"text_align": "left",
+					"Label": {
+						"lang_tag": "undecoded_label",
+						"text": "Undecoded"
+					},
+					"Display": {
+						"Top": 255,
+						"Left": 440,
+						"Width": 75,
+						"Height": 18
+					}
+				},
+				{
+					"ControlType": "multi_state_button",
+					"top": "0",
+					"left": "1",
+					"Display": {
+						"Top": 245,
+						"Left": 560
+					},
+					"states": [{
+							"Label": {
+								"lang_tag": "undecoded_on",
+								"text": ""
+							},
+							"ControlGroup": "1",
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "UndecodedReceiving",
+								"Value": "1"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "UNDECODED"
+									},
+									{
+										"Name": "enable",
+										"Value": "1"
+									}
+								]
+							},
+							"ControlCode": "undecoded_on"
+						},
+						{
+							"ControlGroup": "1",
+							"Label": {
+								"lang_tag": "undecoded_off",
+								"text": ""
+							},
+							"Display": {
+								"Service": "upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Variable": "UndecodedReceiving",
+								"Value": "0"
+							},
+							"Command": {
+								"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+								"Action": "SetupReceiving",
+								"Parameters": [{
+										"Name": "protocol",
+										"Value": "UNDECODED"
+									},
+									{
+										"Name": "enable",
+										"Value": "0"
+									}
+								]
+							},
+							"ControlCode": "undecoded_off"
+						}
+					]
+				},
+				{
+					"ControlType": "button",
+					"Label": {
+						"lang_tag": "cmd_save",
+						"text": "Save RFXtrx settings"
+					},
+					"Display": {
+						"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+						"Top": 358,
+						"Left": 25,
+						"Width": 150,
+						"Height": 18
+					},
+					"Command": {
+						"Service": "urn:upnp-rfxcom-com:serviceId:rfxtrx1",
+						"Action": "SaveSettings",
+						"Parameters": []
+					}
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "saving_warning",
+						"text": "Save in non-volatile memory (max 10000 write cycles)"
+					},
+					"Display": {
+						"Top": 362,
+						"Left": 185,
+						"Width": 225,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "label",
+					"Label": {
+						"lang_tag": "last_msg",
+						"text": "Last received message:"
+					},
+					"Display": {
+						"Top": 380,
+						"Left": 25,
+						"Width": 150,
+						"Height": 20
+					}
+				},
+				{
+					"ControlType": "variable",
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:rfxtrx1",
+						"Variable": "LastReceivedMsg",
+						"Value": "1",
+						"Top": 380,
+						"Left": 185,
+						"Width": 250,
+						"Height": 20
+					}
+				}
+			]
+		},
+
+		{
+			"Label": {
+				"lang_tag": "tabname_plugin_settings",
+				"text": "Plugin settings"
+			},
+			"Position": "1",
+			"TabType": "javascript",
+			"ScriptName": "J_RFXtrx.js",
+			"Function": "RFX_showSettings"
+		},
+		{
+			"Label": {
+				"lang_tag": "tabname_new_device",
+				"text": "New device"
+			},
+			"Position": "2",
+			"TabType": "javascript",
+			"ScriptName": "J_RFXtrx.js",
+			"Function": "RFX_showNewDevice"
+		},
+		{
+			"Label": {
+				"lang_tag": "tabname_devices",
+				"text": "Managed devices"
+			},
+			"Position": "3",
+			"TabType": "javascript",
+			"ScriptName": "J_RFXtrx.js",
+			"Function": "RFX_showManagedDevices"
+		},
+		{
+			"Label": {
+				"lang_tag": "tabname_help",
+				"text": "Help"
+			},
+			"Position": "4",
+			"TabType": "javascript",
+			"ScriptName": "J_RFXtrx.js",
+			"Function": "RFX_showHelp"
+		},
+		{
+			"Label": {
+				"lang_tag": "advanced",
+				"text": "Advanced"
+			},
+			"Position": "5",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "advanced_device"
+		}
+	],
+	"DeviceType": "urn:schemas-rfxcom-com:device:rfxtrx:1"
+}
