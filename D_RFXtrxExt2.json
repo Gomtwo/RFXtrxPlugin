@@ -1692,10 +1692,20 @@
 		},
 		{
 			"Label": {
+				"lang_tag": "tabname_sensordata",
+				"text": "Sensor Data"
+			},
+			"Position": "4",
+			"TabType": "javascript",
+			"ScriptName": "J_RFXtrx.js",
+			"Function": "RFX_showSensorData"
+		},
+		{
+			"Label": {
 				"lang_tag": "tabname_help",
 				"text": "Help"
 			},
-			"Position": "4",
+			"Position": "5",
 			"TabType": "javascript",
 			"ScriptName": "J_RFXtrx.js",
 			"Function": "RFX_showHelp"
@@ -1705,7 +1715,7 @@
 				"lang_tag": "advanced",
 				"text": "Advanced"
 			},
-			"Position": "5",
+			"Position": "6",
 			"TabType": "javascript",
 			"ScriptName": "shared.js",
 			"Function": "advanced_device"

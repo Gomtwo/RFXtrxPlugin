@@ -247,11 +247,11 @@ local tabVars = {
 	VAR_TEMPMAX = { "urn:upnp-org:serviceId:TemperatureSensor1", "MaxTemp", false, true, true },
 	VAR_TEMPMIN = { "urn:upnp-org:serviceId:TemperatureSensor1", "MinTemp", false, true, true },
 	VAR_HUM = { "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", false, true, true },
-	VAR_HUMMAX24HR = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxHum24hr", false, true, true },
-	VAR_HUMMIN24HR = { "urn:upnp-org:serviceId:HumiditySensor1", "MinHum24hr", false, true, true },
-	VAR_HUMMAXMIN = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxMinHum", false, false, true },
-	VAR_HUMMAX = { "urn:upnp-org:serviceId:HumiditySensor1", "MaxHum", false, true, true },
-	VAR_HUMMIN = { "urn:upnp-org:serviceId:HumiditySensor1", "MinHum", false, true, true },
+	VAR_HUMMAX24HR = { "urn:micasaverde-com:serviceId:HumiditySensor1", "MaxHum24hr", false, true, true },
+	VAR_HUMMIN24HR = { "urn:micasaverde-com:serviceId:HumiditySensor1", "MinHum24hr", false, true, true },
+	VAR_HUMMAXMIN = { "urn:micasaverde-com:serviceId:HumiditySensor1", "MaxMinHum", false, false, true },
+	VAR_HUMMAX = { "urn:micasaverde-com:serviceId:HumiditySensor1", "MaxHum", false, true, true },
+	VAR_HUMMIN = { "urn:micasaverde-com:serviceId:HumiditySensor1", "MinHum", false, true, true },
 	VAR_LIGHT = { "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true },
 	VAR_DIMMER = { "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, false, true },
 	VAR_PRESSURE = { "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, true, true },
@@ -1227,11 +1227,19 @@ end
 -- dataString is the string received from the sensor
 -- byte1 is the first byte of temperature data. The second byte of data always
 -- follows the first
-local function decodeTemperature( dataString, byte1 )
+local function decodeTemperature( altid, dataString, byte1 )
 	local temp = (bitw.band(string.byte(dataString, byte1), 0x7F) * 256 + string.byte(dataString, byte1 + 1)) / 10
 	if (bitw.band(string.byte(dataString, byte1), 0x80) == 0x80)
 		then
 		temp = -temp
+		if (temp < -28.89)
+			then
+			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
+		end
+	else if (temp > 65.56)
+			then
+			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
+		end
 	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_TEMP_UNIT) == "0")
 		then
@@ -2826,7 +2834,7 @@ local function decodeTemp(subType, data)
 	local altid = "T" .. subType .. "/" .. id
 
 	local tableCmds = {}
-	local temp = decodeTemperature( data, 3 )
+	local temp = decodeTemperature( altid, data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
 	-- Update if necessary the max and min temperatures detected by this device
@@ -2850,16 +2858,22 @@ local function decodeHum(subType, data)
 	local tableCmds = {}
 
 	local hum = string.byte(data, 3)
-	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
+	-- Ignore humidity greater than 100 - must be an error
+	if(hum < 100)
+		then
+		table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
 
-	-- Update if necessary the max and min humidity detected by this device
-	checkMaxMinHum( altid, tableCmds, hum )
+		-- Update if necessary the max and min humidity detected by this device
+		checkMaxMinHum( altid, tableCmds, hum )
 
-	local strength = bitw.rshift(string.byte(data, 5), 4)
-	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+		local strength = bitw.rshift(string.byte(data, 5), 4)
+		table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
 
-	local battery = decodeBatteryLevel(data, 5)
-	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
+		local battery = decodeBatteryLevel(data, 5)
+		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
+	else
+		debug("Dubious humidity reading: " .. hum .. "%" .. " altid=" .. altid .. " status=")
+	end
 
 	return tableCmds
 
@@ -2872,7 +2886,7 @@ local function decodeTempHum(subType, data)
 
 	local tableCmds = {}
 
-	local temp = decodeTemperature( data, 3 )
+	local temp = decodeTemperature( altid, data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
 	-- Update if necessary the max and min temperatures detected by this device
@@ -2880,10 +2894,16 @@ local function decodeTempHum(subType, data)
 
 	-- Now handle the humidity data
 	local hum = string.byte(data, 5)
-	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
+	-- Ignore humidity greater than 100 - must be an error
+	if(hum < 100)
+		then
+		table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
 
-	-- Update if necessary the max and min humidity detected by this device
-	checkMaxMinHum( altid, tableCmds, hum )
+		-- Update if necessary the max and min humidity detected by this device
+		checkMaxMinHum( altid, tableCmds, hum )
+	else
+		debug("Dubious humidity reading: " .. hum .. " altid=" .. altid .. " status=")
+	end
 
 	local strength = bitw.rshift(string.byte(data, 7), 4)
 	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
@@ -2942,18 +2962,23 @@ local function decodeTempHumBaro(subType, data)
 
 	local tableCmds = {}
 
-	local temp = decodeTemperature( data, 3 )
+	local temp = decodeTemperature( altid, data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
 	-- Update if necessary the max and min temperatures detected by this device
 	checkMaxMinTemp( altid, tableCmds, temp )
 
 	local hum = string.byte(data, 5)
-	table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
+	-- Ignore humidity greater than 100 - must be an error
+	if(hum < 100)
+		then
+		table.insert(tableCmds, { altid, tableCommands.CMD_HUM[1], hum, 0 } )
 
-	-- Update if necessary the max and min humidity detected by this device
-	checkMaxMinHum( altid, tableCmds, hum )
-
+		-- Update if necessary the max and min humidity detected by this device
+		checkMaxMinHum( altid, tableCmds, hum )
+	else
+		debug("Dubious humidity reading: " .. hum .. " altid=" .. altid .. " status=")
+	end
 	local baro = string.byte(data, 7) * 256 + string.byte(data, 8)
 	table.insert(tableCmds, { altid, tableCommands.CMD_PRESSURE[1], baro, 0 } )
 
@@ -3027,7 +3052,7 @@ local function decodeTempRain(subType, data)
 
 	local tableCmds = {}
 
-	local temp = decodeTemperature( data, 3 )
+	local temp = decodeTemperature( altid, data, 3 )
 	table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 
 	-- Update if necessary the max and min temperatures detected by this device
@@ -3083,7 +3108,7 @@ local function decodeWind(subType, data)
 
 	if (subType == tableMsgTypes.WIND4[2])
 		then
-		local temp = decodeTemperature( data, 9 )
+		local temp = decodeTemperature( altid, data, 9 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 		-- Update if necessary the max and min temperatures detected by this device
 		checkMaxMinTemp( altid, tableCmds, temp )
@@ -3111,7 +3136,7 @@ local function decodeUV(subType, data)
 
 	if (subType == tableMsgTypes.UV3[2])
 		then
-		local temp = decodeTemperature( data, 4 )
+		local temp = decodeTemperature( altid, data, 4 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 		-- Update if necessary the max and min temperatures detected by this device
 		checkMaxMinTemp( altid, tableCmds, temp )
@@ -3592,7 +3617,7 @@ local function decodeRFXSensor(subType, data)
 
 	if (subType == tableMsgTypes.RFXSENSOR_T[2])
 		then
-		local temp = decodeTemperature( data, 2 )
+		local temp = decodeTemperature( altid, data, 2 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
 		-- Update if necessary the max and min temperatures detected by this device
 		checkMaxMinTemp( altid, tableCmds, temp )

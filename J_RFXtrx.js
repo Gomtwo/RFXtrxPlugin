@@ -1,5 +1,5 @@
 var RFX = {
-	browserIE : false,
+	browserIE : undefined,
 
 	SID : 'urn:upnp-rfxcom-com:serviceId:rfxtrx1',
 	SID2 : 'upnp-rfxcom-com:serviceId:rfxtrx1',
@@ -626,6 +626,11 @@ var RFX = {
 		[	"HEATER", "Heater", "urn:schemas-upnp-org:device:Heater:1", "HT/", "urn:upnp-org:serviceId:HVAC_UserOperatingMode1", "ModeStatus", false, "", "", ""	]
 	],
 
+	sensorDeviceTypes : [
+		[	"TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", "MaxTemp", "MinTemp", "MaxTemp24hr", "MinTemp24hr", "MaxMinTemps", ""	],
+		[	"HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", "MaxHum", "MinHum", "MaxHum24hr", "MinHum24hr", "MaxMinHum", " %"	]
+	],
+
 	commands : [
 		[ "L5.1/", "LEARN", "Learn" ],
 		[ "L3.0/", "PROGRAM", "Program" ],
@@ -657,9 +662,7 @@ var RFX = {
 
 function RFX_showNewDevice(device)
 {
-	RFX_detectBrowser();
-	RFX_defineUIStyle();
-
+	RFX_checkSettings(device);
 	var html = '';
 
 	html += '<table cellspacing="10">';
@@ -700,14 +703,22 @@ function RFX_showNewDevice(device)
 
 function RFX_showManagedDevices(device)
 {
-	RFX_detectBrowser();
-	RFX_defineUIStyle();
+	RFX_checkSettings(device);
 
 	var autoCreate = get_device_state(device, RFX.SID2, "AutoCreate", 1);
 
 	var html = '';
+	
+	html += '<style>'
+	html += '#devicesTable, th, td { padding:1px 3px; text-align: center; }'
+	html += '</style>'
 
-	html += '<DIV id="devicesTable"/>'
+	html += '<style>'
+	html += '#otherTable, th, td { padding:1px 3px; text-align: left; }'
+	html += '</style>'
+
+	html += '<DIV id="devicesTable">'
+	html += '</DIV>'
 
 	html += '<DIV>'
 	html += '<button type="button" style="margin-right: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 110px; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_updateDevicesTable('+device+');">Refresh table</button>';
@@ -716,7 +727,7 @@ function RFX_showManagedDevices(device)
 	html += '<button type="button" style="margin-left: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 100px; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_selectAllDevices(false);">Unselect All</button>';
 	html += '</DIV>'
 
-	html += '<table cellspacing="10">';
+	html += '<table id="otherTable" cellspacing="10">';
 	html += '<tr><td colspan=2><label id="msg2"/></td></tr>';
 	html += '<tr><td>Device ID:</td><td id="selDeviceID"/></tr>';
 	html += '<tr><td>Battery level:</td><td id="battery"/></tr>';
@@ -760,7 +771,8 @@ function RFX_showManagedDevices(device)
 function RFX_updateDevicesTable(device)
 {
 	var html = '<table border="1">';
-	html += '<tr align="center" style="background-color: '+ RFX.tableTitleBgColor + '; color: white">';
+
+	html += '<tr style="background-color: '+ RFX.tableTitleBgColor + '; color: white">';
 	html += '<th></td>';
 	html += '<th>ID</td>';
 	html += '<th>Name</td>';
@@ -789,19 +801,15 @@ function RFX_updateDevicesTable(device)
 	var nb=0;
 	for (i=0; i<RFX.userData.devices.length; i++) {
 		if (RFX.userData.devices[i].id_parent == device) {
-			var room = '';
+			var room = 'NONE';
 			for (j=0; j<RFX.userData.rooms.length; j++) {
 				if (RFX.userData.rooms[j].id == RFX.userData.devices[i].room) {
 					room = RFX.userData.rooms[j].name;
 					break;
 				}
 			}
-			var room2 = room;
-			if (room2 == '') {
-				room2 = 'NONE';
-			}
-			if (rooms.indexOf(room2) < 0) {
-				rooms.push(room2);
+			if (rooms.indexOf(room) < 0) {
+				rooms.push(room);
 			}
 			var type = '';
 			var type2 = '';
@@ -994,10 +1002,194 @@ function RFX_updateDevicesTable(device)
 	jQuery('#dicardedDevices').html(dicardedDevices);
 }
 
+function RFX_showSensorData(device)
+{
+	RFX_checkSettings(device);
+	var html = '';
+
+	html += '<style>'
+	html += '#sensorDataTable, th, td { padding:1px 3px; text-align: center; }'
+	html += '</style>'
+
+	html += 'Temperature and Humidity Sensor Data';
+	html += '<p><DIV id="sensorDataTable"/></p>';
+
+	html += '<DIV>'
+	html += '<button type="button" style="margin-right: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 110px; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_updateSensorData('+device+');">Refresh table</button>';
+	html += '</DIV>'
+	html += '<p/>'
+
+	set_panel_html(html);
+
+	RFX_updateSensorData(device);
+}
+
+function RFX_pad(num, size)
+{
+	return([1e10] + num).slice(-size)
+}
+
+function RFX_resetSensorData( idx )
+{
+	if(idx != undefined && idx >= 0) {
+		var type = RFX.userData.devices[idx].device_type;
+		var device = RFX.userData.devices[idx].id_parent;
+		if(type != undefined && device != undefined) {
+			var idxType = -1;
+			for (j=0; j<RFX.sensorDeviceTypes.length; j++) {
+				if (RFX.sensorDeviceTypes[j][2] == type) {
+					idxType = j;
+					break;
+				}
+			}
+			if(idxType >= 0) {
+				var currentValue = get_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][5], 1);
+				if (currentValue == undefined)
+					return;
+				set_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][6], currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][7], currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][8], currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][9], currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][10], undefined, 1);
+				setTimeout(function(){ RFX_updateSensorData(device); }, 2000);
+			}
+		}
+	}
+}
+
+function RFX_updateSensorData(device)
+{
+	var date = new Date();
+	var hours = 0;
+	var min = 0;
+	var sec = 0;
+	var elapsedTime = 0;
+	var dateValue = Math.floor(date.getTime()/1000);
+	
+	var html = '<table border="1" >';
+	html += '<tr style="background-color: '+ RFX.tableTitleBgColor + '; color: white">';
+	html += '<th>ID</th>';
+	html += '<th>Name</th>';
+	html += '<th>Room</th>';
+	html += '<th>Type</th>';
+	html += '<th>Now</th>';
+	html += '<th>Maximum</th>';
+	html += '<th>Max 24Hr</th>';
+	html += '<th>Minimum</th>';
+	html += '<th>Min 24hr</th>';
+	html += '<th>Signal</th>';
+	html += '<th>Battery</th>';
+	html += '<th>Age</th>';
+	html += '<th>Reset</th>';
+	html += '</tr>';
+
+
+	if (typeof api !== 'undefined') {
+		RFX.userData = api.getUserData();
+	}
+	else {
+		RFX.userData = jsonp.ud;
+	}
+
+	for (i=0; i<RFX.userData.devices.length; i++) {
+		if (RFX.userData.devices[i].id_parent == device) {
+			var type = RFX.userData.devices[i].device_type;
+			var idxType = -1;
+			for (j=0; j<RFX.sensorDeviceTypes.length; j++) {
+				if (RFX.sensorDeviceTypes[j][2] == type) {
+					idxType = j;
+					break;
+				}
+			}
+			if(idxType < 0)
+				continue;
+
+			type = RFX.sensorDeviceTypes[idxType][1];
+			var room = 'NONE';
+			for (j=0; j<RFX.userData.rooms.length; j++) {
+				if (RFX.userData.rooms[j].id == RFX.userData.devices[i].room) {
+					room = RFX.userData.rooms[j].name;
+					break;
+				}
+			}
+
+			var currentValue = get_device_state(RFX.userData.devices[i].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][5], 1);
+			if (currentValue != undefined) {
+				currentValue += RFX.sensorDeviceTypes[idxType][11];
+			}
+			else continue;
+
+			var maxValue = get_device_state(RFX.userData.devices[i].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][6], 1);
+			if (maxValue != undefined) {
+				maxValue += RFX.sensorDeviceTypes[idxType][11];
+			}
+
+			var minValue = get_device_state(RFX.userData.devices[i].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][7], 1);
+			if (minValue != undefined) {
+				minValue += RFX.sensorDeviceTypes[idxType][11];
+			}
+
+			var maxValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][8], 1);
+			if (maxValue24hr != undefined) {
+				maxValue24hr += RFX.sensorDeviceTypes[idxType][11];
+			}
+
+			var minValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.sensorDeviceTypes[idxType][4], RFX.sensorDeviceTypes[idxType][9], 1);
+			if (minValue24hr != undefined) {
+				minValue24hr += RFX.sensorDeviceTypes[idxType][11];
+			}
+
+			var commStrength = get_device_state(RFX.userData.devices[i].id, 'urn:micasaverde-com:serviceId:HaDevice1', 'CommStrength', 1);
+			if (commStrength != undefined) {
+				commStrength = -(15 - commStrength)*8;
+				commStrength += 'dBm';
+			}
+
+			var batteryLevel = get_device_state(RFX.userData.devices[i].id, 'urn:micasaverde-com:serviceId:HaDevice1', "BatteryLevel", 1);
+			if (batteryLevel == undefined) {
+				batteryLevel = '';
+			}
+			else {
+				batteryLevel += ' %';
+			}
+			var lastUpdate = get_device_state(RFX.userData.devices[i].id, 'urn:micasaverde-com:serviceId:HaDevice1', "BatteryDate", 1);
+			if (lastUpdate != undefined) {
+				elapsedTime = dateValue - lastUpdate;
+				hours = Math.floor(elapsedTime/3600);
+				min = Math.floor(elapsedTime/60) - (hours * 60);
+				sec = elapsedTime  - (hours * 3600) - (min * 60);
+			}
+			else {
+				hours = 0;
+				min = 0;
+				sec = 0;
+			}
+			html += '<tr align="center">';
+			html += '<td>' + RFX.userData.devices[i].id + '</td>';
+			html += '<td>' + RFX.userData.devices[i].name + '</td>';
+			html += '<td>' + room + '</td>';
+			html += '<td>' + type + '</td>';
+			html += '<td>' + currentValue + '</td>';
+			html += '<td>' + maxValue + '</td>';
+			html += '<td>' + maxValue24hr + '</td>';
+			html += '<td>' + minValue + '</td>';
+			html += '<td>' + minValue24hr + '</td>';
+			html += '<td>' + commStrength + '</td>';
+			html += '<td>' + batteryLevel + '</td>';
+			html += '<td>' + RFX_pad(hours,2) + ':' + RFX_pad(min,2) + ':' + RFX_pad(sec,2) + '</td>';
+			html += '<td><button type="button" style="height: 20px; width: 90%; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_resetSensorData(' + i +');"> </button></td>';
+			html += '</tr>';
+		}
+	}
+
+	html += '</table>';
+
+	jQuery('#sensorDataTable').html(html);
+}
+
 function RFX_showSettings(device)
 {
-	RFX_detectBrowser();
-	RFX_defineUIStyle();
+	RFX_checkSettings(device);
 
 	var temp_unit = get_device_state(device, RFX.SID2, "CelciusTemp", 1);
 	var speed_unit = get_device_state(device, RFX.SID2, "KmhSpeed", 1);
@@ -1071,7 +1263,7 @@ function RFX_showSettings(device)
 
 function RFX_showHelp(device)
 {
-	RFX_defineUIStyle();
+	RFX_checkSettings(device);
 
 	var version = get_device_state(device, RFX.SID2, "PluginVersion", 1);
 	if (version == undefined) {
@@ -1408,26 +1600,35 @@ function RFX_selectAllDevices(state)
 	RFX_selectDevices();
 }
 
-function RFX_detectBrowser()
+function RFX_checkSettings(device)
 {
-	if (navigator.userAgent.toLowerCase().indexOf('msie') >= 0
-		|| navigator.userAgent.toLowerCase().indexOf('trident') >= 0) {
-		RFX.browserIE = true;
-	}
-	else {
-		RFX.browserIE = false;
-	}
-}
+	if(RFX.browserIE == undefined) {
+		var temperatureUnit = ' &deg;C';
+		if (get_device_state(device, RFX.SID2, "CelciusTemp", 1) == '0') {
+			temperatureUnit = ' &deg;F';
+		}
+		for (j=0; j<RFX.sensorDeviceTypes.length; j++) {
+			if (RFX.sensorDeviceTypes[j][0] == "TEMPERATURE_SENSOR") {
+				RFX.sensorDeviceTypes[j][11] = temperatureUnit;
+				break;
+			}
+		}
 
-function RFX_defineUIStyle()
-{
-	if (typeof api !== 'undefined') {
-		RFX.buttonBgColor = '#006E47';
-		RFX.tableTitleBgColor = '#00A652';
-	}
-	else {
-		RFX.buttonBgColor = '#3295F8';
-		RFX.tableTitleBgColor = '#025CB6';
+		if (navigator.userAgent.toLowerCase().indexOf('msie') >= 0
+			|| navigator.userAgent.toLowerCase().indexOf('trident') >= 0) {
+			RFX.browserIE = true;
+		}
+		else {
+			RFX.browserIE = false;
+		}
+		if (typeof api !== 'undefined') {
+			RFX.buttonBgColor = '#006E47';
+			RFX.tableTitleBgColor = '#00A652';
+		}
+		else {
+			RFX.buttonBgColor = '#3295F8';
+			RFX.tableTitleBgColor = '#025CB6';
+		}
 	}
 }
 
@@ -1561,7 +1762,7 @@ function RFX_deleteDevices(device, discardCreation)
 		jQuery('#msg2').html('Please first select a device in the table');
 		jQuery('#msg2').css({'color':'red'});
 	}
-	else {	
+	else {
 		jQuery('#msg2').html('Vera will reload to validate the changes...');
 		jQuery('#msg2').css({'color':'green'});
 		var discard = 'false';
