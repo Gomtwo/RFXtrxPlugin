@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.20"
+local PLUGIN_VERSION = "1.22"
 
 local THIS_DEVICE = 0
 local buffer = ""

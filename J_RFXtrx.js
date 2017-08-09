@@ -1,8 +1,23 @@
 var RFX = {
 	browserIE : undefined,
+	sensorDataSortColumn: 0,
+	deviceID: undefined,
+	buttonBgColor : '#3295F8',
+	tableTitleBgColor : '#025CB6',
+	idTitleBgColor: 'white',
+	idTextColor: 'black',
+	nameTitleBgColor: undefined,
+	nameTextColor: 'white',
+	roomTitleBgColor: undefined,
+	roomTextColor: 'white',
+	typeTitleBgColor: undefined,
+	typeTextColor: 'white',
+	userData : undefined,
 
 	SID : 'urn:upnp-rfxcom-com:serviceId:rfxtrx1',
 	SID2 : 'upnp-rfxcom-com:serviceId:rfxtrx1',
+
+	sensorDataSortFunction: [],
 
 	categories : [
 		[	"X10", "X10 lighting", true, false, true, false, true, false,
@@ -651,12 +666,8 @@ var RFX = {
 		[ "RFY0/", "VENETIAN_EU_ANGLE_MINUS", "Change angle - (Venetian EU)" ],
 		[ "RFY0/", "ENABLE_DETECTOR", "Enable sun/wind detector" ],
 		[ "RFY0/", "DISABLE_DETECTOR", "Disable sun detector" ]
-	],
+	]
 
-	userData : undefined,
-
-	buttonBgColor : '#3295F8',
-	tableTitleBgColor : '#025CB6'
 };
 
 
@@ -708,7 +719,7 @@ function RFX_showManagedDevices(device)
 	var autoCreate = get_device_state(device, RFX.SID2, "AutoCreate", 1);
 
 	var html = '';
-	
+
 	html += '<style>'
 	html += '#devicesTable, th, td { padding:1px 3px; text-align: center; }'
 	html += '</style>'
@@ -1002,22 +1013,91 @@ function RFX_updateDevicesTable(device)
 	jQuery('#dicardedDevices').html(dicardedDevices);
 }
 
+function RFX_setSortColumn(column)
+{
+	if((RFX.sensorDataSortColumn != column)&& (column < 4)){
+		RFX.sensorDataSortColumn = column;
+		RFX.idTitleBgColor = RFX.tableTitleBgColor;
+		RFX.idTextColor = 'white';
+		RFX.nameTitleBgColor = RFX.tableTitleBgColor;
+		RFX.nameTextColor = 'white';
+		RFX.roomTitleBgColor = RFX.tableTitleBgColor;
+		RFX.roomTextColor = 'white';
+		RFX.typeTitleBgColor = RFX.tableTitleBgColor;
+		RFX.typeTextColor = 'white';
+		switch(column){
+			case 0:
+				RFX.idTextColor = 'black';
+				RFX.idTitleBgColor = 'white';
+				break;
+			case 1:
+				RFX.nameTextColor = 'black';
+				RFX.nameTitleBgColor = 'white';
+				break;
+			case 2:
+				RFX.roomTextColor = 'black';
+				RFX.roomTitleBgColor = 'white';
+				break;
+			case 3:
+				RFX.typeTextColor = 'black';
+				RFX.typeTitleBgColor = 'white';
+				break;
+			default:
+				break;
+		}
+		RFX_updateSensorData(RFX.deviceID);
+	}
+}
+
+function RFX_sortByName(rowSortData)
+{
+	rowSortData.sort (function(a,b){
+		var x = a.name.toLowerCase();
+		var y = b.name.toLowerCase();
+		if (x < y) {return -1;}
+		if (x > y) {return 1;}
+		return 0;
+	});
+}
+
+function RFX_sortByRoom(rowSortData)
+{
+	rowSortData.sort (function(a,b){
+		var x = a.room.toLowerCase();
+		var y = b.room.toLowerCase();
+		if (x < y) {return -1;}
+		if (x > y) {return 1;}
+		return 0;
+	});
+}
+
+function RFX_sortByType(rowSortData)
+{
+	rowSortData.sort (function(a,b){
+		var x = a.type.toLowerCase();
+		var y = b.type.toLowerCase();
+		if (x < y) {return -1;}
+		if (x > y) {return 1;}
+		return 0;
+	});
+}
+
 function RFX_showSensorData(device)
 {
 	RFX_checkSettings(device);
 	var html = '';
 
-	html += '<style>'
-	html += '#sensorDataTable, th, td { padding:1px 3px; text-align: center; }'
-	html += '</style>'
+	html += '<style>';
+	html += '#sensorDataTable, th, td { padding:1px 3px; text-align: center; }';
+	html += '</style>';
 
 	html += 'Temperature and Humidity Sensor Data';
 	html += '<p><DIV id="sensorDataTable"/></p>';
 
-	html += '<DIV>'
+	html += '<DIV>';
 	html += '<button type="button" style="margin-right: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 110px; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_updateSensorData('+device+');">Refresh table</button>';
-	html += '</DIV>'
-	html += '<p/>'
+	html += '</DIV>';
+	html += '<p/>';
 
 	set_panel_html(html);
 
@@ -1026,7 +1106,7 @@ function RFX_showSensorData(device)
 
 function RFX_pad(num, size)
 {
-	return([1e10] + num).slice(-size)
+	return([1e10] + num).slice(-size);
 }
 
 function RFX_resetSensorData( idx )
@@ -1059,28 +1139,30 @@ function RFX_resetSensorData( idx )
 
 function RFX_updateSensorData(device)
 {
+	var sortingArray = [];
+	var rowDataArray = [];
+	var tableRowSortData = [];
 	var date = new Date();
 	var hours = 0;
 	var min = 0;
 	var sec = 0;
 	var elapsedTime = 0;
 	var dateValue = Math.floor(date.getTime()/1000);
-	
+
 	var html = '<table border="1" >';
-	html += '<tr style="background-color: '+ RFX.tableTitleBgColor + '; color: white">';
-	html += '<th>ID</th>';
-	html += '<th>Name</th>';
-	html += '<th>Room</th>';
-	html += '<th>Type</th>';
-	html += '<th>Now</th>';
-	html += '<th>Maximum</th>';
-	html += '<th>Max 24Hr</th>';
-	html += '<th>Minimum</th>';
-	html += '<th>Min 24hr</th>';
-	html += '<th>Signal</th>';
-	html += '<th>Battery</th>';
-	html += '<th>Age</th>';
-	html += '<th>Reset</th>';
+	html += '<th onclick="RFX_setSortColumn(0);" style="background-color:'+ RFX.idTitleBgColor + '; color:'+ RFX.idTextColor + '">ID</th>';
+	html += '<th onclick="RFX_setSortColumn(1);" style="background-color:'+ RFX.nameTitleBgColor + '; color:'+ RFX.nameTextColor + '">Name</th>';
+	html += '<th onclick="RFX_setSortColumn(2);" style="background-color:'+ RFX.roomTitleBgColor + '; color:'+ RFX.roomTextColor + '">Room</th>';
+	html += '<th onclick="RFX_setSortColumn(3);" style="background-color:'+ RFX.typeTitleBgColor + '; color:'+ RFX.typeTextColor + '">Type</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Now</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Maximum</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Max 24Hr</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Minimum</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Min 24hr</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Signal</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Battery</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Age</th>';
+	html += '<th style="background-color:'+ RFX.tableTitleBgColor + '; color:white">Reset</th>';
 	html += '</tr>';
 
 
@@ -1164,22 +1246,35 @@ function RFX_updateSensorData(device)
 				min = 0;
 				sec = 0;
 			}
-			html += '<tr align="center">';
-			html += '<td>' + RFX.userData.devices[i].id + '</td>';
-			html += '<td>' + RFX.userData.devices[i].name + '</td>';
-			html += '<td>' + room + '</td>';
-			html += '<td>' + type + '</td>';
-			html += '<td>' + currentValue + '</td>';
-			html += '<td>' + maxValue + '</td>';
-			html += '<td>' + maxValue24hr + '</td>';
-			html += '<td>' + minValue + '</td>';
-			html += '<td>' + minValue24hr + '</td>';
-			html += '<td>' + commStrength + '</td>';
-			html += '<td>' + batteryLevel + '</td>';
-			html += '<td>' + RFX_pad(hours,2) + ':' + RFX_pad(min,2) + ':' + RFX_pad(sec,2) + '</td>';
-			html += '<td><button type="button" style="height: 20px; width: 90%; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_resetSensorData(' + i +');"> </button></td>';
-			html += '</tr>';
+			tableRowSortData = {index:sortingArray.length, name:RFX.userData.devices[i].name, room:room,type:type};
+			sortingArray.push(tableRowSortData);
+			var rowhtml = '';
+			rowhtml += '<tr align="center">';
+			rowhtml += '<td>' + RFX.userData.devices[i].id + '</td>';
+			rowhtml += '<td>' + RFX.userData.devices[i].name + '</td>';
+			rowhtml += '<td>' + room + '</td>';
+			rowhtml += '<td>' + type + '</td>';
+			rowhtml += '<td>' + currentValue + '</td>';
+			rowhtml += '<td>' + maxValue + '</td>';
+			rowhtml += '<td>' + maxValue24hr + '</td>';
+			rowhtml += '<td>' + minValue + '</td>';
+			rowhtml += '<td>' + minValue24hr + '</td>';
+			rowhtml += '<td>' + commStrength + '</td>';
+			rowhtml += '<td>' + batteryLevel + '</td>';
+			rowhtml += '<td>' + RFX_pad(hours,2) + ':' + RFX_pad(min,2) + ':' + RFX_pad(sec,2) + '</td>';
+			rowhtml += '<td><button type="button" style="height: 20px; width: 90%; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_resetSensorData(' + i +');"> </button></td>';
+			rowhtml += '</tr>';
+
+			rowDataArray.push(rowhtml);
+
+			if(RFX.sensorDataSortColumn > 0) {
+				RFX.sensorDataSortFunction[RFX.sensorDataSortColumn-1](sortingArray);
+			}
 		}
+	}
+
+	for (i=0; i<rowDataArray.length; i++) {
+		html += rowDataArray[sortingArray[i].index];
 	}
 
 	html += '</table>';
@@ -1603,6 +1698,7 @@ function RFX_selectAllDevices(state)
 function RFX_checkSettings(device)
 {
 	if(RFX.browserIE == undefined) {
+		RFX.deviceID = device;
 		var temperatureUnit = ' &deg;C';
 		if (get_device_state(device, RFX.SID2, "CelciusTemp", 1) == '0') {
 			temperatureUnit = ' &deg;F';
@@ -1629,6 +1725,11 @@ function RFX_checkSettings(device)
 			RFX.buttonBgColor = '#3295F8';
 			RFX.tableTitleBgColor = '#025CB6';
 		}
+		RFX.nameTitleBgColor = RFX.tableTitleBgColor;
+		RFX.roomTitleBgColor = RFX.tableTitleBgColor;
+		RFX.typeTitleBgColor = RFX.tableTitleBgColor;
+
+		RFX.sensorDataSortFunction = [RFX_sortByName, RFX_sortByRoom, RFX_sortByType ];
 	}
 }
 
