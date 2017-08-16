@@ -1261,7 +1261,14 @@ function RFX_updateSensorData(device)
 			rowhtml += '<td>' + minValue24hr + '</td>';
 			rowhtml += '<td>' + commStrength + '</td>';
 			rowhtml += '<td>' + batteryLevel + '</td>';
-			rowhtml += '<td>' + RFX_pad(hours,2) + ':' + RFX_pad(min,2) + ':' + RFX_pad(sec,2) + '</td>';
+			rowhtml += '<td>';
+			if(hours < 10) {
+				rowhtml += RFX_pad(hours,2);
+			}
+			else {
+				rowhtml += hours;
+			}
+			rowhtml += ':' + RFX_pad(min,2) + ':' + RFX_pad(sec,2) + '</td>';
 			rowhtml += '<td><button type="button" style="height: 20px; width: 90%; -moz-border-radius: 6px; -webkit-border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_resetSensorData(' + i +');"> </button></td>';
 			rowhtml += '</tr>';
 
