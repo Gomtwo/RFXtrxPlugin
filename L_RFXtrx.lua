@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.22"
+local PLUGIN_VERSION = "1.30"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -47,6 +47,8 @@ local tableMsgTypes = {
 	LIGHTING_ANSLUT = { 0x11, 0x2, 11, nil, nil, "ANSLUT" },
 
 	LIGHTING_KOPPLA = { 0x12, 0x0, 8, nil, "Ikea", "Koppla" },
+
+	SECURITY_DOOR = { 0x13, 0x0, 9, nil, nil, nil },
 
 	LIGHTING_LIGHTWARERF = { 0x14, 0x0, 10, nil, nil, "LightwaveRF, Siemens" },
 	LIGHTING_EMW100 = { 0x14, 0x1, 10, nil, "GAO/Everflourish", "GAO/Everflourish EMW100" },
@@ -205,6 +207,7 @@ local tableCommands = {
 	CMD_WEIGHT = { "Weight", "WEIGHT", "VAR_WEIGHT" },
 	CMD_IMPEDANCE = { "Impedance", "WEIGHT", "VAR_IMPEDANCE" },
 	CMD_DOOR = { "Door", "DOOR", "VAR_TRIPPED" },
+	CMD_AUTOUNTRIP = { "AutoUntrip", "DOOR", "VAR_AUTOUNTRIP" },
 	CMD_MOTION = { "Motion", "MOTION", "VAR_TRIPPED" },
 	CMD_SMOKE = { "Smoke", "SMOKE", "VAR_TRIPPED" },
 	CMD_SMOKE_OFF = { "SmokeOff", "SMOKE", nil },
@@ -271,6 +274,7 @@ local tabVars = {
 	VAR_ARMED = { "urn:micasaverde-com:serviceId:SecuritySensor1", "Armed", false, false, true },
 	VAR_TRIPPED = { "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", false, false, false },
 	VAR_LAST_TRIP = { "urn:micasaverde-com:serviceId:SecuritySensor1", "LastTrip", false, false, true },
+	VAR_AUTOUNTRIP = { "urn:micasaverde-com:serviceId:SecuritySensor1", "AutoUntrip", false, false, false },
 	VAR_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "ArmMode", false, false, true },
 	VAR_ARM_MODE_NUM = { "urn:rfxcom-com:serviceId:SecurityRemote1", "ArmModeNum", false, false, true },
 	VAR_DETAILED_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "DetailedArmMode", false, false, true },
@@ -1691,6 +1695,8 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 					parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
+					parameters = parameters .. "\n"
+					parameters = parameters .. tabVars.VAR_AUTOUNTRIP[1] .. "," .. tabVars.VAR_AUTOUNTRIP[2] .. "=0"
 				elseif (deviceType == tableDeviceTypes.ALARM)
 					then
 					if (parameters ~= "")
@@ -1722,7 +1728,7 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 
 end
 
-local function actOnMessage(tableCmds)
+local function actOnCommands(tableCmds)
 
 	logCmds("cmds", tableCmds)
 
@@ -1799,6 +1805,7 @@ local function actOnMessage(tableCmds)
 				and (isDisabledDevice(tableDeviceTypes[cmdType][4] .. deviceId) == false))
 				then
 				table.insert(tableNewDevices, { nil, nil, deviceId, cmdType })
+				debug("New device: deviceId: " .. deviceId .. " cmdType: " .. cmdType)
 			end
 		end
 	end
@@ -2015,7 +2022,7 @@ end
 function handleDelayedCmds(data)
 
 	local tableCmds = decodeCommandsFromString(data)
-	actOnMessage(tableCmds)
+	actOnCommands(tableCmds)
 	return 0
 
 end
@@ -2046,7 +2053,7 @@ local function decodeMessage(message )
 		then
 		warning("Decoding not yet implemented for message " .. formattohex(message))
 	else
-		actOnMessage(tableCmds)
+		actOnCommands(tableCmds)
 	end
 
 end
@@ -3180,6 +3187,38 @@ local function decodeWeight(subType, data)
 
 end
 
+-- This function is for door sensors that only transmit when tripped
+--  they do not transmit when the door is again closed.
+local function decodeSecurity(subType, data)
+
+	-- For a PT2262 type device the first 20 bits are fixed
+	-- the last 4 bits could be a status
+	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%1X", bitw.rshift(string.byte(data, 3), 4))
+--	.. string.format("%02X", string.byte(data, 3))
+
+	local tableCmds = {}
+	-- Since many devices only transmit 'door opened', default the command value to 1
+	local cmdValue = 1
+	local cmd = tableCommands.CMD_DOOR[1]
+	local cmdCode = bitw.band(string.byte(data, 3), 0x0F)
+
+	debug("decodeSecurity: " .. subType .. " altid=" .. altid .. " status=" .. string.format("%02X", cmdCode))
+
+	table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
+
+	local strength = bitw.rshift(string.byte(data, 6), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+
+	-- Don't know if these devices send battery status
+	--local battery = decodeBatteryLevel(data, 5)
+	--table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
+
+	return tableCmds
+
+end
+
 local function decodeSecurityDS(subType, data)
 
 	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
@@ -3690,6 +3729,7 @@ local function initDecodingFunctions()
 	tableMsgTypes.LIGHTING_HEU[4] = decodeLighting2
 	tableMsgTypes.LIGHTING_ANSLUT[4] = decodeLighting2
 	tableMsgTypes.LIGHTING_KOPPLA[4] = decodeLighting3
+	tableMsgTypes.SECURITY_DOOR[4] = decodeSecurity
 	tableMsgTypes.LIGHTING_LIGHTWARERF[4] = decodeLighting5
 	tableMsgTypes.LIGHTING_EMW100[4] = decodeLighting5
 	tableMsgTypes.LIGHTING_BBSB[4] = decodeLighting5
