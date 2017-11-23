@@ -1975,7 +1975,7 @@ function RFX_callAction(device, sid, actname, args) {
     if (RFX.browserIE) {
     	q['timestamp'] = new Date().getTime(); //we need this to avoid IE caching of the AJAX get
     }
-	new Ajax.Request (command_url+'/data_request', {
+	new Ajax.Request (data_request_url, {
 		method: 'get',
 		parameters: q,
 		onSuccess: function (response) {

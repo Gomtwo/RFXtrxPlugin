@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.30"
+local PLUGIN_VERSION = "1.31"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -2872,15 +2872,15 @@ local function decodeHum(subType, data)
 
 		-- Update if necessary the max and min humidity detected by this device
 		checkMaxMinHum( altid, tableCmds, hum )
-
-		local strength = bitw.rshift(string.byte(data, 5), 4)
-		table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
-
-		local battery = decodeBatteryLevel(data, 5)
-		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 	else
 		debug("Dubious humidity reading: " .. hum .. "%" .. " altid=" .. altid .. " status=")
 	end
+
+	local strength = bitw.rshift(string.byte(data, 5), 4)
+	table.insert(tableCmds, { altid, tableCommands.CMD_STRENGTH[1], strength, 0 } )
+
+	local battery = decodeBatteryLevel(data, 5)
+	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 
 	return tableCmds
 
