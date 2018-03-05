@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.31"
+local PLUGIN_VERSION = "1.32"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -3221,16 +3221,15 @@ end
 
 local function decodeSecurityDS(subType, data)
 
-	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
-
-	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
-
 	local tableCmds = {}
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
+  
+	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
+
 
 	if (cmdCode == 0x00 or cmdCode == 0x01)
 		then
@@ -3240,6 +3239,20 @@ local function decodeSecurityDS(subType, data)
 		then
 		cmd = tableCommands.CMD_DOOR[1]
 		cmdValue = "1"
+	elseif (cmdCode == 0x04 or cmdCode == 0x05)
+		then
+    -- If these command codes are present then the device is probably a motion sensor
+    -- Modify the altid to indicate a motion sensor
+    altid = string.gsub(altid, "D/", "M/", 1)
+		cmd = tableCommands.CMD_MOTION[1]
+	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
+  
+    if(cmdCode == 0x04)
+    then
+      cmdValue = "1"
+    else
+      cmdValue = "0"
+    end
 	else
 		if (cmdCode ~= nil)
 			then
