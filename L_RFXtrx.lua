@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.32"
+local PLUGIN_VERSION = "1.40"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -19,6 +19,15 @@ local typeRFX = 0x53
 local firmware = 0
 local firmtype = 0
 local hardware = 0
+
+local mm2inch = 0.03937008
+local inch2mm = 25.4
+local LacrosseInchesPerCount = 0.0105
+local LacrosseMMPerCount = 0.2667
+
+-- Used to speed up the search for a message type
+-- Used by decodeMessage(message )
+local tableMessageDecodeFunctions = {}
 
 local tableMsgTypes = {
 	MODE_COMMAND = { 0x00, 0x00, 13, nil, nil, nil },
@@ -101,6 +110,7 @@ local tableMsgTypes = {
 	RAIN3 = { 0x55, 0x3, 11, nil, "TFA", nil },
 	RAIN4 = { 0x55, 0x4, 11, nil, "UPM", "RG700" },
 	RAIN5 = { 0x55, 0x5, 11, nil, "La Crosse Technology", "WS2300" },
+	RAIN6 = { 0x55, 0x6, 11, nil, "La Crosse Technology", "TX5" },
 	RAIN7 = { 0x55, 0x7, 11, nil, nil, "Alecto WS4500, Auriol H13726, Hama EWS1500, Meteoscan W155/W160, Ventus WS155" },
 
 	TR1 = { 0x4F, 0x1, 10, nil, "Alecto", "WS1200" },
@@ -136,11 +146,11 @@ local tableMsgTypes = {
 	SECURITY_X10DS = { 0x20, 0x0, 8, nil, nil, "X10 security door/window sensor" },
 	SECURITY_X10MS = { 0x20, 0x1, 8, nil, nil, "X10 security motion sensor" },
 	SECURITY_X10SR = { 0x20, 0x2, 8, nil, nil, "X10 security remote" },
-	POWERCODE_PRIMDS = { 0x20, 0x4, 8, nil, "Visonic", "PowerCode door/window sensor � primary contact" },
-	POWERCODE_AUXDS = { 0x20, 0x7, 8, nil, "Visonic", "PowerCode door/window sensor � auxiliary contact" },
-	POWERCODE_MS = { 0x20, 0x5, 8, nil, "Visonic", "PowerCode motion sensor" },
-	SECURITY_MEISR = { 0x20, 0x8, 8, nil, "Meiantech", "Meiantech/Atlantic security remote" },
 	KD101 = { 0x20, 0x3, 8, nil, nil, "KD101 smoke detector" },
+	POWERCODE_PRIMDS = { 0x20, 0x4, 8, nil, "Visonic", "PowerCode door/window sensor � primary contact" },
+	POWERCODE_MS = { 0x20, 0x5, 8, nil, "Visonic", "PowerCode motion sensor" },
+	POWERCODE_AUXDS = { 0x20, 0x7, 8, nil, "Visonic", "PowerCode door/window sensor � auxiliary contact" },
+	SECURITY_MEISR = { 0x20, 0x8, 8, nil, "Meiantech", "Meiantech/Atlantic security remote" },
 	SA30 = { 0x20, 0x9, 8, nil, "Alecto", "SA30 smoke detector" },
 
 	ELEC1 = { 0x59, 0x1, 13, nil, nil, "OWL CM113, Electrisave, cent-a-meter" },
@@ -158,7 +168,9 @@ local tableMsgTypes = {
 	ATI_REMOTE_WONDER_II = { 0x30, 0x4, 6, nil, "ATI", "ATI Remote Wonder II" }
 
 }
-
+function testFunction()
+debug("testFunction has been run")
+end
 local DATA_MSG_RESET = string.char(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 local DATA_MSG_GET_STATUS = string.char(2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 local DATA_MSG_SAVE = string.char(6, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -169,13 +181,16 @@ local DATA_MSG_SAVE = string.char(6, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 -- 2) table of commands
 local tableMsgSent = {}
 
+-- A table to speed up searching for a command
+-- Used by searchCommandsTable(cmd)
+local tableCommandByCmd = {}
+
 -- The table tableCmds stores all decoded commands from a RFXtrx message
 -- Each entry is a table of 4 elements:
 -- 1) device ID (altid) minus the first three characters
 -- 2) command (a string)
 -- 3) type of the device to create
 -- 4) value (may be of any type and can be nil for commands that don't require a value)
-
 local tableCommands = {
 	CMD_ON = { "On", "LIGHT", "VAR_LIGHT" },
 	CMD_OFF = { "Off", "LIGHT", "VAR_LIGHT" },
@@ -199,7 +214,14 @@ local tableCommands = {
 	CMD_PRESSURE = { "Pressure", "BARO", "VAR_PRESSURE" },
 	CMD_FORECAST = { "Forecast", "BARO", "VAR_FORECAST" },
 	CMD_RAIN = { "Rain", "RAIN", "VAR_RAIN" },
+	CMD_RAIN24HRS = { "Rain60Min", "RAIN", "VAR_RAIN24HRS" },
 	CMD_RAINRATE = { "RainRate", "RAIN", "VAR_RAINRATE" },
+	CMD_RAINBYMINUTE = { "Rainbyminute", "RAIN", "VAR_RAINBYMINUTE" },
+	CMD_RAINBYHOUR = { "Rainbyhour", "RAIN", "VAR_RAINBYHOUR" },
+	CMD_RAINBYDAY = { "Rainbyday", "RAIN", "VAR_RAINBYDAY" },
+	CMD_RAINBYWEEK = { "Rainbyweek", "RAIN", "VAR_RAINBYWEEK" },
+	CMD_RAINBYMONTH = { "Rainbymonth", "RAIN", "VAR_RAINBYMONTH" },
+	CMD_CURRENTWEEK = { "WeekNumber", "RAIN", "VAR_WEEKNUM" },
 	CMD_DIRECTION = { "Direction", "WIND", "VAR_DIRECTION" },
 	CMD_WIND = { "Speed", "WIND", "VAR_WIND" },
 	CMD_GUST = { "Gust", "WIND", "VAR_GUST" },
@@ -209,6 +231,7 @@ local tableCommands = {
 	CMD_DOOR = { "Door", "DOOR", "VAR_TRIPPED" },
 	CMD_AUTOUNTRIP = { "AutoUntrip", "DOOR", "VAR_AUTOUNTRIP" },
 	CMD_MOTION = { "Motion", "MOTION", "VAR_TRIPPED" },
+--	CMD_TAMPERED = { "Door", "DOOR", "VAR_TAMPERED" },
 	CMD_SMOKE = { "Smoke", "SMOKE", "VAR_TRIPPED" },
 	CMD_SMOKE_OFF = { "SmokeOff", "SMOKE", nil },
 	CMD_ARM_MODE = { "ArmMode", "ALARM", "VAR_ARM_MODE" },
@@ -260,7 +283,14 @@ local tabVars = {
 	VAR_PRESSURE = { "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, true, true },
 	VAR_FORECAST = { "urn:upnp-org:serviceId:BarometerSensor1", "Forecast", false, false, true },
 	VAR_RAIN = { "urn:upnp-org:serviceId:RainSensor1", "CurrentTRain", false, false, true },
+	VAR_RAIN24HRS = { "urn:upnp-org:serviceId:RainSensor1", "Rain24Hrs", false, false, false },
 	VAR_RAINRATE = { "urn:upnp-org:serviceId:RainSensor1", "CurrentRain", false, false, true },
+	VAR_WEEKNUM = { "urn:upnp-org:serviceId:RainSensor1", "WeekNumber", false, false, false },
+	VAR_RAINBYMINUTE = { "urn:upnp-org:serviceId:RainSensor1", "MinuteRain", false, false, true },
+	VAR_RAINBYHOUR = { "urn:upnp-org:serviceId:RainSensor1", "HourlyRain", false, false, true },
+	VAR_RAINBYDAY = { "urn:upnp-org:serviceId:RainSensor1", "DailyRain", false, false, true },
+	VAR_RAINBYWEEK = { "urn:upnp-org:serviceId:RainSensor1", "WeeklyRain", false, false, true },
+	VAR_RAINBYMONTH = { "urn:upnp-org:serviceId:RainSensor1", "MonthlyRain", false, false, true },
 	VAR_WIND = { "urn:upnp-org:serviceId:WindSensor1", "AvgSpeed", false, false, true },
 	VAR_GUST = { "urn:upnp-org:serviceId:WindSensor1", "GustSpeed", false, false, true },
 	VAR_DIRECTION = { "urn:upnp-org:serviceId:WindSensor1", "Direction", false, false, true },
@@ -273,11 +303,13 @@ local tabVars = {
 	VAR_BAUD = { "urn:micasaverde-org:serviceId:SerialPort1", "baud", false, false, true },
 	VAR_ARMED = { "urn:micasaverde-com:serviceId:SecuritySensor1", "Armed", false, false, true },
 	VAR_TRIPPED = { "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", false, false, false },
+	VAR_ARMEDTRIPPED = { "urn:micasaverde-com:serviceId:SecuritySensor1", "ArmedTripped", false, false, false },
 	VAR_LAST_TRIP = { "urn:micasaverde-com:serviceId:SecuritySensor1", "LastTrip", false, false, true },
 	VAR_AUTOUNTRIP = { "urn:micasaverde-com:serviceId:SecuritySensor1", "AutoUntrip", false, false, false },
 	VAR_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "ArmMode", false, false, true },
 	VAR_ARM_MODE_NUM = { "urn:rfxcom-com:serviceId:SecurityRemote1", "ArmModeNum", false, false, true },
 	VAR_DETAILED_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "DetailedArmMode", false, false, true },
+--	VAR_TAMPERED = { "urn:micasaverde-com:serviceId:HaDevice1", "sl_TamperAlarm", false, false, true },
 	VAR_WATT = { "urn:micasaverde-com:serviceId:EnergyMetering1", "Watts", false, false, true },
 	VAR_KWH = { "urn:micasaverde-com:serviceId:EnergyMetering1", "KWH", false, false, true },
 	VAR_SCENE_ON = { "urn:micasaverde-com:serviceId:SceneController1", "sl_SceneActivated", false, false, false },
@@ -290,6 +322,7 @@ local tabVars = {
 	VAR_OFFSET = { "urn:delanghe-com:serviceId:RFXMetering1", "Offset", false, false, true },
 	VAR_MULT = { "urn:delanghe-com:serviceId:RFXMetering1", "Mult", false, false, true },
 	VAR_LIGHT_LEVEL = { "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, false, true },
+	VAR_STATE = { "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true },
 	VAR_COMM_FAILURE = { "urn:micasaverde-com:serviceId:HaDevice1", "CommFailure", false, false, true },
 	VAR_COMM_STRENGTH = { "urn:micasaverde-com:serviceId:HaDevice1", "CommStrength", false, false, true },
 
@@ -300,8 +333,10 @@ local tabVars = {
 	VAR_FIRMWARE_TYPE = { "upnp-rfxcom-com:serviceId:rfxtrx1", "FirmwareType", false, false, true },
 	VAR_HARDWARE_VERSION = { "upnp-rfxcom-com:serviceId:rfxtrx1", "HardwareVersion", false, false, true },
 	VAR_TEMP_UNIT = { "upnp-rfxcom-com:serviceId:rfxtrx1", "CelciusTemp", true, false, true },
+	VAR_LENGTH_UNIT = { "upnp-rfxcom-com:serviceId:rfxtrx1", "MMLength", true, false, true },
 	VAR_SPEED_UNIT = { "upnp-rfxcom-com:serviceId:rfxtrx1", "KmhSpeed", true, false, true },
 	VAR_VOLTAGE = { "upnp-rfxcom-com:serviceId:rfxtrx1", "Voltage", false, false, true },
+	VAR_VERATIME = { "upnp-rfxcom-com:serviceId:rfxtrx1", "VeraTime", false, false, false },
 	VAR_BYRONSX_RECEIVING = { "upnp-rfxcom-com:serviceId:rfxtrx1", "ByronSXReceiving", true, false, true },
 	VAR_RSL_RECEIVING = { "upnp-rfxcom-com:serviceId:rfxtrx1", "RSLReceiving", true, false, true },
 	VAR_UNDECODED_RECEIVING = { "upnp-rfxcom-com:serviceId:rfxtrx1", "UndecodedReceiving", true, false, true },
@@ -369,7 +404,8 @@ local tableDeviceTypes = {
 	LWRF_REMOTE = { "urn:rfxcom-com:device:LWRFRemote:1", "D_LWRFRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil },
 	ATI_REMOTE = { "urn:rfxcom-com:device:ATIRemote:1", "D_ATIRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil },
 	HEATER = { "urn:schemas-upnp-org:device:Heater:1", "D_Heater1.xml", "RFX Heater ", "HT/", false, false, false, nil },
-	LIGHT_LEVEL = { "urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_SENSOR" }
+	LIGHT_LEVEL = { "urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_SENSOR" },
+	SWITCH_TOGGLE = { "urn:rfxcom-com:device:SwitchToggle:1", "D_SwitchToggle1.xml", "RFX Toggle Switch ", "L4/", false, false, false, "SWITCH_TOGGLE" }
 }
 
 -- Scene controller - scene number
@@ -677,8 +713,20 @@ local tableCategories = {
 		true, 0, 4,
 		false, nil, nil,
 		false, nil, nil,
-	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	}
+	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	},
+	SONOFF = {	"Sonoff Smart Switch", true, false, false, false, false, false,
+		true, 1, 0xFFFFFF,
+		false, nil, nil,
+		false, nil, nil,
+		false, nil, nil,
+		false, nil, nil,
+		false, nil, nil,
+	"L4/", "%s%06X/00", nil, nil, nil, nil	}
 }
+
+-- A table used to speed up searching for a child device
+-- Used by findChild(parentDevice, label, deviceType)
+local tableDeviceNumByLabelAndType  = {}
 
 
 -- This table stores all children
@@ -818,22 +866,23 @@ local function searchInTable2(table, searchIndex1, value1, searchIndex2, value2)
 
 end
 
-local function searchInKeyTable(table, searchIndex, value)
-
-	local key = nil
-	for k, v in pairs(table)
-		do
-		if (v[searchIndex] == value)
-			then
-			key = k
-			break
+local function searchCommandsTable(cmd)
+	local key = tableCommandByCmd[cmd]
+	if((key==nil) and (cmd ~= nil)) then
+		for k, v in pairs(tableCommands)
+			do
+			if (v[1] == cmd)
+				then
+				key = k
+				tableCommandByCmd[cmd] = k
+				break
+			end
 		end
 	end
 	return key
-
 end
 
-local function searchInKeyTable2(table, searchIndex1, value1, searchIndex2, value2)
+local function searchInKeyTable(table, searchIndex1, value1, searchIndex2, value2)
 
 	local key = nil
 	for k, v in pairs(table)
@@ -892,9 +941,11 @@ local function setVariable(device, variable, value)
 			then
 			doChange = false
 		end
-
 		if (doChange) then
+			--debug("doChange is true  device: " .. device .. "  variable:" .. variable[2])
 			luup.variable_set(variable[1], variable[2], value, device)
+--		else
+--			debug("doChange is false  device: " .. device .. "  variable:" .. variable[2])
 		end
 
 		if (variable == tabVars.VAR_TRIPPED and value == "1")
@@ -913,6 +964,22 @@ local function initStateVariables()
 
 	setDefaultValue(THIS_DEVICE, tabVars.VAR_VOLTAGE, 230)
 	setDefaultValue(THIS_DEVICE, tabVars.VAR_DISABLED_DEVICES, "")
+
+	-- Previous versions used one of four different static JSON files
+	-- to handle the different firmware versions. That is no longer needed
+	-- but we need to be sure the original JSON file is used.
+	local currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
+	debug("Current JSON file: " .. currentJsonFilename)
+	local properJsonFilename = "D_RFXtrx.json"
+	debug("Proper JSON file: " .. properJsonFilename)
+	if (currentJsonFilename ~= properJsonFilename)
+		then
+		debug("Setting device_json to " .. properJsonFilename)
+		luup.attr_set("device_json", properJsonFilename, THIS_DEVICE)
+		currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
+		debug("Current JSON file: " .. currentJsonFilename)
+		luup.reload()
+	end
 
 	-- Handle all potential values received for a boolean-type UPnP Variable, and
 	-- convert them to their "strongly recommended" values of "0" or "1".
@@ -1003,6 +1070,8 @@ local function logDevices()
 	local countHT = 0
 	local countRM = 0
 	local countLL = 0
+	local countST = 0
+
 	for i, v in ipairs(tableDevices)
 		do
 		local key = v[2]
@@ -1060,6 +1129,9 @@ local function logDevices()
 		elseif (key == "LIGHT_LEVEL")
 			then
 			countLL = countLL + 1
+		elseif (key == "SWITCH_TOGGLE")
+			then
+			countST = countST + 1
 		end
 	end
 	log("Tree with number child devices: " .. #tableDevices)
@@ -1081,6 +1153,7 @@ local function logDevices()
 	log("    remote controls: " .. countRC)
 	log("    heating devices: " .. countHT)
 	log("          RFXMeters: " .. countRM)
+	log("     smart switches: " .. countST)
 
 end
 
@@ -1129,23 +1202,46 @@ end
 
 local function findChild(parentDevice, label, deviceType)
 
+	local key = label .. (deviceType or "")
+	local deviceNum = tableDeviceNumByLabelAndType[key]
+	if(deviceNum ~= nil) then
+		--debug("devicenum found in table - key: " .. key .. " devicenum: " .. deviceNum)
+		return deviceNum
+	end
+	--debug("searching for devicenum " .. key)
 	local foundAssoc = nil
-
 	for k, v in pairs(luup.devices)
 		do
 		if ((deviceType == nil) or (v.device_type == deviceType))
 			then
 			if (v.device_num_parent == parentDevice and string.find(v.id, label .. "$", 4) == 4)
 				then
+				tableDeviceNumByLabelAndType[key]= k
 				return k
 			elseif (findAssociation(k, label) == true)
 				then
 				foundAssoc = k
+				tableDeviceNumByLabelAndType[key]= k
 			end
 		end
 	end
 
 	return foundAssoc
+
+end
+
+local function findChildren(parentDevice, deviceType)
+
+	local children = {}
+
+	for k, v in pairs(luup.devices)
+	do
+		if (v.device_type == deviceType)
+		then
+			children[#children+1] = v.id
+		end
+	end
+	return children
 
 end
 
@@ -1211,6 +1307,50 @@ local function disableDevice(id)
 
 end
 
+-- Convert a value from millimeters to inches
+local function inches( millimeters )
+    return (millimeters * mm2inch)
+end
+
+-- Convert a value from inches to millimeters
+local function millimeters( inches )
+    return (inches * inch2mm)
+end
+
+local function isLeapYear( year )
+    if(((year % 4 == 0) and (year % 100 ~= 0)) or (year % 400 == 0)) then
+        return true
+    else
+        return false
+    end
+end
+
+local function indexDiff(first, last, size)
+	local diff = last - first
+	if(last < first) then
+		diff = diff + size
+	end
+	return diff
+end
+
+-- Given the year and the julian day
+-- determine the week number
+local function weekOfYear( year, day )
+    local yearStart = { year = year, month = 1, day = 1, hour = 0 }
+    -- The numeric value of that date
+    local yearNum = os.time(yearStart)
+    -- This will fill in all of the details for 1 January of that year including the day of the week
+    yearStart = os.date("*t", yearNum)
+    local weekOffset = math.floor((yearStart["wday"] + 6) / 12 )
+    local daysOffset = yearStart["wday"] - 2
+    local week = (math.floor((day + daysOffset)/7) - weekOffset + 1)
+    -- If the week is 53 then it's the start of week 1 of the next year
+    if (week==53) then
+        week = 1
+    end
+    return week
+end
+
 -- Extract the battery level from the data string sent by the device
 -- byte1 is the location of the byte containing the battery level in the data string
 -- Battery level should never be greater than 9?
@@ -1240,7 +1380,7 @@ local function decodeTemperature( altid, dataString, byte1 )
 			then
 			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
 		end
-	else if (temp > 65.56)
+		else if (temp > 65.56)
 			then
 			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
 		end
@@ -1253,6 +1393,74 @@ local function decodeTemperature( altid, dataString, byte1 )
 	return temp
 end
 
+local function resetRainData(first, last, rainTable)
+    if(type(rainTable) ~= "table")
+        then
+        warning("Invalid type passed to resetRainData")
+        return
+    end
+	debug("Resetting rain data from " .. first .. " to " .. last .. " in " .. #rainTable)
+	i = first
+	if (first <= last) then
+		while i <= last do
+			rainTable[i] = 0
+			i = i + 1
+		end
+	else
+		while i <= #rainTable do
+			rainTable[i] = 0
+			i = i + 1
+		end
+		i = 1
+		while i <= last do
+			rainTable[i] = 0
+			i = i + 1
+		end
+	end
+end
+
+-- Reset all of the data in one of the rain data tables
+-- size is used in case dataTable needs to be created
+local function resetRainTable(rainTable, size)
+    if(type(rainTable) ~= "table")
+        then
+        warning("Invalid type passed to resetRainTable")
+        return
+    end
+	debug("Resetting rain table " .. #rainTable)
+    resetRainData(1, size, rainTable)
+end
+
+-- Retrieve the a rain data table from the rain device data
+local function getRainTableData(device, variable, size)
+    local tableDataString = getVariable(device, variable)
+    local rainTable = {}
+    if(tableDataString == nil)
+        then
+        local i = 1
+        while(i <= size) do
+            rainTable[i] = 0.0
+            i = i+1
+        end
+    else
+		for v in string.gmatch(tableDataString, "(-?%d+%.?%d*)") do
+			rainTable[#rainTable + 1] = tonumber(v)
+		end
+    end
+
+    return rainTable
+end
+
+-- A function to concatenate table values with a comma seperator
+-- Works even if a table contains tables
+local function recursiveConcat(item)
+    if type(item) ~= "table" then return item end
+    local res = {}
+    for i = 1, #item do
+        res[i] = recursiveConcat(item[i])
+    end
+    return table.concat(res, ',')
+end
 
 -- Create an new max min table of 24 given max and min values
 local function createMaxMinTable( maxVal, minVal )
@@ -1267,7 +1475,6 @@ local function createMaxMinTable( maxVal, minVal )
 	end
 	return newMaxMinTable
 end
-
 
 -- Put all of the max and min values from a table into a single string
 local function stringifyMaxMinTable(tableMaxMin)
@@ -1465,7 +1672,7 @@ local function checkExistingDevices(lul_device)
 			debug( "Found child device id " .. tostring(v.id) .. " of type " .. tostring(v.device_type))
 			nbr = nbr + 1
 
-			local key = searchInKeyTable2(tableDeviceTypes, 1, tostring(v.device_type), 4, string.sub(v.id, 1, 3))
+			local key = searchInKeyTable(tableDeviceTypes, 1, tostring(v.device_type), 4, string.sub(v.id, 1, 3))
 			if (key ~= nil)
 				then
 				local associations = getVariable(k, tabVars.VAR_ASSOCIATION)
@@ -1596,9 +1803,13 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 							then
 							parameters = parameters .. "\n"
 						end
-						parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
+						parameters = parameters .. tabVars.VAR_ARMEDTRIPPED[1] .. "," .. tabVars.VAR_ARMEDTRIPPED[2] .. "=0"
+--						parameters = parameters .. "\n"
+--						parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 						parameters = parameters .. "\n"
 						parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
+--						parameters = parameters .. "\n"
+--						parameters = parameters .. tabVars.VAR_TAMPERED[1] .. "," .. tabVars.VAR_TAMPERED[2] .. "=0"
 					elseif (newDeviceType == tableDeviceTypes.LIGHT_LEVEL)
 						then
 						if (parameters ~= "")
@@ -1674,6 +1885,15 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 					parameters = parameters .. tabVars.VAR_LIGHT[1] .. "," .. tabVars.VAR_LIGHT[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=0"
+				elseif (deviceType == tableDeviceTypes.SWITCH_TOGGLE)
+					then
+					if (parameters ~= "")
+						then
+						parameters = parameters .. "\n"
+					end
+					parameters = parameters .. tabVars.VAR_STATE[1] .. "," .. tabVars.VAR_STATE[2] .. "=0"
+					parameters = parameters .. "\n"
+					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
 				elseif (deviceType == tableDeviceTypes.DIMMER
 					or deviceType == tableDeviceTypes.COVER)
 					then
@@ -1695,6 +1915,8 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 					parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
+					parameters = parameters .. "\n"
+					parameters = parameters .. tabVars.VAR_ARMED[1] .. "," .. tabVars.VAR_ARMED[2] .. "=0"
 					parameters = parameters .. "\n"
 					parameters = parameters .. tabVars.VAR_AUTOUNTRIP[1] .. "," .. tabVars.VAR_AUTOUNTRIP[2] .. "=0"
 				elseif (deviceType == tableDeviceTypes.ALARM)
@@ -1757,7 +1979,7 @@ local function actOnCommands(tableCmds)
 		deviceId = v[1]
 		cmd = v[2]
 		cmdType = nil
-		key = searchInKeyTable(tableCommands, 1, cmd)
+		key = searchCommandsTable(cmd)
 		if (key ~= nil)
 			then
 			cmdType = tableCommands[key][2]
@@ -1863,7 +2085,7 @@ local function actOnCommands(tableCmds)
 		variable = nil
 		if (deviceId == "parent")
 			then
-			key = searchInKeyTable(tableCommands, 1, cmd)
+			key = searchCommandsTable(cmd)
 			if (key ~= nil)
 				then
 				if (tableCommands[key][3] ~= nil)
@@ -1908,7 +2130,7 @@ local function actOnCommands(tableCmds)
 					end
 					deviceType = nil
 					variable = nil
-					key = searchInKeyTable(tableCommands, 1, cmd)
+					key = searchCommandsTable(cmd)
 					if (key ~= nil)
 						then
 						if (tableCommands[key][2] ~= nil)
@@ -2030,23 +2252,35 @@ end
 -- Function to decode a message.
 local function decodeMessage(message )
 
+	local tableCmds = {}
+	local key = GetStringPart(message, 1, 3)
 	local packetLength = string.byte(message, 1)
-	local type = string.byte(message, 2)
+	local packetType = string.byte(message, 2)
 	local subType = string.byte(message, 3)
 	local seqNum = string.byte(message, 4)
 	local data = GetStringPart(message, 5, #message)
-
-	local tableCmds = {}
-	for k,v in pairs(tableMsgTypes)
-		do
-		if (v[1] == type and v[2] == subType and v[3] == packetLength)
-			then
-			if (v[4] ~= nil)
+	local decodeFunction = tableMessageDecodeFunctions[key]
+	--If we haven't seen this message before
+	if(decodeFunction == nil) then
+		for k,v in pairs(tableMsgTypes)
+			do
+			if (v[1] == packetType and v[2] == subType and v[3] == packetLength)
 				then
-				tableCmds = v[4](subType, data, seqNum)
+				if (v[4] ~= nil)
+					then --Decode the message appropriate for this device
+					decodeFunction = v[4]
+					-- Save the function that decodes this message type
+					tableMessageDecodeFunctions[key] = v[4]
+					tableCmds = decodeFunction(subType, data, seqNum)
+				else
+					warning("Missing decode method for message: " .. formattohex(message))
+					return
+				end
+				break
 			end
-			break
 		end
+	else
+		tableCmds = decodeFunction(subType, data, seqNum)
 	end
 
 	if (tableCmds == nil or #tableCmds == 0)
@@ -2159,26 +2393,9 @@ local function decodeResponseMode(subType, data, seqNum)
 				firmtype = "Ext2"
 			else
 				log("Unknown firmware type")
-				firmtype = ''
+				firmtype = "Unknown"
 			end
 			setVariable(THIS_DEVICE, tabVars.VAR_FIRMWARE_TYPE, firmtype)
-
-			if (firmtype ~= '')
-				then
-				-- Determine if the JSON file matches the firmware type
-				local currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
-				log("Current JSON file: " .. currentJsonFilename)
-				local properJsonFilename = "D_RFXtrx" .. firmtype .. ".json"
-				log("Proper JSON file: " .. properJsonFilename)
-				if (currentJsonFilename ~= properJsonFilename)
-					then
-					log("Setting device_json to " .. properJsonFilename)
-					luup.attr_set("device_json", properJsonFilename, THIS_DEVICE)
-					currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
-					log("Current JSON file: " .. currentJsonFilename)
-					luup.reload()
-				end
-			end
 			-- Get the hardware version ;
 			--  the major and minor versions
 			hardware = string.byte(data, 8) .. "." .. string.byte(data, 9)
@@ -3025,21 +3242,174 @@ local function decodeRain(subType, data)
 	local altid = "R" .. subType .. "/" .. id
 
 	local tableCmds = {}
-
-	local total = (string.byte(data, 5) * 65536 + string.byte(data, 6) * 256 + string.byte(data, 7)) / 10
-	table.insert(tableCmds, { altid, tableCommands.CMD_RAIN[1], total, 0 } )
-
-	local rate = nil
-	if (subType == tableMsgTypes.RAIN1[2])
-		then
-		rate = string.byte(data, 3) * 256 + string.byte(data, 4)
-	elseif (subType == tableMsgTypes.RAIN2[2])
-		then
-		rate = (string.byte(data, 3) * 256 + string.byte(data, 4)) / 100
+	local rainReading = 0
+	local rainDiff = 0
+	-- Most rain gauges report readings in mm
+	--  and we'll store all data this way
+	local readingConversionFactor = 1.0
+	local lengthUnit = getVariable(THIS_DEVICE, tabVars.VAR_LENGTH_UNIT)
+	local lengthConversionFactor = 1.0
+	local unitsSpecifier = " mm"
+	if (lengthUnit == "0") then
+		lengthConversionFactor = mm2inch
+		unitsSpecifier = " in"
 	end
-	if (rate ~= nil)
+	if (subType ~= tableMsgTypes.RAIN6[2])
 		then
-		table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], rate, 0 } )
+		rainReading = (string.byte(data, 5) * 65536 + string.byte(data, 6) * 256 + string.byte(data, 7)) / 10
+	else
+		rainReading = string.byte(data, 7)
+	end
+	-- Determine the device number of the rain sensor
+	local device = findChild(THIS_DEVICE, altid, tableDeviceTypes.RAIN[1])
+	-- If the device doesn't exist just save the rain amount so it will be created
+	--   if autocreate is on
+	if (device == nil) then
+		table.insert(tableCmds, { altid, tableCommands.CMD_RAIN[1], rainReading, 0 } )
+	else
+		-- Get the last reading
+		local previousRain = getVariable(device, tabVars.VAR_RAIN)
+		table.insert(tableCmds, { altid, tableCommands.CMD_RAIN[1], rainReading, 0 } )
+		if(previousRain ~= nil) then
+			--Get the old battery time
+			local previousSeconds = getVariable(device, tabVars.VAR_BATTERY_DATE)
+			local previousTime  = {}
+			previousTime = os.date("*t", previousSeconds)
+			--Get the current time
+			local currentSeconds = os.time()
+			local currentTime  = {}
+			currentTime = os.date("*t", currentSeconds)
+			-- Determine the difference between this reading and the last
+			rainDiff = rainReading - previousRain
+			-- If this is a LaCrosse TX5 calculate mm
+			if (subType == tableMsgTypes.RAIN6[2]) then
+				readingConversionFactor = LacrosseMMPerCount
+				if(rainDiff < 0) then
+					rainDiff = rainDiff + 16.0
+				end
+			end
+			rainDiff = rainDiff * readingConversionFactor
+			local rainTotal = previousRain + rainDiff
+			-- Get the saved rain data into tables
+			local rainByMinute  = getRainTableData(device, tabVars.VAR_RAINBYMINUTE, 60)
+			local rainByHour = getRainTableData(device, tabVars.VAR_RAINBYHOUR, 24)
+			local rainByWkDay = getRainTableData(device, tabVars.VAR_RAINBYDAY, 7)
+			local rainByWeek = getRainTableData(device, tabVars.VAR_RAINBYWEEK, 52)
+			local rainByMonth = getRainTableData(device, tabVars.VAR_RAINBYMONTH, 12)
+
+			-- calculate the differences in the date and time components
+			local yearDiff = currentTime["year"] - previousTime["year"]
+			local monthDiff = indexDiff(previousTime["month"], currentTime["month"], 12)
+			local currentWeek = weekOfYear(currentTime["year"], currentTime["yday"])
+			local previousWeek = weekOfYear(previousTime["year"], previousTime["yday"])
+			local weekDiff = indexDiff(previousWeek, currentWeek, 52)
+			table.insert(tableCmds, { altid, tableCommands.CMD_CURRENTWEEK[1], currentWeek, 0 } )
+			local dayDiff
+			if(isLeapYear(previousTime["year"])) then
+				dayDiff = indexDiff(previousTime["yday"], currentTime["yday"], 366)
+			else
+				dayDiff = indexDiff(previousTime["yday"], currentTime["yday"], 365)
+			end
+			local hourDiff = indexDiff(previousTime["hour"], currentTime["hour"], 24)
+			local minuteDiff = indexDiff(previousTime["min"], currentTime["min"], 60)
+			-- Determine if any of the rain data needs to be cleared (has expired)
+			if((yearDiff>1) or ((yearDiff > 0) and (previousTime["month"] <= currentTime["month"])))
+				then
+				resetRainTable(rainByMonth, #rainByMonth)
+				resetRainTable(rainByWeek, #rainByWeek)
+				resetRainTable(rainByWkDay, #rainByWkDay)
+				resetRainTable(rainByHour, #rainByHour)
+				resetRainTable(rainByMinute, #rainByMinute)
+			else
+				if(monthDiff ~= 0) then
+					resetRainData(previousTime["month"]+1, currentTime["month"], rainByMonth)
+				end
+				if(weekDiff ~= 0) then
+					resetRainData(previousWeek+1, currentWeek, rainByWeek)
+				end
+				if(dayDiff > 7) then
+					resetRainTable(rainByWkDay, #rainByWkDay)
+				elseif(dayDiff ~= 0) then
+					resetRainData(previousTime["wday"]+1, currentTime["wday"], rainByWkDay)
+				end
+				if((dayDiff>1) or ((dayDiff > 0) and (previousTime["hour"] <= currentTime["hour"])))
+					then
+					resetRainTable(rainByHour, #rainByHour)
+					resetRainTable(rainByMinute, #rainByMinute)
+				elseif(hourDiff > 0) then
+					resetRainData(previousTime["hour"]+2, currentTime["hour"]+1, rainByHour)
+				end
+				if((hourDiff > 1)  or ((hourDiff > 0) and (previousTime["min"] <= currentTime["min"])))
+					then
+					resetRainTable(rainByMinute, #rainByMinute)
+				elseif(minuteDiff > 0) then
+					resetRainData(previousTime["min"]+2, currentTime["min"]+1, rainByMinute)
+				end
+			end
+
+			if(rainDiff > 0.0)
+				then
+				rainByMonth[currentTime["month"]] = rainByMonth[currentTime["month"]] + rainDiff
+				rainByWeek[currentWeek] = rainByWeek[currentWeek] + rainDiff
+				rainByWkDay[currentTime["wday"]] = rainByWkDay[currentTime["wday"]] + rainDiff
+				rainByHour[currentTime["hour"]+1] = rainByHour[currentTime["hour"]+1] + rainDiff
+				rainByMinute[currentTime["min"]+1] = rainByMinute[currentTime["min"]+1] + rainDiff
+			end
+			-- Calculate the rain over the last 24hours
+			if(yearDiff+monthDiff+weekDiff+hourDiff+rainDiff ~= 0) then
+				local rain24Hrs = 0.0
+				for i, v in ipairs(rainByHour)
+					do
+					rain24Hrs = rain24Hrs + v
+				end
+				table.insert(tableCmds, { altid, tableCommands.CMD_RAIN24HRS[1], string.format("%4.2f%s", (rain24Hrs * lengthConversionFactor), unitsSpecifier), 0 } )
+			end
+
+--			if(DEBUG_MODE) then
+--				debug("               year yday wk m d hr mm ss wday")
+--				debug("previous time: " .. previousTime["year"] .. " " .. previousTime["yday"] .. " " .. previousWeek .. " " .. previousTime["month"] .. " " .. previousTime["day"] .. " " .. previousTime["hour"] .. " " .. previousTime["min"] .. " " .. previousTime["sec"] .. " " .. previousTime["wday"])
+--				debug("current time:  " .. currentTime["year"] .. " " .. currentTime["yday"] .. " " .. currentWeek .. " " .. currentTime["month"] .. " " .. currentTime["day"] .. " " .. currentTime["hour"] .. " " .. currentTime["min"] .. " " .. currentTime["sec"] .. " " .. currentTime["wday"])
+--				debug("Rain this minute: " .. currentTime["min"] .. " " .. rainByMinute[currentTime["min"]+1])
+--				debug("Rain by Minute: " .. recursiveConcat(rainByMinute))
+--				debug("Rain this hour: " .. currentTime["hour"] .. " " .. rainByHour[currentTime["hour"]+1])
+--				debug("Rain by Hour: " .. recursiveConcat(rainByHour))
+--				debug("Rain this day: " .. currentTime["wday"] .. " " .. rainByWkDay[currentTime["wday"]])
+--				debug("Rain by Day: " .. recursiveConcat(rainByWkDay))
+--				debug("Rain this week: " .. currentWeek .. " " .. rainByWeek[currentWeek])
+--				debug("Rain by Week: " .. recursiveConcat(rainByWeek))
+--				debug("Rain this month: " .. currentTime["month"] .. " " .. rainByMonth[currentTime["month"]])
+--				debug("Rain by Month: " .. recursiveConcat(rainByMonth))
+--			end
+
+			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYMONTH[1], recursiveConcat(rainByMonth), 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYWEEK[1], recursiveConcat(rainByWeek), 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYDAY[1], recursiveConcat(rainByWkDay), 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYHOUR[1], recursiveConcat(rainByHour), 0 } )
+			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYMINUTE[1], recursiveConcat(rainByMinute), 0 } )
+			local rate = nil
+			if (subType == tableMsgTypes.RAIN1[2])
+				then
+				rate = string.byte(data, 3) * 256 + string.byte(data, 4)
+			elseif (subType == tableMsgTypes.RAIN2[2])
+				then
+				rate = (string.byte(data, 3) * 256 + string.byte(data, 4)) / 100
+			end
+			if (rate ~= nil)
+				then
+				table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], rate, 0 } )
+			else
+				-- Calculate the rain rate based on the last two readings
+				local elapsedSeconds = currentSeconds - previousSeconds
+				if(elapsedSeconds > 0)
+					then
+					local periodsPerHour = 3600 / elapsedSeconds
+					rate = periodsPerHour * rainDiff
+					table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], rate, 0 } )
+					else
+					table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], 0, 0 } )
+				end
+			end
+		end
 	end
 
 	local strength = bitw.rshift(string.byte(data, 8), 4)
@@ -3196,7 +3566,7 @@ local function decodeSecurity(subType, data)
 	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
 	.. string.format("%02X", string.byte(data, 2))
 	.. string.format("%1X", bitw.rshift(string.byte(data, 3), 4))
---	.. string.format("%02X", string.byte(data, 3))
+	--	.. string.format("%02X", string.byte(data, 3))
 
 	local tableCmds = {}
 	-- Since many devices only transmit 'door opened', default the command value to 1
@@ -3218,56 +3588,85 @@ local function decodeSecurity(subType, data)
 	return tableCmds
 
 end
+-- Determine if we need to set or clear the tampered state
+-- Attempting to do anything with the HaDevice sl_tamper variable results in
+--  unexpected behavior. I wonder if anyone at Vera knows how this works.
+local function handleTamperSwitch(altid, deviceType, tampered, tableCmds)
+	-- Get the device number
+	local device = findChild(THIS_DEVICE, altid, deviceType)
+	if((device ~= nil) and (tampered ~= nil)) then
+		-- Get current state of tampered
+		local wasTampered = getVariable(device, tabVars.VAR_TAMPERED)
+		-- Get current state of armed
+		local armed = getVariable(device, tabVars.VAR_ARMED)
+		debug("handleTamper - armed: " .. (armed or 'nil') .. " wasTampered: ".. (wasTampered or 'nil') .. " tamperedNow: " .. (tampered or 'nil'))
+		if(wasTampered ~= nil) then
+			if(tonumber(wasTampered)>0) then wasTampered = 1 else wasTampered = 0 end
+		end
+		if(((wasTampered == nil) or (wasTampered == 0)) and (tampered == 1)) then
+			if(armed ~= nil) then
+				if(tonumber(armed)>0) then armed = 1 else armed = 0 end
+				if(armed == 1) then
+					debug("setting tampered")
+					table.insert(tableCmds, { altid, tableCommands.CMD_TAMPERED[1], 1, 0 })
+				end
+			end
+		elseif((wasTampered ~= nil) and (wasTampered == 1) and (tampered == 0)) then
+			debug("resetting tampered")
+			table.insert(tableCmds, { altid, tableCommands.CMD_TAMPERED[1], 0, 0 })
+		end
+		-- Get current state of tripped
+		--local tripped = getVariable(device, tabVars.VAR_TRIPPED)
+		-- Get current state of AutoUntrip
+		--local autoUntrip = getVariable(device, tabVars.VAR_AUTOUNTRIP)
+		-- Get last time tripped
+		--local lastTrip = getVariable(device, tabVars.VAR_LAST_TRIP)
+	end
+	return tableCmds
+end
 
 local function decodeSecurityDS(subType, data)
+
+	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
+	.. string.format("%02X", string.byte(data, 2))
+	.. string.format("%02X", string.byte(data, 3))
+
+	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
 
 	local tableCmds = {}
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
-  
-	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
-
-
-	if (cmdCode == 0x00 or cmdCode == 0x01)
-		then
-		cmd = tableCommands.CMD_DOOR[1]
-		cmdValue = "0"
-	elseif (cmdCode == 0x02 or cmdCode == 0x03)
-		then
-		cmd = tableCommands.CMD_DOOR[1]
-		cmdValue = "1"
-	elseif (cmdCode == 0x04 or cmdCode == 0x05)
-		then
-    -- If these command codes are present then the device is probably a motion sensor
-    -- Modify the altid to indicate a motion sensor
-    altid = string.gsub(altid, "D/", "M/", 1)
-		cmd = tableCommands.CMD_MOTION[1]
-	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
-  
-    if(cmdCode == 0x04)
-    then
-      cmdValue = "1"
-    else
-      cmdValue = "0"
-    end
+	local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
+	-- If the cmdCode is 4 or 5 then this is really a motion sensor
+	if (cmdCode == 0x04 or cmdCode == 0x05) then
+		tableCmds = decodeSecurityMS(subType, data)
 	else
-		if (cmdCode ~= nil)
+		if (cmdCode == 0x00 or cmdCode == 0x01)
 			then
-			warning("decodeSecurityDS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
+			cmd = tableCommands.CMD_DOOR[1]
+			cmdValue = "0"
+		elseif (cmdCode == 0x02 or cmdCode == 0x03)
+			then
+			cmd = tableCommands.CMD_DOOR[1]
+			cmdValue = "1"
 		else
-			warning("decodeSecurityDS command not yet implemented")
+			if (cmdCode ~= nil)
+				then
+				warning("decodeSecurityDS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
+			else
+				warning("decodeSecurityDS command not yet implemented")
+			end
 		end
-	end
-	if (cmd ~= nil)
-		then
-		table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
-	end
+		if (cmd ~= nil)
+			then
+			table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
+--			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR[1], tampered, tableCmds)
+		end
 
-	local battery = decodeBatteryLevel(data, 5)
-	table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
+		local battery = decodeBatteryLevel(data, 5)
+		table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
+	end
 
 	return tableCmds
 
@@ -3285,6 +3684,7 @@ local function decodeSecurityMS(subType, data)
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
+	local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
 
 	if (cmdCode == 0x04)
 		then
@@ -3305,6 +3705,7 @@ local function decodeSecurityMS(subType, data)
 	if (cmd ~= nil)
 		then
 		table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
+--		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION[1], tampered, tableCmds)
 	end
 
 	local battery = decodeBatteryLevel(data, 5)
@@ -3785,6 +4186,7 @@ local function initDecodingFunctions()
 	tableMsgTypes.RAIN3[4] = decodeRain
 	tableMsgTypes.RAIN4[4] = decodeRain
 	tableMsgTypes.RAIN5[4] = decodeRain
+	tableMsgTypes.RAIN6[4] = decodeRain
 	tableMsgTypes.RAIN7[4] = decodeRain
 	tableMsgTypes.TR1[4] = decodeTempRain
 	tableMsgTypes.WIND1[4] = decodeWind
@@ -3837,7 +4239,6 @@ function startup(lul_device)
 	THIS_DEVICE = lul_device
 
 	task("Starting RFXtrx device: " .. tostring(lul_device), TASK_SUCCESS)
-
 	local debugLogs = getVariable(lul_device, tabVars.VAR_DEBUG_LOGS)
 	if (debugLogs == nil or tonumber(debugLogs) == nil) then
 		setVariable(lul_device, tabVars.VAR_DEBUG_LOGS, "0")
@@ -3945,6 +4346,7 @@ function incomingData(lul_device, lul_data)
 
 		debug("Received message: " .. formattohex(message))
 		setVariable(THIS_DEVICE, tabVars.VAR_LAST_RECEIVED_MSG, formattohex(message))
+		setVariable(THIS_DEVICE, tabVars.VAR_VERATIME, os.time())
 		if (getVariable(THIS_DEVICE, tabVars.VAR_COMM_FAILURE) ~= "0")
 			then
 			luup.set_failure(false)
@@ -3996,6 +4398,9 @@ function switchPower(device, newTargetValue)
 	elseif ((string.len(id) == 15) and (string.sub(id, 1, 5) == "HT/HT") and (string.sub(id, 7, 7) == ".")  and (string.sub(id, 9, 9) == "/"))
 		then
 		category = 8
+	elseif ((string.len(id) == 15) and (string.sub(id, 1, 5) == "L4/L4"))
+		then
+		category = 9
 	else
 		warning("Unexpected device id " .. id .. ". Switch Power command not sent")
 		return
@@ -4202,11 +4607,23 @@ function switchPower(device, newTargetValue)
 			tonumber(string.sub(remoteId, 5, 6), 16),
 			cmdCode, 0)
 		end
-		-- elseif (category == 8)
-		-- then
-		-- TODO: Mertik
+	-- elseif (category == 8)
+	-- then
+	-- TODO: Mertik
+	elseif (category == 9)
+		then
+		type = tableMsgTypes.SECURITY_DOOR[1]
+		subType = tableMsgTypes.SECURITY_DOOR[2]
+		nbTimes = 2
+		remoteId = string.sub(id, 7, 12)
+		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+			tonumber(string.sub(remoteId, 3, 4), 16),
+			tonumber(string.sub(remoteId, 5, 6), 16),
+			tonumber("01", 16),
+			tonumber("76", 16),
+			0)
 	else
-		warning("Unimpemented lighting type " .. category .. ". Switch Power command not sent")
+		warning("Unimplemented lighting type " .. category .. ". Switch Power command not sent")
 	end
 
 	if (data ~= nil)
@@ -4417,7 +4834,7 @@ function setDimLevel(device, newLoadlevelTarget)
 			end
 		end
 	else
-		warning("Unimpemented lighting type " .. category .. ". Set level command not sent")
+		warning("Unimplemented lighting type " .. category .. ". Set level command not sent")
 	end
 
 	if (data ~= nil)
@@ -5252,9 +5669,11 @@ function setModeTarget(device, NewModeTarget)
 end
 
 function toggleState(device)
+	debug("toggleState: " .. device)
 	local devType = string.sub(luup.devices[device].id, 1, 2)
+	debug("Device Type: " .. devType)
 
-	-- Only implemented for Light Switches and HeaTers so far
+	-- Only implemented for Sonoff switches, Light Switches and Heaters so far
 	if (devType == "LS")
 		then
 		local curStat = getVariable(device, tabVars.VAR_LIGHT) or "0"
@@ -5277,6 +5696,21 @@ function toggleState(device)
 			NewModeTarget = "Off"
 		end
 		setModeTarget(device, NewModeTarget)
+	elseif (devType == "L4")
+		then
+		local id = luup.devices[device].id
+		local currentState = getVariable(device,tabVars.VAR_STATE) or "0"
+		local newTargetState
+		if (currentState == "0")
+			then
+			newTargetState = "1"
+		else
+			newTargetState = "0"
+		end
+		setVariable(device, tabVars.VAR_STATE, newTargetState)
+		-- Send a command to toggle the switch state
+		switchPower(device, newTargetState)
+
 	end
 end
 
@@ -5461,6 +5895,11 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 	if (deviceType == "SWITCH_LIGHT")
 		then
 		devType = "LIGHT"
+		-- This is part of the SONOFF hack
+		if (category == "SONOFF")
+			then
+			devType = "SWITCH_TOGGLE"
+		end
 	elseif (deviceType == "DIMMABLE_LIGHT")
 		then
 		devType = "DIMMER"
@@ -5853,10 +6292,33 @@ function setTemperatureUnit(unit)
 
 end
 
+function setLengthUnit(newUnit)
+
+	debug("setLengthUnit " .. (newUnit or "nil"))
+	if (newUnit ~= "MILLIMETERS" and newUnit ~= "INCHES")
+		then
+		task("setLengthUnit: invalid argument", TASK_ERROR)
+		return
+	end
+	-- Get the current setting
+	local value = getVariable(THIS_DEVICE, tabVars.VAR_LENGTH_UNIT)
+	--If the new setting is the same as the old, do nothing
+	if ((value == 0) and (newUnit == "INCHES")) or ((value == 1) and (newUnit == "MILLIMETERS"))
+		then
+		return
+	else -- We're changing the length units.
+		if (newUnit == "INCHES") then
+			value = 0
+		else
+			value = 1
+		end
+	end
+	setVariable(THIS_DEVICE, tabVars.VAR_LENGTH_UNIT, value)
+end
+
 function setSpeedUnit(unit)
 
 	debug("setSpeedUnit " .. (unit or "nil"))
-
 	if (unit ~= "KMH" and unit ~= "MPH")
 		then
 		task("SetSpeedUnit: invalid argument", TASK_ERROR)
@@ -5869,21 +6331,17 @@ function setSpeedUnit(unit)
 		value = 0
 	end
 	setVariable(THIS_DEVICE, tabVars.VAR_SPEED_UNIT, value)
-
 end
 
 function setVoltage(value)
 
 	debug("setVoltage " .. (value or "nil"))
-
 	setVariable(THIS_DEVICE, tabVars.VAR_VOLTAGE, value or 230)
-
 end
 
 function setAutoCreate(enable)
 
 	debug("setAutoCreate " .. (enable or "nil"))
-
 	if ((enable == "true") or (enable == "yes"))
 		then
 		enable = "1"
@@ -5896,15 +6354,12 @@ function setAutoCreate(enable)
 		task("SetAutoCreate: invalid argument", TASK_ERROR)
 		return
 	end
-
 	setVariable(THIS_DEVICE, tabVars.VAR_AUTO_CREATE, enable)
-
 end
 
 function setDebugLogs(enable)
 
 	debug("setDebugLogs " .. (enable or "nil"))
-
 	if ((enable == "true") or (enable == "yes"))
 		then
 		enable = "1"
@@ -5917,7 +6372,6 @@ function setDebugLogs(enable)
 		task("SetDebugLogs: invalid argument", TASK_ERROR)
 		return
 	end
-
 	setVariable(THIS_DEVICE, tabVars.VAR_DEBUG_LOGS, enable)
 	if (enable == "1")
 		then
@@ -5925,7 +6379,6 @@ function setDebugLogs(enable)
 	else
 		DEBUG_MODE = false
 	end
-
 end
 
 local function setMode()
@@ -6052,32 +6505,32 @@ function setupReceiving(protocol, enable)
 	debug("setupReceiving " .. (protocol or "nil") .. " " .. (enable or "nil"))
 
 	local tabProtocols = {
-		X10 = "VAR_X10_RECEIVING",
-		ARC = "VAR_ARC_RECEIVING",
-		AC = "VAR_AC_RECEIVING",
-		HOMEEASY_EU = "VAR_HEU_RECEIVING",
-		MEIANTECH = "VAR_MEIANTECH_RECEIVING",
-		OREGON = "VAR_OREGON_RECEIVING",
-		ATI = "VAR_ATI_RECEIVING",
-		VISONIC = "VAR_VISONIC_RECEIVING",
-		MERTIK = "VAR_MERTIK_RECEIVING",
-		LIGHTWAVERF = "VAR_AD_RECEIVING",
-		HIDEKI_UPM = "VAR_HIDEKI_RECEIVING",
-		LACROSSE = "VAR_LACROSSE_RECEIVING",
-		FS20 = "VAR_FS20_RECEIVING",
-		PROGUARD = "VAR_PROGUARD_RECEIVING",
-		BLINDS_T0 = "VAR_BLINDST0_RECEIVING",
-		BLINDS_T1T2T3T4 = "VAR_BLINDST1_RECEIVING",
-		BLYSS = "VAR_AE_RECEIVING",
-		RUBICSON = "VAR_RUBICSON_RECEIVING",
-		FINEOFFSET_VIKING = "VAR_FINEOFFSET_RECEIVING",
-		LIGHTING4 = "VAR_LIGHTING4_RECEIVING",
-		RSL = "VAR_RSL_RECEIVING",
-		BYRON_SX = "VAR_BYRONSX_RECEIVING",
-		IMAGINTRONIX = "VAR_IMAGINTRONIX_RECEIVING",
-		KEELOQ = "VAR_KEELOQ_RECEIVING",
-		HOMECONFORT = "VAR_HOMECONFORT_RECEIVING",
-		UNDECODED = "VAR_UNDECODED_RECEIVING"
+		X10Receiving = "VAR_X10_RECEIVING",
+		ARCReceiving = "VAR_ARC_RECEIVING",
+		ACReceiving = "VAR_AC_RECEIVING",
+		HEUReceiving = "VAR_HEU_RECEIVING",
+		MeiantechReceiving = "VAR_MEIANTECH_RECEIVING",
+		OregonReceiving = "VAR_OREGON_RECEIVING",
+		ATIReceiving = "VAR_ATI_RECEIVING",
+		VisonicReceiving = "VAR_VISONIC_RECEIVING",
+		MertikReceiving = "VAR_MERTIK_RECEIVING",
+		ADReceiving = "VAR_AD_RECEIVING",
+		HidekiReceiving = "VAR_HIDEKI_RECEIVING",
+		LaCrosseReceiving = "VAR_LACROSSE_RECEIVING",
+		FS20Receiving = "VAR_FS20_RECEIVING",
+		ProGuardReceiving = "VAR_PROGUARD_RECEIVING",
+		BlindsT0Receiving = "VAR_BLINDST0_RECEIVING",
+		BlindsT1Receiving = "VAR_BLINDST1_RECEIVING",
+		AEReceiving = "VAR_AE_RECEIVING",
+		RubicsonReceiving = "VAR_RUBICSON_RECEIVING",
+		FineOffsetReceiving = "VAR_FINEOFFSET_RECEIVING",
+		Lighting4Receiving = "VAR_LIGHTING4_RECEIVING",
+		RSLReceiving = "VAR_RSL_RECEIVING",
+		ByronSXReceiving = "VAR_BYRONSX_RECEIVING",
+		ImagintronixReceiving = "VAR_IMAGINTRONIX_RECEIVING",
+		KeelogReceiving = "VAR_KEELOQ_RECEIVING",
+		HomeConfortReceiving = "VAR_HOMECONFORT_RECEIVING",
+		UndecodedReceiving = "VAR_UNDECODED_RECEIVING"
 	}
 
 	local valid = true
@@ -6088,10 +6541,10 @@ function setupReceiving(protocol, enable)
 		valid = false
 	end
 
-	if ((enable == "true") or (enable == "yes"))
+	if ((enable == "true") or (enable == "yes") or (enable == 1))
 		then
 		enable = "1"
-	elseif ((enable == "false") or (enable == "no"))
+	elseif ((enable == "false") or (enable == "no") or (enable == 0))
 		then
 		enable = "0"
 	end
