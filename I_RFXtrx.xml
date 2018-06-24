@@ -45,6 +45,11 @@
 
 	<startup>startup</startup>
 	<actionList>
+	    <action>
+	  		<serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
+	  		<name>SetTarget</name>
+	  		<run>if (pluginLib ~= nil) then pluginLib.switchPower(lul_device, lul_settings.newTargetValue) end</run>
+	    </action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
 			<name>ToggleState</name>
