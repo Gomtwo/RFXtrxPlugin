@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.41"
+local PLUGIN_VERSION = "1.50"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -25,149 +25,185 @@ local inch2mm = 25.4
 local LacrosseInchesPerCount = 0.0105
 local LacrosseMMPerCount = 0.2667
 
--- Used to speed up the search for a message type
--- Used by decodeMessage(message )
-local tableMessageDecodeFunctions = {}
+-- class.lua
+-- Compatible with Lua 5.1 (not 5.0).
+-- This class definition is copied from http://lua-users.org/wiki/SimpleLuaClasses
+function class(base, init)
+	local c = {}    -- a new class instance
+	if not init and type(base) == 'function' then
+		init = base
+		base = nil
+	elseif type(base) == 'table' then
+		-- our new class is a shallow copy of the base class!
+		for i,v in pairs(base) do
+			c[i] = v
+		end
+		c._base = base
+	end
+	-- the class will be the metatable for all its objects,
+	-- and they will look up their methods in it.
+	c.__index = c
 
+	-- expose a constructor which can be called by <classname>(<args>)
+	local mt = {}
+	mt.__call = function(class_tbl, ...)
+		local obj = {}
+		setmetatable(obj,c)
+		if init then
+			init(obj,...)
+		else
+			-- make sure that any stuff from the base class is initialized!
+			if base and base.init then
+				base.init(obj, ...)
+			end
+		end
+		return obj
+	end
+	c.init = init
+	c.is_a = function(self, klass)
+		local m = getmetatable(self)
+		while m do
+			if m == klass then return true end
+			m = m._base
+		end
+		return false
+	end
+	setmetatable(c, mt)
+	return c
+end
+
+-- Define a class for our message types
+Message = class(function(a, type, subType, length)
+	a.type = type
+	a.subType = subType
+	a.length = length
+	a.decodeKey = string.format('%06X',((length * 65536) + (type * 256) + subType))
+	a.decodeFunction = nil
+end)
+
+-- A class method to print a message class object
+function Message:__tostring()
+	local part1 = "length: " .. string.format("0x%02X", self.length) .. " type: " .. string.format("0x%02X", self.type)
+	local part2 = ' subType: ' .. self.subtype .. ' decodeKey: ' .. self.decodeKey or 'nil' .. ' decode function: ' .. self.decodeFunction or 'nil'
+	return (part1 .. part2)
+end
+
+-- Put them in a table so we can work with them as a group
 local tableMsgTypes = {
-	MODE_COMMAND = { 0x00, 0x00, 13, nil, nil, nil },
-
-	RESPONSE_MODE_COMMAND = { 0x01, 0x00, 20, nil, nil, nil },
-	UNKNOWN_RTS_REMOTE = { 0x01, 0x01, 13, nil, nil, nil },
-	WRONG_COMMAND = { 0x01, 0xFF, 13, nil, nil, nil },
-
-	RECEIVER_LOCK_ERROR = { 0x02, 0x00, 4, nil, nil, nil },
-	TRANSMITTER_RESPONSE = { 0x02, 0x01, 4, nil, nil, nil },
-
-	LIGHTING_X10 = { 0x10, 0x0, 7, nil, nil, "X10" },
-	LIGHTING_ARC = { 0x10, 0x1, 7, nil, nil, "ARC" },
-	LIGHTING_AB400D = { 0x10, 0x2, 7, nil, "ELRO", "AB400D" },
-	LIGHTING_WAVEMAN = { 0x10, 0x3, 7, nil, nil, "Waveman" },
-	LIGHTING_EMW200 = { 0x10, 0x4, 7, nil, "Chacon", "EMW200" },
-	LIGHTING_IMPULS = { 0x10, 0x5, 7, nil, nil, "Impuls" },
-	LIGHTING_RISINGSUN = { 0x10, 0x6, 7, nil, "Risingsun Electronics", "RisingSun" },
-	LIGHTING_PHILIPS = { 0x10, 0x7, 7, nil, "Philips", "SBC" },
-	LIGHTING_ENERGENIE_ENER010 = { 0x10, 0x8, 7, nil, "Energenie", "Energenie ENER010" },
-	LIGHTING_ENERGENIE_5GANG = { 0x10, 0x9, 7, nil, "Energenie", "Energenie 5-gang" },
-	LIGHTING_COCO = { 0x10, 0xa, 7, nil, "COCO", "COCO GDR2-2000R" },
-
-	LIGHTING_AC = { 0x11, 0x0, 11, nil, nil, "AC" },
-	LIGHTING_HEU = { 0x11, 0x1, 11, nil, nil, "HomeEasy EU" },
-	LIGHTING_ANSLUT = { 0x11, 0x2, 11, nil, nil, "ANSLUT" },
-
-	LIGHTING_KOPPLA = { 0x12, 0x0, 8, nil, "Ikea", "Koppla" },
-
-	SECURITY_DOOR = { 0x13, 0x0, 9, nil, nil, nil },
-
-	LIGHTING_LIGHTWARERF = { 0x14, 0x0, 10, nil, nil, "LightwaveRF, Siemens" },
-	LIGHTING_EMW100 = { 0x14, 0x1, 10, nil, "GAO/Everflourish", "GAO/Everflourish EMW100" },
-	LIGHTING_BBSB = { 0x14, 0x2, 10, nil, "Bye Bye Standby", "Bye Bye Standby" },
-	LIGHTING_RSL2 = { 0x14, 0x4, 10, nil, "Conrad", "Conrad RSL2" },
-	LIGHTING_LIVOLO = { 0x14, 0x5, 10, nil, "Livolo", "Livolo" },
-
-	LIGHTING_BLYSS = { 0x15, 0x0, 11, nil, "Thomson", "Blyss" },
-
-	HEATER3_MERTIK1 = { 0x42, 0x0, 8, nil, "Mertik", "Mertik Maxitrol G6R-H4T1" },
-	HEATER3_MERTIK2 = { 0x42, 0x1, 8, nil, "Mertik", "Mertik Maxitrol G6R-H4TB" },
-
-	TEMP1 = { 0x50, 0x1, 8, nil, "Oregon Scientific", "THR128/138, THC138" },
-	TEMP2 = { 0x50, 0x2, 8, nil, "Oregon Scientific", "THC238/268, THN132, THWR288, THRN122, THN122, AW129/131" },
-	TEMP3 = { 0x50, 0x3, 8, nil, "Oregon Scientific", "THWR800" },
-	TEMP4 = { 0x50, 0x4, 8, nil, "Oregon Scientific", "RTHN318" },
-	TEMP5 = { 0x50, 0x5, 8, nil, "La Crosse Technology", "La Crosse TX3, TX4, TX17" },
-	TEMP6 = { 0x50, 0x6, 8, nil, "Honeywell", "TS15C" },
-	TEMP7 = { 0x50, 0x7, 8, nil, nil, "Viking 02811, Proove TSS330/311346" },
-	TEMP8 = { 0x50, 0x8, 8, nil, "La Crosse Technology", "WS2300" },
-	TEMP9 = { 0x50, 0x9, 8, nil, "Rubicson", "Rubicson" },
-	TEMP10 = { 0x50, 0xA, 8, nil, "TFA", "TFA 30.3133, 30.3160" },
-	TEMP11 = { 0x50, 0xB, 8, nil, nil, "WT0122" },
-
-	HUM1 = { 0x51, 0x1, 8, nil, "La Crosse Technology","La Crosse TX3" },
-	HUM2 = { 0x51, 0x2, 8, nil, "La Crosse Technology","WS2300" },
-
-	TEMP_HUM1 = { 0x52, 0x1, 10, nil, "Oregon Scientific", "THGN122/123, THGN132, THGR122/228/238/268" },
-	TEMP_HUM2 = { 0x52, 0x2, 10, nil, "Oregon Scientific", "THGR810, THGN800" },
-	TEMP_HUM3 = { 0x52, 0x3, 10, nil, "Oregon Scientific", "RTGR328" },
-	TEMP_HUM4 = { 0x52, 0x4, 10, nil, "Oregon Scientific", "THGR328" },
-	TEMP_HUM5 = { 0x52, 0x5, 10, nil, "Oregon Scientific", "WTGR800" },
-	TEMP_HUM6 = { 0x52, 0x6, 10, nil, "Oregon Scientific", "THGR918, THGRN228, THGN500" },
-	TEMP_HUM7 = { 0x52, 0x7, 10, nil, nil, "TFA TS34C, Cresta" },
-	TEMP_HUM8 = { 0x52, 0x8, 10, nil, "UPM", "WT450H" },
-	TEMP_HUM9 = { 0x52, 0x9, 10, nil, nil, "Viking 02035/02038, Proove TSS320/311501" },
-	TEMP_HUM10 = { 0x52, 0xa, 10, nil, "Rubicson", "Rubicson" },
-	TEMP_HUM11 = { 0x52, 0xb, 10, nil, "Oregon Scientific", "EW109" },
-	TEMP_HUM12 = { 0x52, 0xc, 10, nil, "Imagintronix", "Imagintronix Soil sensor" },
-	TEMP_HUM13 = { 0x52, 0xd, 10, nil, "Alecto", "Alecto WS1700 and compatibles" },
-	TEMP_HUM14 = { 0x52, 0xe, 10, nil, nil, "Alecto WS4500, Auriol H13726, Hama EWS1500, Meteoscan W155/W160, Ventus WS155" },
-
-	BARO1 = { 0x53, 0x1, 9, nil, nil, nil },
-
-	TEMP_HUM_BARO1 = { 0x54, 0x1, 13, nil, "Oregon Scientific", "BTHR918, BTHGN129" },
-	TEMP_HUM_BARO2 = { 0x54, 0x2, 13, nil, "Oregon Scientific", "BTHR918N, BTHR968" },
-
-	RAIN1 = { 0x55, 0x1, 11, nil, "Oregon Scientific", "RGR126/682/918" },
-	RAIN2 = { 0x55, 0x2, 11, nil, "Oregon Scientific", "PCR800" },
-	RAIN3 = { 0x55, 0x3, 11, nil, "TFA", nil },
-	RAIN4 = { 0x55, 0x4, 11, nil, "UPM", "RG700" },
-	RAIN5 = { 0x55, 0x5, 11, nil, "La Crosse Technology", "WS2300" },
-	RAIN6 = { 0x55, 0x6, 11, nil, "La Crosse Technology", "TX5" },
-	RAIN7 = { 0x55, 0x7, 11, nil, nil, "Alecto WS4500, Auriol H13726, Hama EWS1500, Meteoscan W155/W160, Ventus WS155" },
-
-	TR1 = { 0x4F, 0x1, 10, nil, "Alecto", "WS1200" },
-
-	WIND1 = { 0x56, 0x1, 16, nil, "Oregon Scientific", "WTGR800" },
-	WIND2 = { 0x56, 0x2, 16, nil, "Oregon Scientific", "WGR800" },
-	WIND3 = { 0x56, 0x3, 16, nil, "Oregon Scientific", "STR918, WGR918" },
-	WIND4 = { 0x56, 0x4, 16, nil, "TFA", nil },
-	WIND5 = { 0x56, 0x5, 16, nil, "UPM", "WDS500" },
-	WIND6 = { 0x56, 0x6, 16, nil, "La Crosse Technology", "WS2300" },
-	WIND7 = { 0x56, 0x7, 16, nil, nil, "Alecto WS4500, Auriol H13726, Hama EWS1500, Meteoscan W155/W160, Ventus WS155" },
-
-	UV1 = { 0x57, 0x1, 9, nil, "Oregon Scientific", "UVN128, UV138" },
-	UV2 = { 0x57, 0x2, 9, nil, "Oregon Scientific", "UVN800" },
-	UV3 = { 0x57, 0x3, 9, nil, "TFA", nil },
-
-	WEIGHT1 = { 0x5D, 0x1, 8, nil, "Oregon Scientific", "BWR101, BWR102" },
-	WEIGHT2 = { 0x5D, 0x2, 8, nil, "Oregon Scientific", "GR101" },
-
-	CURTAIN_HARRISON = { 0x18, 0x0, 7, nil, "Harrison", "Harrison" },
-
-	BLIND_T0 = { 0x19, 0x0, 9, nil, nil, "RollerTrol, Hasta" },
-	BLIND_T1 = { 0x19, 0x1, 9, nil, "Hasta", "Hasta" },
-	BLIND_T2 = { 0x19, 0x2, 9, nil, "A-OK", "A-OK RF01" },
-	BLIND_T3 = { 0x19, 0x3, 9, nil, "A-OK", "A-OK AC114" },
-	BLIND_T4 = { 0x19, 0x4, 9, nil, "Raex", "Raex YR1326" },
-	BLIND_T5 = { 0x19, 0x5, 9, nil, "Media Mount", "Media Mount projection screen" },
-	BLIND_T6 = { 0x19, 0x6, 9, nil, nil, "DC106, YOODA, Rohrmotor24 RMF" },
-	BLIND_T7 = { 0x19, 0x7, 9, nil, nil, "Forest" },
-
-	RFY0 = { 0x1A, 0x0, 12, nil, nil, "RFY" },
-
-	SECURITY_X10DS = { 0x20, 0x0, 8, nil, nil, "X10 security door/window sensor" },
-	SECURITY_X10MS = { 0x20, 0x1, 8, nil, nil, "X10 security motion sensor" },
-	SECURITY_X10SR = { 0x20, 0x2, 8, nil, nil, "X10 security remote" },
-	KD101 = { 0x20, 0x3, 8, nil, nil, "KD101 smoke detector" },
-	POWERCODE_PRIMDS = { 0x20, 0x4, 8, nil, "Visonic", "PowerCode door/window sensor � primary contact" },
-	POWERCODE_MS = { 0x20, 0x5, 8, nil, "Visonic", "PowerCode motion sensor" },
-	POWERCODE_AUXDS = { 0x20, 0x7, 8, nil, "Visonic", "PowerCode door/window sensor � auxiliary contact" },
-	SECURITY_MEISR = { 0x20, 0x8, 8, nil, "Meiantech", "Meiantech/Atlantic security remote" },
-	SA30 = { 0x20, 0x9, 8, nil, "Alecto", "SA30 smoke detector" },
-
-	ELEC1 = { 0x59, 0x1, 13, nil, nil, "OWL CM113, Electrisave, cent-a-meter" },
-	ELEC2 = { 0x5A, 0x1, 17, nil, "OWL", "CM119/160" },
-	ELEC3 = { 0x5A, 0x2, 17, nil, "OWL", "CM180" },
-	ELEC4 = { 0x5B, 0x1, 19, nil, "OWL", "CM180i" },
-
-	RFXSENSOR_T = { 0x70, 0x0, 7, nil, "RFXCOM", "RFXSensor" },
-	RFXMETER = { 0x71, 0x0, 10, nil, "RFXCOM", "RFXMeter" },
-
-	ATI_REMOTE_WONDER = { 0x30, 0x0, 6, nil, "ATI", "ATI Remote Wonder" },
-	ATI_REMOTE_WONDER_PLUS = { 0x30, 0x1, 6, nil, "ATI", "ATI Remote Wonder Plus" },
-	MEDION_REMOTE = { 0x30, 0x2, 6, nil, "Medion", "Medion Remote" },
-	X10_PC_REMOTE = { 0x30, 0x3, 6, nil, nil, "X10 PC remote" },
-	ATI_REMOTE_WONDER_II = { 0x30, 0x4, 6, nil, "ATI", "ATI Remote Wonder II" }
-
+	MODE_COMMAND = (Message( 0x00, 0x00, 13 )),
+	RESPONSE_MODE_COMMAND = (Message( 0x01, 0x00, 20 )),
+	UNKNOWN_RTS_REMOTE = (Message( 0x01, 0x01, 13 )),
+	WRONG_COMMAND = (Message( 0x01, 0xFF, 13 )),
+	RECEIVER_LOCK_ERROR = (Message( 0x02, 0x00, 4 )),
+	TRANSMITTER_RESPONSE = (Message( 0x02, 0x01, 4 )),
+	LIGHTING_X10 = (Message( 0x10, 0x0, 7 )),
+	LIGHTING_ARC = (Message( 0x10, 0x1, 7 )),
+	LIGHTING_AB400D = (Message( 0x10, 0x2, 7 )),
+	LIGHTING_WAVEMAN = (Message( 0x10, 0x3, 7 )),
+	LIGHTING_EMW200 = (Message( 0x10, 0x4, 7 )),
+	LIGHTING_IMPULS = (Message( 0x10, 0x5, 7 )),
+	LIGHTING_RISINGSUN = (Message( 0x10, 0x6, 7 )),
+	LIGHTING_PHILIPS = (Message( 0x10, 0x7, 7 )),
+	LIGHTING_ENERGENIE_ENER010 = (Message( 0x10, 0x8, 7 )),
+	LIGHTING_ENERGENIE_5GANG = (Message( 0x10, 0x9, 7 )),
+	LIGHTING_COCO = (Message( 0x10, 0xa, 7 )),
+	LIGHTING_AC = (Message( 0x11, 0x0, 11 )),
+	LIGHTING_HEU = (Message( 0x11, 0x1, 11 )),
+	LIGHTING_ANSLUT = (Message( 0x11, 0x2, 11 )),
+	LIGHTING_KOPPLA = (Message( 0x12, 0x0, 8 )),
+	SECURITY_DOOR = (Message( 0x13, 0x0, 9 )),
+	LIGHTING_LIGHTWARERF = (Message( 0x14, 0x0, 10 )),
+	LIGHTING_EMW100 = (Message( 0x14, 0x1, 10 )),
+	LIGHTING_BBSB = (Message( 0x14, 0x2, 10 )),
+	LIGHTING_RSL2 = (Message( 0x14, 0x4, 10 )),
+	LIGHTING_LIVOLO = (Message( 0x14, 0x5, 10 )),
+	LIGHTING_BLYSS = (Message( 0x15, 0x0, 11 )),
+	HEATER3_MERTIK1 = (Message( 0x42, 0x0, 8 )),
+	HEATER3_MERTIK2 = (Message( 0x42, 0x1, 8 )),
+	TEMP1 = (Message( 0x50, 0x1, 8 )),
+	TEMP2 = (Message( 0x50, 0x2, 8 )),
+	TEMP3 = (Message( 0x50, 0x3, 8 )),
+	TEMP4 = (Message( 0x50, 0x4, 8 )),
+	TEMP5 = (Message( 0x50, 0x5, 8 )),
+	TEMP6 = (Message( 0x50, 0x6, 8 )),
+	TEMP7 = (Message( 0x50, 0x7, 8 )),
+	TEMP8 = (Message( 0x50, 0x8, 8 )),
+	TEMP9 = (Message( 0x50, 0x9, 8 )),
+	TEMP10 = (Message( 0x50, 0xA, 8 )),
+	TEMP11 = (Message( 0x50, 0xB, 8 )),
+	HUM1 = (Message( 0x51, 0x1, 8 )),
+	HUM2 = (Message( 0x51, 0x2, 8 )),
+	TEMP_HUM1 = (Message( 0x52, 0x1, 10 )),
+	TEMP_HUM2 = (Message( 0x52, 0x2, 10 )),
+	TEMP_HUM3 = (Message( 0x52, 0x3, 10 )),
+	TEMP_HUM4 = (Message( 0x52, 0x4, 10 )),
+	TEMP_HUM5 = (Message( 0x52, 0x5, 10 )),
+	TEMP_HUM6 = (Message( 0x52, 0x6, 10 )),
+	TEMP_HUM7 = (Message( 0x52, 0x7, 10 )),
+	TEMP_HUM8 = (Message( 0x52, 0x8, 10 )),
+	TEMP_HUM9 = (Message( 0x52, 0x9, 10 )),
+	TEMP_HUM10 = (Message( 0x52, 0xa, 10 )),
+	TEMP_HUM11 = (Message( 0x52, 0xb, 10 )),
+	TEMP_HUM12 = (Message( 0x52, 0xc, 10 )),
+	TEMP_HUM13 = (Message( 0x52, 0xd, 10 )),
+	TEMP_HUM14 = (Message( 0x52, 0xe, 10 )),
+	BARO1 = (Message( 0x53, 0x1, 9 )),
+	TEMP_HUM_BARO1 = (Message( 0x54, 0x1, 13 )),
+	TEMP_HUM_BARO2 = (Message( 0x54, 0x2, 13 )),
+	RAIN1 = (Message( 0x55, 0x1, 11 )),
+	RAIN2 = (Message( 0x55, 0x2, 11 )),
+	RAIN3 = (Message( 0x55, 0x3, 11 )),
+	RAIN4 = (Message( 0x55, 0x4, 11 )),
+	RAIN5 = (Message( 0x55, 0x5, 11 )),
+	RAIN6 = (Message( 0x55, 0x6, 11 )),
+	RAIN7 = (Message( 0x55, 0x7, 11 )),
+	TR1 = (Message( 0x4F, 0x1, 10 )),
+	WIND1 = (Message( 0x56, 0x1, 16 )),
+	WIND2 = (Message( 0x56, 0x2, 16 )),
+	WIND3 = (Message( 0x56, 0x3, 16 )),
+	WIND4 = (Message( 0x56, 0x4, 16 )),
+	WIND5 = (Message( 0x56, 0x5, 16 )),
+	WIND6 = (Message( 0x56, 0x6, 16 )),
+	WIND7 = (Message( 0x56, 0x7, 16 )),
+	UV1 = (Message( 0x57, 0x1, 9 )),
+	UV2 = (Message( 0x57, 0x2, 9 )),
+	UV3 = (Message( 0x57, 0x3, 9 )),
+	WEIGHT1 = (Message( 0x5D, 0x1, 8 )),
+	WEIGHT2 = (Message( 0x5D, 0x2, 8 )),
+	CURTAIN_HARRISON = (Message( 0x18, 0x0, 7 )),
+	BLIND_T0 = (Message( 0x19, 0x0, 9 )),
+	BLIND_T1 = (Message( 0x19, 0x1, 9 )),
+	BLIND_T2 = (Message( 0x19, 0x2, 9 )),
+	BLIND_T3 = (Message( 0x19, 0x3, 9 )),
+	BLIND_T4 = (Message( 0x19, 0x4, 9 )),
+	BLIND_T5 = (Message( 0x19, 0x5, 9 )),
+	BLIND_T6 = (Message( 0x19, 0x6, 9 )),
+	BLIND_T7 = (Message( 0x19, 0x7, 9 )),
+	RFY0 = (Message( 0x1A, 0x0, 12 )),
+	SECURITY_X10DS = (Message( 0x20, 0x0, 8 )),
+	SECURITY_X10MS = (Message( 0x20, 0x1, 8 )),
+	SECURITY_X10SR = (Message( 0x20, 0x2, 8 )),
+	KD101 = (Message( 0x20, 0x3, 8 )),
+	POWERCODE_PRIMDS = (Message( 0x20, 0x4, 8 )),
+	POWERCODE_MS = (Message( 0x20, 0x5, 8 )),
+	POWERCODE_AUXDS = (Message( 0x20, 0x7, 8 )),
+	SECURITY_MEISR = (Message( 0x20, 0x8, 8 )),
+	SA30 = (Message( 0x20, 0x9, 8 )),
+	ELEC1 = (Message( 0x59, 0x1, 13 )),
+	ELEC2 = (Message( 0x5A, 0x1, 17 )),
+	ELEC3 = (Message( 0x5A, 0x2, 17 )),
+	ELEC4 = (Message( 0x5B, 0x1, 19 )),
+	RFXSENSOR_T = (Message( 0x70, 0x0, 7 )),
+	RFXMETER = (Message( 0x71, 0x0, 10 )),
+	ATI_REMOTE_WONDER = (Message( 0x30, 0x0, 6 )),
+	ATI_REMOTE_WONDER_PLUS = (Message( 0x30, 0x1, 6 )),
+	MEDION_REMOTE = (Message( 0x30, 0x2, 6 )),
+	X10_PC_REMOTE = (Message( 0x30, 0x3, 6 )),
+	ATI_REMOTE_WONDER_II = (Message( 0x30, 0x4, 6 ))
 }
+
+-- This table is initialized in deferredStartup
+local tableMsgSelect = {}
 
 local DATA_MSG_RESET = string.char(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 local DATA_MSG_GET_STATUS = string.char(2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -184,11 +220,10 @@ local tableMsgSent = {}
 local tableCommandByCmd = {}
 
 -- The table tableCmds stores all decoded commands from a RFXtrx message
--- Each entry is a table of 4 elements:
--- 1) device ID (altid) minus the first three characters
--- 2) command (a string)
--- 3) type of the device to create
--- 4) value (may be of any type and can be nil for commands that don't require a value)
+-- Each entry is a table of 3 elements:
+-- 1) command (a string)
+-- 2) type of the device to create
+-- 3) variable (can be nil for commands that don't require a value)
 local tableCommands = {
 	CMD_ON = { "On", "LIGHT", "VAR_LIGHT" },
 	CMD_OFF = { "Off", "LIGHT", "VAR_LIGHT" },
@@ -229,7 +264,7 @@ local tableCommands = {
 	CMD_DOOR = { "Door", "DOOR", "VAR_TRIPPED" },
 	CMD_AUTOUNTRIP = { "AutoUntrip", "DOOR", "VAR_AUTOUNTRIP" },
 	CMD_MOTION = { "Motion", "MOTION", "VAR_TRIPPED" },
---	CMD_TAMPERED = { "Door", "DOOR", "VAR_TAMPERED" },
+	--	CMD_TAMPERED = { "Door", "DOOR", "VAR_TAMPERED" },
 	CMD_SMOKE = { "Smoke", "SMOKE", "VAR_TRIPPED" },
 	CMD_SMOKE_OFF = { "SmokeOff", "SMOKE", nil },
 	CMD_ARM_MODE = { "ArmMode", "ALARM", "VAR_ARM_MODE" },
@@ -307,7 +342,7 @@ local tabVars = {
 	VAR_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "ArmMode", false, false, true },
 	VAR_ARM_MODE_NUM = { "urn:rfxcom-com:serviceId:SecurityRemote1", "ArmModeNum", false, false, true },
 	VAR_DETAILED_ARM_MODE = { "urn:micasaverde-com:serviceId:AlarmPartition2", "DetailedArmMode", false, false, true },
---	VAR_TAMPERED = { "urn:micasaverde-com:serviceId:HaDevice1", "sl_TamperAlarm", false, false, true },
+	--	VAR_TAMPERED = { "urn:micasaverde-com:serviceId:HaDevice1", "sl_TamperAlarm", false, false, true },
 	VAR_WATT = { "urn:micasaverde-com:serviceId:EnergyMetering1", "Watts", false, false, true },
 	VAR_KWH = { "urn:micasaverde-com:serviceId:EnergyMetering1", "KWH", false, false, true },
 	VAR_SCENE_ON = { "urn:micasaverde-com:serviceId:SceneController1", "sl_SceneActivated", false, false, false },
@@ -786,7 +821,7 @@ end
 
 -- Helper function to get a substring that can handle null chars
 -- Code from RFXCOM plugin
-local function GetStringPart( psString, piStart, piLen )
+local function getStringPart( psString, piStart, piLen )
 	local lsResult = ""
 
 	if ( psString ~= nil )
@@ -817,6 +852,16 @@ local function formattohex(dataBuf)
 	end
 	return resultstr
 
+end
+
+local function messageKey(msgString)
+	local msgKey = ""
+	if (#msgString > 2) then
+		for i = 1, 3 do
+			msgKey = msgKey .. string.format("%02X", string.byte(msgString, i))
+		end
+	end
+	return msgKey
 end
 
 local function searchInStringTable(table, value)
@@ -942,8 +987,8 @@ local function setVariable(device, variable, value)
 		if (doChange) then
 			--debug("doChange is true  device: " .. device .. "  variable:" .. variable[2])
 			luup.variable_set(variable[1], variable[2], value, device)
---		else
---			debug("doChange is false  device: " .. device .. "  variable:" .. variable[2])
+			--		else
+			--			debug("doChange is false  device: " .. device .. "  variable:" .. variable[2])
 		end
 
 		if (variable == tabVars.VAR_TRIPPED and value == "1")
@@ -1233,9 +1278,9 @@ local function findChildren(parentDevice, deviceType)
 	local children = {}
 
 	for k, v in pairs(luup.devices)
-	do
+		do
 		if (v.device_type == deviceType)
-		then
+			then
 			children[#children+1] = v.id
 		end
 	end
@@ -1802,12 +1847,12 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 							parameters = parameters .. "\n"
 						end
 						parameters = parameters .. tabVars.VAR_ARMEDTRIPPED[1] .. "," .. tabVars.VAR_ARMEDTRIPPED[2] .. "=0"
---						parameters = parameters .. "\n"
---						parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
+						--						parameters = parameters .. "\n"
+						--						parameters = parameters .. tabVars.VAR_TRIPPED[1] .. "," .. tabVars.VAR_TRIPPED[2] .. "=0"
 						parameters = parameters .. "\n"
 						parameters = parameters .. tabVars.VAR_REPEAT_EVENT[1] .. "," .. tabVars.VAR_REPEAT_EVENT[2] .. "=1"
---						parameters = parameters .. "\n"
---						parameters = parameters .. tabVars.VAR_TAMPERED[1] .. "," .. tabVars.VAR_TAMPERED[2] .. "=0"
+						--						parameters = parameters .. "\n"
+						--						parameters = parameters .. tabVars.VAR_TAMPERED[1] .. "," .. tabVars.VAR_TAMPERED[2] .. "=0"
 					elseif (newDeviceType == tableDeviceTypes.LIGHT_LEVEL)
 						then
 						if (parameters ~= "")
@@ -2248,53 +2293,29 @@ function handleDelayedCmds(data)
 end
 
 -- Function to decode a message.
-local function decodeMessage(message )
+local function decodeMessage(message)
 
 	local tableCmds = {}
-	local key = GetStringPart(message, 1, 3)
-	local packetLength = string.byte(message, 1)
-	local packetType = string.byte(message, 2)
-	local subType = string.byte(message, 3)
+	local key = string.format("%06X",(string.byte(message, 1)*65536) + (string.byte(message, 2)*256) + string.byte(message, 3))
 	local seqNum = string.byte(message, 4)
-	local data = GetStringPart(message, 5, #message)
-	local decodeFunction = tableMessageDecodeFunctions[key]
-	--If we haven't seen this message before
-	if(decodeFunction == nil) then
-		for k,v in pairs(tableMsgTypes)
-			do
-			if (v[1] == packetType and v[2] == subType and v[3] == packetLength)
-				then
-				if (v[4] ~= nil)
-					then --Decode the message appropriate for this device
-					decodeFunction = v[4]
-					-- Save the function that decodes this message type
-					tableMessageDecodeFunctions[key] = v[4]
-					tableCmds = decodeFunction(subType, data, seqNum)
-				else
-					warning("Missing decode method for message: " .. formattohex(message))
-					return
-				end
-				break
-			end
-		end
+	local data = getStringPart(message, 5, #message)
+	local decodeFunction = tableMsgSelect[key].decodeFunction
+	
+	--If this message isn't defined
+	if(decodeFunction ~= nil) then
+		tableCmds = decodeFunction(tableMsgSelect[key].subType, data, seqNum)
 	else
-		tableCmds = decodeFunction(subType, data, seqNum)
+		warning("Missing decode method for message: " .. formattohex(message))
+		return
 	end
-
-	if (tableCmds == nil or #tableCmds == 0)
-		then
-		warning("Decoding not yet implemented for message " .. formattohex(message))
-	else
-		actOnCommands(tableCmds)
-	end
-
+	actOnCommands(tableCmds)
 end
 
 local function decodeResponse(subType, data, seqNum)
 
 	local tableCmds = {}
 
-	if (subType == tableMsgTypes.TRANSMITTER_RESPONSE[2])
+	if (subType == tableMsgTypes.TRANSMITTER_RESPONSE.subType)
 		then
 		tableCmds = { { "", "", nil, 0 } }
 		local idx = searchInTable(tableMsgSent, 1, seqNum)
@@ -2322,7 +2343,7 @@ end
 local function decodeResponseMode(subType, data, seqNum)
 	local tableCmds = {}
 
-	if (subType == tableMsgTypes.RESPONSE_MODE_COMMAND[2])
+	if (subType == tableMsgTypes.RESPONSE_MODE_COMMAND.subType)
 		then
 		local cmd = string.byte(data, 1)
 		-- if result of Get Status or Set Mode commands
@@ -2597,11 +2618,11 @@ local function decodeResponseMode(subType, data, seqNum)
 		else
 			error("Response to an unexpected mode command: " .. cmd)
 		end
-	elseif (subType == tableMsgTypes.UNKNOWN_RTS_REMOTE[2])
+	elseif (subType == tableMsgTypes.UNKNOWN_RTS_REMOTE.subType)
 		then
 		warning("Unknown RTS remote")
 		tableCmds = { { "", "", nil, 0 } }
-	elseif (subType == tableMsgTypes.WRONG_COMMAND[2])
+	elseif (subType == tableMsgTypes.WRONG_COMMAND.subType)
 		then
 		warning("Wrong command received")
 		tableCmds = { { "", "", nil, 0 } }
@@ -2804,10 +2825,10 @@ local function decodeLighting5(subType, data)
 		then
 		-- OFF => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_OFF[1], nil, 0 } )
-		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_OFF[1], string.byte(data, 4), 0 } )
-		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
+		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], string.byte(data, 4), 0 } )
 		end
@@ -2815,30 +2836,30 @@ local function decodeLighting5(subType, data)
 		then
 		-- ON => scene number from 1 to 16
 		table.insert(tableCmds, { altid, tableCommands.CMD_ON[1], nil, 0 } )
-		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], string.byte(data, 4), 0 } )
-		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
+		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], string.byte(data, 4), 0 } )
 		end
 	elseif (cmdCode == 2)
 		then
 		-- GROUP OFF => scene number 100
-		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_OFF[1], 100, 0 } )
-		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
+		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100.subType)
 			then
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_OFF[1], 100, 0 } )
 		end
 	elseif (cmdCode == 3)
 		then
-		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+		if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
 			then
 			-- MOOD1 => scene number 111
 			table.insert(tableCmds, { altid2, tableCommands.CMD_LWRF_SCENE_ON[1], 111, 0 } )
-		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100[2])
+		elseif (subType ~= tableMsgTypes.LIGHTING_EMW100.subType)
 			then
 			-- GROUP ON => scene number 100
 			table.insert(tableCmds, { altid2, tableCommands.CMD_SCENE_ON[1], 100, 0 } )
@@ -2968,7 +2989,7 @@ local function decodeBlind(subType, data)
 	.. string.format("%02X", string.byte(data, 1))
 	.. string.format("%02X", string.byte(data, 2))
 	.. string.format("%02X", string.byte(data, 3))
-	if (subType == tableMsgTypes.BLIND_T6[2] or subType == tableMsgTypes.BLIND_T7[2])
+	if (subType == tableMsgTypes.BLIND_T6.subType or subType == tableMsgTypes.BLIND_T7.subType)
 		then
 		altid = altid .. string.format("%X", bitw.rshift(string.byte(data, 4), 4))
 	end
@@ -3252,7 +3273,7 @@ local function decodeRain(subType, data)
 		lengthConversionFactor = mm2inch
 		unitsSpecifier = " in"
 	end
-	if (subType ~= tableMsgTypes.RAIN6[2])
+	if (subType ~= tableMsgTypes.RAIN6.subType)
 		then
 		rainReading = (string.byte(data, 5) * 65536 + string.byte(data, 6) * 256 + string.byte(data, 7)) / 10
 	else
@@ -3280,7 +3301,7 @@ local function decodeRain(subType, data)
 			-- Determine the difference between this reading and the last
 			rainDiff = rainReading - previousRain
 			-- If this is a LaCrosse TX5 calculate mm
-			if (subType == tableMsgTypes.RAIN6[2]) then
+			if (subType == tableMsgTypes.RAIN6.subType) then
 				readingConversionFactor = LacrosseMMPerCount
 				if(rainDiff < 0) then
 					rainDiff = rainDiff + 16.0
@@ -3363,21 +3384,21 @@ local function decodeRain(subType, data)
 				table.insert(tableCmds, { altid, tableCommands.CMD_RAIN24HRS[1], string.format("%4.2f%s", (rain24Hrs * lengthConversionFactor), unitsSpecifier), 0 } )
 			end
 
---			if(DEBUG_MODE) then
---				debug("               year yday wk m d hr mm ss wday")
---				debug("previous time: " .. previousTime["year"] .. " " .. previousTime["yday"] .. " " .. previousWeek .. " " .. previousTime["month"] .. " " .. previousTime["day"] .. " " .. previousTime["hour"] .. " " .. previousTime["min"] .. " " .. previousTime["sec"] .. " " .. previousTime["wday"])
---				debug("current time:  " .. currentTime["year"] .. " " .. currentTime["yday"] .. " " .. currentWeek .. " " .. currentTime["month"] .. " " .. currentTime["day"] .. " " .. currentTime["hour"] .. " " .. currentTime["min"] .. " " .. currentTime["sec"] .. " " .. currentTime["wday"])
---				debug("Rain this minute: " .. currentTime["min"] .. " " .. rainByMinute[currentTime["min"]+1])
---				debug("Rain by Minute: " .. recursiveConcat(rainByMinute))
---				debug("Rain this hour: " .. currentTime["hour"] .. " " .. rainByHour[currentTime["hour"]+1])
---				debug("Rain by Hour: " .. recursiveConcat(rainByHour))
---				debug("Rain this day: " .. currentTime["wday"] .. " " .. rainByWkDay[currentTime["wday"]])
---				debug("Rain by Day: " .. recursiveConcat(rainByWkDay))
---				debug("Rain this week: " .. currentWeek .. " " .. rainByWeek[currentWeek])
---				debug("Rain by Week: " .. recursiveConcat(rainByWeek))
---				debug("Rain this month: " .. currentTime["month"] .. " " .. rainByMonth[currentTime["month"]])
---				debug("Rain by Month: " .. recursiveConcat(rainByMonth))
---			end
+			--			if(DEBUG_MODE) then
+			--				debug("               year yday wk m d hr mm ss wday")
+			--				debug("previous time: " .. previousTime["year"] .. " " .. previousTime["yday"] .. " " .. previousWeek .. " " .. previousTime["month"] .. " " .. previousTime["day"] .. " " .. previousTime["hour"] .. " " .. previousTime["min"] .. " " .. previousTime["sec"] .. " " .. previousTime["wday"])
+			--				debug("current time:  " .. currentTime["year"] .. " " .. currentTime["yday"] .. " " .. currentWeek .. " " .. currentTime["month"] .. " " .. currentTime["day"] .. " " .. currentTime["hour"] .. " " .. currentTime["min"] .. " " .. currentTime["sec"] .. " " .. currentTime["wday"])
+			--				debug("Rain this minute: " .. currentTime["min"] .. " " .. rainByMinute[currentTime["min"]+1])
+			--				debug("Rain by Minute: " .. recursiveConcat(rainByMinute))
+			--				debug("Rain this hour: " .. currentTime["hour"] .. " " .. rainByHour[currentTime["hour"]+1])
+			--				debug("Rain by Hour: " .. recursiveConcat(rainByHour))
+			--				debug("Rain this day: " .. currentTime["wday"] .. " " .. rainByWkDay[currentTime["wday"]])
+			--				debug("Rain by Day: " .. recursiveConcat(rainByWkDay))
+			--				debug("Rain this week: " .. currentWeek .. " " .. rainByWeek[currentWeek])
+			--				debug("Rain by Week: " .. recursiveConcat(rainByWeek))
+			--				debug("Rain this month: " .. currentTime["month"] .. " " .. rainByMonth[currentTime["month"]])
+			--				debug("Rain by Month: " .. recursiveConcat(rainByMonth))
+			--			end
 
 			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYMONTH[1], recursiveConcat(rainByMonth), 0 } )
 			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYWEEK[1], recursiveConcat(rainByWeek), 0 } )
@@ -3385,10 +3406,10 @@ local function decodeRain(subType, data)
 			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYHOUR[1], recursiveConcat(rainByHour), 0 } )
 			table.insert(tableCmds, { altid, tableCommands.CMD_RAINBYMINUTE[1], recursiveConcat(rainByMinute), 0 } )
 			local rate = nil
-			if (subType == tableMsgTypes.RAIN1[2])
+			if (subType == tableMsgTypes.RAIN1.subType)
 				then
 				rate = string.byte(data, 3) * 256 + string.byte(data, 4)
-			elseif (subType == tableMsgTypes.RAIN2[2])
+			elseif (subType == tableMsgTypes.RAIN2.subType)
 				then
 				rate = (string.byte(data, 3) * 256 + string.byte(data, 4)) / 100
 			end
@@ -3403,7 +3424,7 @@ local function decodeRain(subType, data)
 					local periodsPerHour = 3600 / elapsedSeconds
 					rate = periodsPerHour * rainDiff
 					table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], rate, 0 } )
-					else
+				else
 					table.insert(tableCmds, { altid, tableCommands.CMD_RAINRATE[1], 0, 0 } )
 				end
 			end
@@ -3458,7 +3479,7 @@ local function decodeWind(subType, data)
 	local direction = string.byte(data, 3) * 256 + string.byte(data, 4)
 	table.insert(tableCmds, { altid, tableCommands.CMD_DIRECTION[1], direction, 0 } )
 
-	if (subType ~= tableMsgTypes.WIND5[2])
+	if (subType ~= tableMsgTypes.WIND5.subType)
 		then
 		local avgSpeed = (string.byte(data, 5) * 256 + string.byte(data, 6)) / 10
 		-- Convert m/s to km/h or mph and keep an integer
@@ -3481,7 +3502,7 @@ local function decodeWind(subType, data)
 	end
 	table.insert(tableCmds, { altid, tableCommands.CMD_GUST[1], gust, 0 } )
 
-	if (subType == tableMsgTypes.WIND4[2])
+	if (subType == tableMsgTypes.WIND4.subType)
 		then
 		local temp = decodeTemperature( altid, data, 9 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
@@ -3509,7 +3530,7 @@ local function decodeUV(subType, data)
 	local uv = string.byte(data, 3) / 10
 	table.insert(tableCmds, { altid, tableCommands.CMD_UV[1], uv, 0 } )
 
-	if (subType == tableMsgTypes.UV3[2])
+	if (subType == tableMsgTypes.UV3.subType)
 		then
 		local temp = decodeTemperature( altid, data, 4 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
@@ -3659,7 +3680,7 @@ local function decodeSecurityDS(subType, data)
 		if (cmd ~= nil)
 			then
 			table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
---			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR[1], tampered, tableCmds)
+			--			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR[1], tampered, tableCmds)
 		end
 
 		local battery = decodeBatteryLevel(data, 5)
@@ -3703,7 +3724,7 @@ local function decodeSecurityMS(subType, data)
 	if (cmd ~= nil)
 		then
 		table.insert(tableCmds, { altid, cmd, cmdValue, 0 } )
---		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION[1], tampered, tableCmds)
+		--		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION[1], tampered, tableCmds)
 	end
 
 	local battery = decodeBatteryLevel(data, 5)
@@ -3723,7 +3744,7 @@ local function decodeSecurityRemote(subType, data)
 
 	local battery = decodeBatteryLevel(data, 5)
 
-	if (subType == tableMsgTypes.SECURITY_X10SR[2])
+	if (subType == tableMsgTypes.SECURITY_X10SR.subType)
 		then
 		altid = "X10/SR/" .. string.format("%02X", string.byte(data, 1))
 		.. string.format("%02X", string.byte(data, 2))
@@ -3734,19 +3755,19 @@ local function decodeSecurityRemote(subType, data)
 			then
 			exitDelay = tonumber(getVariable(device, tabVars.VAR_EXIT_DELAY) or "0")
 		end
-	elseif (subType == tableMsgTypes.SECURITY_MEISR[2])
+	elseif (subType == tableMsgTypes.SECURITY_MEISR.subType)
 		then
 		altid = "MEI/SR/" .. string.format("%02X", string.byte(data, 1))
 		.. string.format("%02X", string.byte(data, 2))
 		.. string.format("%02X", string.byte(data, 3))
-	elseif (subType == tableMsgTypes.KD101[2])
+	elseif (subType == tableMsgTypes.KD101.subType)
 		then
 		altid = "KD1/SR/" .. string.format("%02X", string.byte(data, 1))
 		.. string.format("%02X", string.byte(data, 2))
 		.. string.format("%02X", string.byte(data, 3))
 
 		battery = -1
-	elseif (subType == tableMsgTypes.SA30[2])
+	elseif (subType == tableMsgTypes.SA30.subType)
 		then
 		altid = "S30/SR/" .. string.format("%02X", string.byte(data, 1))
 		.. string.format("%02X", string.byte(data, 2))
@@ -3814,9 +3835,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
-		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
+		if (subType == tableMsgTypes.KD101.subType or subType == tableMsgTypes.SA30.subType)
 			then
-			if (subType == tableMsgTypes.KD101[2])
+			if (subType == tableMsgTypes.KD101.subType)
 				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
 				.. string.format("%02X", string.byte(data, 2))
@@ -3840,9 +3861,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, { altid, tableCommands.CMD_BATTERY[1], battery, 0 } )
 		end
-		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
+		if (subType == tableMsgTypes.KD101.subType or subType == tableMsgTypes.SA30.subType)
 			then
-			if (subType == tableMsgTypes.KD101[2])
+			if (subType == tableMsgTypes.KD101.subType)
 				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
 				.. string.format("%02X", string.byte(data, 2))
@@ -3908,9 +3929,9 @@ local function decodeSecurityRemote(subType, data)
 	elseif (cmd == 0x17)
 		then
 		table.insert(tableCmds, { altid, tableCommands.CMD_ALARM_SCENE_ON[1], 124, 0 } )
-		if (subType == tableMsgTypes.KD101[2] or subType == tableMsgTypes.SA30[2])
+		if (subType == tableMsgTypes.KD101.subType or subType == tableMsgTypes.SA30.subType)
 			then
-			if (subType == tableMsgTypes.KD101[2])
+			if (subType == tableMsgTypes.KD101.subType)
 				then
 				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
 				.. string.format("%02X", string.byte(data, 2))
@@ -4066,7 +4087,7 @@ local function decodeRFXSensor(subType, data)
 	local altid = "RFXSENSOR" .. subType .. "/" .. id
 	local tableCmds = {}
 
-	if (subType == tableMsgTypes.RFXSENSOR_T[2])
+	if (subType == tableMsgTypes.RFXSENSOR_T.subType)
 		then
 		local temp = decodeTemperature( altid, data, 2 )
 		table.insert(tableCmds, { altid, tableCommands.CMD_TEMP[1], temp, 0 } )
@@ -4121,113 +4142,113 @@ end
 
 local function initDecodingFunctions()
 
-	tableMsgTypes.RESPONSE_MODE_COMMAND[4] = decodeResponseMode
-	tableMsgTypes.UNKNOWN_RTS_REMOTE[4] = decodeResponseMode
-	tableMsgTypes.WRONG_COMMAND[4] = decodeResponseMode
-	tableMsgTypes.RECEIVER_LOCK_ERROR[4] = decodeResponse
-	tableMsgTypes.TRANSMITTER_RESPONSE[4] = decodeResponse
-	tableMsgTypes.LIGHTING_X10[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_ARC[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_AB400D[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_WAVEMAN[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_EMW200[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_IMPULS[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_RISINGSUN[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_PHILIPS[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_ENERGENIE_ENER010[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_ENERGENIE_5GANG[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_COCO[4] = decodeLighting1
-	tableMsgTypes.LIGHTING_AC[4] = decodeLighting2
-	tableMsgTypes.LIGHTING_HEU[4] = decodeLighting2
-	tableMsgTypes.LIGHTING_ANSLUT[4] = decodeLighting2
-	tableMsgTypes.LIGHTING_KOPPLA[4] = decodeLighting3
-	tableMsgTypes.SECURITY_DOOR[4] = decodeSecurity
-	tableMsgTypes.LIGHTING_LIGHTWARERF[4] = decodeLighting5
-	tableMsgTypes.LIGHTING_EMW100[4] = decodeLighting5
-	tableMsgTypes.LIGHTING_BBSB[4] = decodeLighting5
-	tableMsgTypes.LIGHTING_RSL2[4] = decodeLighting5
-	tableMsgTypes.LIGHTING_BLYSS[4] = decodeLighting6
-	tableMsgTypes.HEATER3_MERTIK1[4] = decodeThermostat3
-	tableMsgTypes.HEATER3_MERTIK2[4] = decodeThermostat3
-	tableMsgTypes.TEMP1[4] = decodeTemp
-	tableMsgTypes.TEMP2[4] = decodeTemp
-	tableMsgTypes.TEMP3[4] = decodeTemp
-	tableMsgTypes.TEMP4[4] = decodeTemp
-	tableMsgTypes.TEMP5[4] = decodeTemp
-	tableMsgTypes.TEMP6[4] = decodeTemp
-	tableMsgTypes.TEMP7[4] = decodeTemp
-	tableMsgTypes.TEMP8[4] = decodeTemp
-	tableMsgTypes.TEMP9[4] = decodeTemp
-	tableMsgTypes.TEMP10[4] = decodeTemp
-	tableMsgTypes.TEMP11[4] = decodeTemp
-	tableMsgTypes.HUM1[4] = decodeHum
-	tableMsgTypes.HUM2[4] = decodeHum
-	tableMsgTypes.TEMP_HUM1[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM2[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM3[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM4[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM5[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM6[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM7[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM8[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM9[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM10[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM11[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM12[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM13[4] = decodeTempHum
-	tableMsgTypes.TEMP_HUM14[4] = decodeTempHum
-	tableMsgTypes.BARO1[4] = decodeBaro
-	tableMsgTypes.TEMP_HUM_BARO1[4] = decodeTempHumBaro
-	tableMsgTypes.TEMP_HUM_BARO2[4] = decodeTempHumBaro
-	tableMsgTypes.RAIN1[4] = decodeRain
-	tableMsgTypes.RAIN2[4] = decodeRain
-	tableMsgTypes.RAIN3[4] = decodeRain
-	tableMsgTypes.RAIN4[4] = decodeRain
-	tableMsgTypes.RAIN5[4] = decodeRain
-	tableMsgTypes.RAIN6[4] = decodeRain
-	tableMsgTypes.RAIN7[4] = decodeRain
-	tableMsgTypes.TR1[4] = decodeTempRain
-	tableMsgTypes.WIND1[4] = decodeWind
-	tableMsgTypes.WIND2[4] = decodeWind
-	tableMsgTypes.WIND3[4] = decodeWind
-	tableMsgTypes.WIND4[4] = decodeWind
-	tableMsgTypes.WIND5[4] = decodeWind
-	tableMsgTypes.WIND6[4] = decodeWind
-	tableMsgTypes.WIND7[4] = decodeWind
-	tableMsgTypes.UV1[4] = decodeUV
-	tableMsgTypes.UV2[4] = decodeUV
-	tableMsgTypes.UV3[4] = decodeUV
-	tableMsgTypes.WEIGHT1[4] = decodeWeight
-	tableMsgTypes.WEIGHT2[4] = decodeWeight
-	tableMsgTypes.CURTAIN_HARRISON[4] = decodeCurtain
-	tableMsgTypes.BLIND_T0[4] = decodeBlind
-	tableMsgTypes.BLIND_T1[4] = decodeBlind
-	tableMsgTypes.BLIND_T2[4] = decodeBlind
-	tableMsgTypes.BLIND_T3[4] = decodeBlind
-	tableMsgTypes.BLIND_T4[4] = decodeBlind
-	tableMsgTypes.BLIND_T5[4] = decodeBlind
-	tableMsgTypes.BLIND_T6[4] = decodeBlind
-	tableMsgTypes.BLIND_T7[4] = decodeBlind
-	tableMsgTypes.SECURITY_X10DS[4] = decodeSecurityDS
-	tableMsgTypes.SECURITY_X10MS[4] = decodeSecurityMS
-	tableMsgTypes.SECURITY_X10SR[4] = decodeSecurityRemote
-	tableMsgTypes.SECURITY_MEISR[4] = decodeSecurityMeiantech
-	tableMsgTypes.KD101[4] = decodeSecurityRemote
-	tableMsgTypes.SA30[4] = decodeSecurityRemote
-	tableMsgTypes.POWERCODE_PRIMDS[4] = decodeSecurityDS
-	tableMsgTypes.POWERCODE_AUXDS[4] = decodeSecurityDS
-	tableMsgTypes.POWERCODE_MS[4] = decodeSecurityMS
-	tableMsgTypes.ELEC1[4] = decodeElec1
-	tableMsgTypes.ELEC2[4] = decodeElec2Elec3
-	tableMsgTypes.ELEC3[4] = decodeElec2Elec3
-	tableMsgTypes.ELEC4[4] = decodeElec4
-	tableMsgTypes.RFXSENSOR_T[4] = decodeRFXSensor
-	tableMsgTypes.RFXMETER[4] = decodeRFXMeter
-	tableMsgTypes.ATI_REMOTE_WONDER[4] = decodeRemote
-	tableMsgTypes.ATI_REMOTE_WONDER_PLUS[4] = decodeRemote
-	tableMsgTypes.MEDION_REMOTE[4] = decodeRemote
-	tableMsgTypes.X10_PC_REMOTE[4] = decodeRemote
-	tableMsgTypes.ATI_REMOTE_WONDER_II[4] = decodeRemote
+	tableMsgTypes.RESPONSE_MODE_COMMAND.decodeFunction = decodeResponseMode
+	tableMsgTypes.UNKNOWN_RTS_REMOTE.decodeFunction = decodeResponseMode
+	tableMsgTypes.WRONG_COMMAND.decodeFunction = decodeResponseMode
+	tableMsgTypes.RECEIVER_LOCK_ERROR.decodeFunction = decodeResponse
+	tableMsgTypes.TRANSMITTER_RESPONSE.decodeFunction = decodeResponse
+	tableMsgTypes.LIGHTING_X10.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ARC.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_AB400D.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_WAVEMAN.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_EMW200.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_IMPULS.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_RISINGSUN.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_PHILIPS.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ENERGENIE_ENER010.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ENERGENIE_5GANG.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_COCO.decodeFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_AC.decodeFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_HEU.decodeFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_ANSLUT.decodeFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_KOPPLA.decodeFunction = decodeLighting3
+	tableMsgTypes.SECURITY_DOOR.decodeFunction = decodeSecurity
+	tableMsgTypes.LIGHTING_LIGHTWARERF.decodeFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_EMW100.decodeFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_BBSB.decodeFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_RSL2.decodeFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_BLYSS.decodeFunction = decodeLighting6
+	tableMsgTypes.HEATER3_MERTIK1.decodeFunction = decodeThermostat3
+	tableMsgTypes.HEATER3_MERTIK2.decodeFunction = decodeThermostat3
+	tableMsgTypes.TEMP1.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP2.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP3.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP4.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP5.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP6.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP7.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP8.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP9.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP10.decodeFunction = decodeTemp
+	tableMsgTypes.TEMP11.decodeFunction = decodeTemp
+	tableMsgTypes.HUM1.decodeFunction = decodeHum
+	tableMsgTypes.HUM2.decodeFunction = decodeHum
+	tableMsgTypes.TEMP_HUM1.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM2.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM3.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM4.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM5.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM6.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM7.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM8.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM9.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM10.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM11.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM12.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM13.decodeFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM14.decodeFunction = decodeTempHum
+	tableMsgTypes.BARO1.decodeFunction = decodeBaro
+	tableMsgTypes.TEMP_HUM_BARO1.decodeFunction = decodeTempHumBaro
+	tableMsgTypes.TEMP_HUM_BARO2.decodeFunction = decodeTempHumBaro
+	tableMsgTypes.RAIN1.decodeFunction = decodeRain
+	tableMsgTypes.RAIN2.decodeFunction = decodeRain
+	tableMsgTypes.RAIN3.decodeFunction = decodeRain
+	tableMsgTypes.RAIN4.decodeFunction = decodeRain
+	tableMsgTypes.RAIN5.decodeFunction = decodeRain
+	tableMsgTypes.RAIN6.decodeFunction = decodeRain
+	tableMsgTypes.RAIN7.decodeFunction = decodeRain
+	tableMsgTypes.TR1.decodeFunction = decodeTempRain
+	tableMsgTypes.WIND1.decodeFunction = decodeWind
+	tableMsgTypes.WIND2.decodeFunction = decodeWind
+	tableMsgTypes.WIND3.decodeFunction = decodeWind
+	tableMsgTypes.WIND4.decodeFunction = decodeWind
+	tableMsgTypes.WIND5.decodeFunction = decodeWind
+	tableMsgTypes.WIND6.decodeFunction = decodeWind
+	tableMsgTypes.WIND7.decodeFunction = decodeWind
+	tableMsgTypes.UV1.decodeFunction = decodeUV
+	tableMsgTypes.UV2.decodeFunction = decodeUV
+	tableMsgTypes.UV3.decodeFunction = decodeUV
+	tableMsgTypes.WEIGHT1.decodeFunction = decodeWeight
+	tableMsgTypes.WEIGHT2.decodeFunction = decodeWeight
+	tableMsgTypes.CURTAIN_HARRISON.decodeFunction = decodeCurtain
+	tableMsgTypes.BLIND_T0.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T1.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T2.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T3.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T4.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T5.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T6.decodeFunction = decodeBlind
+	tableMsgTypes.BLIND_T7.decodeFunction = decodeBlind
+	tableMsgTypes.SECURITY_X10DS.decodeFunction = decodeSecurityDS
+	tableMsgTypes.SECURITY_X10MS.decodeFunction = decodeSecurityMS
+	tableMsgTypes.SECURITY_X10SR.decodeFunction = decodeSecurityRemote
+	tableMsgTypes.SECURITY_MEISR.decodeFunction = decodeSecurityMeiantech
+	tableMsgTypes.KD101.decodeFunction = decodeSecurityRemote
+	tableMsgTypes.SA30.decodeFunction = decodeSecurityRemote
+	tableMsgTypes.POWERCODE_PRIMDS.decodeFunction = decodeSecurityDS
+	tableMsgTypes.POWERCODE_AUXDS.decodeFunction = decodeSecurityDS
+	tableMsgTypes.POWERCODE_MS.decodeFunction = decodeSecurityMS
+	tableMsgTypes.ELEC1.decodeFunction = decodeElec1
+	tableMsgTypes.ELEC2.decodeFunction = decodeElec2Elec3
+	tableMsgTypes.ELEC3.decodeFunction = decodeElec2Elec3
+	tableMsgTypes.ELEC4.decodeFunction = decodeElec4
+	tableMsgTypes.RFXSENSOR_T.decodeFunction = decodeRFXSensor
+	tableMsgTypes.RFXMETER.decodeFunction = decodeRFXMeter
+	tableMsgTypes.ATI_REMOTE_WONDER.decodeFunction = decodeRemote
+	tableMsgTypes.ATI_REMOTE_WONDER_PLUS.decodeFunction = decodeRemote
+	tableMsgTypes.MEDION_REMOTE.decodeFunction = decodeRemote
+	tableMsgTypes.X10_PC_REMOTE.decodeFunction = decodeRemote
+	tableMsgTypes.ATI_REMOTE_WONDER_II.decodeFunction = decodeRemote
 
 end
 
@@ -4291,6 +4312,11 @@ function startup(lul_device)
 end
 
 function deferredStartup(data)
+	
+	-- Build a table for selecting the message type based on the decodeKey
+	for k, v in pairs(tableMsgTypes) do
+		tableMsgSelect[v.decodeKey] = v
+	end
 
 	initDecodingFunctions()
 
@@ -4303,13 +4329,14 @@ function deferredStartup(data)
 
 	-- Send a reset command
 	debug("reset...")
-	sendCommand(tableMsgTypes.MODE_COMMAND[1], tableMsgTypes.MODE_COMMAND[2], DATA_MSG_RESET, nil)
+	debug("MODE_COMMAND.packetType: " .. tableMsgTypes.MODE_COMMAND.type or 'nil')
+	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_RESET, nil)
 
 	-- Wait at least 50 ms and max 9 s
 	luup.sleep(2000)
 
 	-- Send a get status command
-	sendCommand(tableMsgTypes.MODE_COMMAND[1], tableMsgTypes.MODE_COMMAND[2], DATA_MSG_GET_STATUS, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_GET_STATUS, nil)
 
 	-- Clear the buffer and enable buffering
 	buffer = ""
@@ -4336,11 +4363,11 @@ function incomingData(lul_device, lul_data)
 
 	buffer = buffer .. data
 
-	local packetLength = string.byte(buffer, 1)
-	if (#buffer > packetLength)
+	local length = string.byte(buffer, 1)
+	if (#buffer > length)
 		then
-		local message = GetStringPart(buffer, 1, packetLength + 1)
-		buffer = GetStringPart(buffer, packetLength + 2, #buffer)
+		local message = getStringPart(buffer, 1, length + 1)
+		buffer = getStringPart(buffer, length + 2, #buffer)
 
 		debug("Received message: " .. formattohex(message))
 		setVariable(THIS_DEVICE, tabVars.VAR_LAST_RECEIVED_MSG, formattohex(message))
@@ -4358,7 +4385,7 @@ end
 function saveSettings()
 
 	log("Saving receiving modes in non-volatile memory...")
-	sendCommand(tableMsgTypes.MODE_COMMAND[1], tableMsgTypes.MODE_COMMAND[2], DATA_MSG_SAVE, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_SAVE, nil)
 
 end
 
@@ -4429,7 +4456,7 @@ function switchPower(device, newTargetValue)
 		end
 	elseif (category == 1)
 		then
-		type = tableMsgTypes.LIGHTING_ARC[1]
+		type = tableMsgTypes.LIGHTING_ARC.type
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		if (cmd == tableCommands.CMD_ON[1])
 			then
@@ -4443,7 +4470,7 @@ function switchPower(device, newTargetValue)
 		data = housecode .. string.char(unitcode, cmdCode, 0)
 	elseif (category == 2)
 		then
-		type = tableMsgTypes.LIGHTING_AC[1]
+		type = tableMsgTypes.LIGHTING_AC.type
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
 			then
@@ -4461,7 +4488,7 @@ function switchPower(device, newTargetValue)
 		cmdCode, 0, 0)
 	elseif (category == 3)
 		then
-		type = tableMsgTypes.LIGHTING_KOPPLA[1]
+		type = tableMsgTypes.LIGHTING_KOPPLA.type
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
 			then
@@ -4502,9 +4529,9 @@ function switchPower(device, newTargetValue)
 				windowCovering(device, "Down")
 			end
 		else
-			type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
+			type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
 			subType = tonumber(string.sub(id, 7, 7))
-			if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
+			if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
 				then
 				-- Livolo
 				if (luup.devices[device].device_type == tableDeviceTypes.LIGHT[1])
@@ -4561,7 +4588,7 @@ function switchPower(device, newTargetValue)
 		end
 	elseif (category == 6)
 		then
-		type = tableMsgTypes.LIGHTING_BLYSS[1]
+		type = tableMsgTypes.LIGHTING_BLYSS.type
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_ON[1])
 			then
@@ -4579,8 +4606,8 @@ function switchPower(device, newTargetValue)
 		.. string.char(unitcode, cmdCode, 1, 0, 0)
 	elseif (category == 7)
 		then
-		type = tableMsgTypes.SECURITY_X10SR[1]
-		subType = tableMsgTypes.SECURITY_X10SR[2]
+		type = tableMsgTypes.SECURITY_X10SR.type
+		subType = tableMsgTypes.SECURITY_X10SR.subType
 		local light_num = string.sub(id, 9, 9)
 		if (cmd == tableCommands.CMD_ON[1] and light_num == "1")
 			then
@@ -4605,21 +4632,21 @@ function switchPower(device, newTargetValue)
 			tonumber(string.sub(remoteId, 5, 6), 16),
 			cmdCode, 0)
 		end
-	-- elseif (category == 8)
-	-- then
-	-- TODO: Mertik
+		-- elseif (category == 8)
+		-- then
+		-- TODO: Mertik
 	elseif (category == 9)
 		then
-		type = tableMsgTypes.SECURITY_DOOR[1]
-		subType = tableMsgTypes.SECURITY_DOOR[2]
+		type = tableMsgTypes.SECURITY_DOOR.type
+		subType = tableMsgTypes.SECURITY_DOOR.subType
 		nbTimes = 2
 		remoteId = string.sub(id, 7, 12)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-			tonumber(string.sub(remoteId, 3, 4), 16),
-			tonumber(string.sub(remoteId, 5, 6), 16),
-			tonumber("01", 16),
-			tonumber("76", 16),
-			0)
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		tonumber("01", 16),
+		tonumber("76", 16),
+		0)
 	else
 		warning("Unimplemented lighting type " .. category .. ". Switch Power command not sent")
 	end
@@ -4691,7 +4718,7 @@ function setDimLevel(device, newLoadlevelTarget)
 			then
 			switchPower(device, "0")
 		else
-			type = tableMsgTypes.LIGHTING_AC[1]
+			type = tableMsgTypes.LIGHTING_AC.type
 			subType = tonumber(string.sub(id, 7, 7))
 			remoteId = string.sub(id, 9, 18)
 			cmdCode = 0x2
@@ -4713,7 +4740,7 @@ function setDimLevel(device, newLoadlevelTarget)
 			then
 			switchPower(device, "1")
 		else
-			type = tableMsgTypes.LIGHTING_KOPPLA[1]
+			type = tableMsgTypes.LIGHTING_KOPPLA.type
 			subType = tonumber(string.sub(id, 7, 7))
 			remoteId = tonumber(string.sub(id, 9, 9), 16)
 			unitcode = tonumber(string.sub(id, 10, 11))
@@ -4743,10 +4770,10 @@ function setDimLevel(device, newLoadlevelTarget)
 			then
 			newLoadlevelTarget = "100"
 		end
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
+		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
 		subType = tonumber(string.sub(id, 7, 7))
 		newLoadlevelTarget = tonumber(newLoadlevelTarget)
-		if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
+		if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
 			then
 			-- Livolo
 			local curLevel = tonumber(getVariable(device, tabVars.VAR_DIMMER) or "0") or 0
@@ -4902,7 +4929,7 @@ function windowCovering(device, action)
 
 	if (category == 0)
 		then
-		type = tableMsgTypes.CURTAIN_HARRISON[1]
+		type = tableMsgTypes.CURTAIN_HARRISON.type
 		subType = tonumber(string.sub(id, 5, 5))
 		if (cmd == tableCommands.CMD_OPEN[1])
 			then
@@ -4927,7 +4954,7 @@ function windowCovering(device, action)
 			luup.sleep(1000)
 			windowCovering(device, "Down")
 		else
-			type = tableMsgTypes.LIGHTING_AC[1]
+			type = tableMsgTypes.LIGHTING_AC.type
 			subType = tonumber(string.sub(id, 7, 7))
 			remoteId = string.sub(id, 9, 18)
 			if (cmd == tableCommands.CMD_OPEN[1])
@@ -4946,7 +4973,7 @@ function windowCovering(device, action)
 		end
 	elseif (category == 5)
 		then
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
+		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_OPEN[1])
 			then
@@ -4966,7 +4993,7 @@ function windowCovering(device, action)
 		cmdCode, 0, 0)
 	elseif (category == 6)
 		then
-		type = tableMsgTypes.BLIND_T0[1]
+		type = tableMsgTypes.BLIND_T0.type
 		subType = tonumber(string.sub(id, 5, 5))
 		if (cmd == tableCommands.CMD_OPEN[1])
 			then
@@ -4979,7 +5006,7 @@ function windowCovering(device, action)
 			cmdCode = 2
 		end
 		remoteId = string.sub(id, 7, 12)
-		if (subType == tableMsgTypes.BLIND_T6[2] or subType == tableMsgTypes.BLIND_T7[2])
+		if (subType == tableMsgTypes.BLIND_T6.subType or subType == tableMsgTypes.BLIND_T7.subType)
 			then
 			id4 = tonumber(string.sub(id, 13, 13), 16)
 			unitcode = tonumber(string.sub(id, 15, 16)) % 16
@@ -4994,7 +5021,7 @@ function windowCovering(device, action)
 	elseif (category == 7)
 		then
 		local mode = getVariable(device, tabVars.VAR_RFY_MODE) or ""
-		type = tableMsgTypes.RFY0[1]
+		type = tableMsgTypes.RFY0.type
 		subType = tonumber(string.sub(id, 7, 7))
 		if (cmd == tableCommands.CMD_OPEN[1])
 			then
@@ -5072,13 +5099,13 @@ function requestQuickArmMode(device, state)
 	local exitDelay = 0
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
 		then
-		type = tableMsgTypes.SECURITY_X10SR[1]
-		subType = tableMsgTypes.SECURITY_X10SR[2]
+		type = tableMsgTypes.SECURITY_X10SR.type
+		subType = tableMsgTypes.SECURITY_X10SR.subType
 		exitDelay = tonumber(getVariable(device, tabVars.VAR_EXIT_DELAY) or "0")
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
 		then
-		type = tableMsgTypes.SECURITY_MEISR[1]
-		subType = tableMsgTypes.SECURITY_MEISR[2]
+		type = tableMsgTypes.SECURITY_MEISR.type
+		subType = tableMsgTypes.SECURITY_MEISR.subType
 	end
 
 	local cmdCode = nil
@@ -5156,20 +5183,20 @@ function requestPanicMode(device, state)
 	local subType = nil
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
 		then
-		type = tableMsgTypes.SECURITY_X10SR[1]
-		subType = tableMsgTypes.SECURITY_X10SR[2]
+		type = tableMsgTypes.SECURITY_X10SR.type
+		subType = tableMsgTypes.SECURITY_X10SR.subType
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
 		then
-		type = tableMsgTypes.SECURITY_MEISR[1]
-		subType = tableMsgTypes.SECURITY_MEISR[2]
+		type = tableMsgTypes.SECURITY_MEISR.type
+		subType = tableMsgTypes.SECURITY_MEISR.subType
 	elseif (string.sub(id, 1, 9) == "SR/KD1/SR")
 		then
-		type = tableMsgTypes.KD101[1]
-		subType = tableMsgTypes.KD101[2]
+		type = tableMsgTypes.KD101.type
+		subType = tableMsgTypes.KD101.subType
 	elseif (string.sub(id, 1, 9) == "SR/S30/SR")
 		then
-		type = tableMsgTypes.SA30[1]
-		subType = tableMsgTypes.SA30[2]
+		type = tableMsgTypes.SA30.type
+		subType = tableMsgTypes.SA30.subType
 	end
 
 	local remoteId = string.sub(id, 11, 16)
@@ -5179,14 +5206,14 @@ function requestPanicMode(device, state)
 	0x06, 0)
 	local tableCmds = {}
 	table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_ALARM_SCENE_ON[1], 120, 0 })
-	if (type == tableMsgTypes.KD101[1])
+	if (type == tableMsgTypes.KD101.type)
 		then
 		id = "KD1/SS/" .. string.sub(remoteId, 1, 2)
 		.. string.sub(remoteId, 3, 4)
 		.. string.sub(remoteId, 5, 6)
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE[1], "1", 0 } )
 		table.insert(tableCmds, { id, tableCommands.CMD_SMOKE_OFF[1], nil, 30 } )
-	elseif (type == tableMsgTypes.SA30[1])
+	elseif (type == tableMsgTypes.SA30.type)
 		then
 		id = "S30/SS/" .. string.sub(remoteId, 1, 2)
 		.. string.sub(remoteId, 3, 4)
@@ -5228,7 +5255,7 @@ function dim(device)
 	table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_SCENE_ON[1], 102, 0 })
 
 	local data = string.sub(id, 9, 9) .. string.char(0, 0x02, 0)
-	sendCommand(tableMsgTypes.LIGHTING_X10[1], tableMsgTypes.LIGHTING_X10[2], data, tableCmds)
+	sendCommand(tableMsgTypes.LIGHTING_X10.type, tableMsgTypes.LIGHTING_X10.subType, data, tableCmds)
 
 end
 
@@ -5247,7 +5274,7 @@ function bright(device)
 	table.insert(tableCmds, { string.sub(id, 4), tableCommands.CMD_SCENE_ON[1], 103, 0 })
 
 	local data = string.sub(id, 9, 9) .. string.char(0, 0x03, 0)
-	sendCommand(tableMsgTypes.LIGHTING_X10[1], tableMsgTypes.LIGHTING_X10[2], data, tableCmds)
+	sendCommand(tableMsgTypes.LIGHTING_X10.type, tableMsgTypes.LIGHTING_X10.subType, data, tableCmds)
 
 end
 
@@ -5280,7 +5307,7 @@ function groupOff(device)
 	if (category == 1)
 		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
-		type = tableMsgTypes.LIGHTING_ARC[1]
+		type = tableMsgTypes.LIGHTING_ARC.type
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5297,7 +5324,7 @@ function groupOff(device)
 	elseif (category == 2)
 		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
-		type = tableMsgTypes.LIGHTING_AC[1]
+		type = tableMsgTypes.LIGHTING_AC.type
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5318,10 +5345,10 @@ function groupOff(device)
 		0, 0x03, 0, 0)
 	elseif (category == 5)
 		then
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
+		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
 		subType = tonumber(string.sub(id, 7, 7))
 		cmdCode = 0x02
-		if (subType == tableMsgTypes.LIGHTING_LIVOLO[2])
+		if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
 			then
 			-- Livolo
 			unitCodeMin = 1
@@ -5330,7 +5357,7 @@ function groupOff(device)
 			formatAltid = "%s/%d"
 			cmdCode = 0
 		else
-			if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF[2])
+			if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
 				then
 				cmd = tableCommands.CMD_LWRF_SCENE_OFF[1]
 			else
@@ -5356,7 +5383,7 @@ function groupOff(device)
 	elseif (category == 6)
 		then
 		cmd = tableCommands.CMD_SCENE_OFF[1]
-		type = tableMsgTypes.LIGHTING_BLYSS[1]
+		type = tableMsgTypes.LIGHTING_BLYSS.type
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5425,7 +5452,7 @@ function groupOn(device)
 	if (category == 1)
 		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
-		type = tableMsgTypes.LIGHTING_ARC[1]
+		type = tableMsgTypes.LIGHTING_ARC.type
 		subType = tonumber(string.sub(id, 7, 7), 16)
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5442,7 +5469,7 @@ function groupOn(device)
 	elseif (category == 2)
 		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
-		type = tableMsgTypes.LIGHTING_AC[1]
+		type = tableMsgTypes.LIGHTING_AC.type
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5464,7 +5491,7 @@ function groupOn(device)
 	elseif (category == 5)
 		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF[1]
+		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5485,7 +5512,7 @@ function groupOn(device)
 	elseif (category == 6)
 		then
 		cmd = tableCommands.CMD_SCENE_ON[1]
-		type = tableMsgTypes.LIGHTING_BLYSS[1]
+		type = tableMsgTypes.LIGHTING_BLYSS.type
 		subType = tonumber(string.sub(id, 7, 7))
 		table.insert(tableCmds, { string.sub(id, 4), cmd, 100, 0 })
 		for k, v in pairs(tableCategories)
@@ -5570,7 +5597,7 @@ function mood(device, param)
 		tonumber(string.sub(remoteId, 3, 4), 16),
 		tonumber(string.sub(remoteId, 5, 6), 16),
 		0, cmdCode, 0, 0)
-		sendCommand(tableMsgTypes.LIGHTING_LIGHTWARERF[1], tableMsgTypes.LIGHTING_LIGHTWARERF[2], data, tableCmds)
+		sendCommand(tableMsgTypes.LIGHTING_LIGHTWARERF.type, tableMsgTypes.LIGHTING_LIGHTWARERF.subType, data, tableCmds)
 	end
 
 end
@@ -5597,7 +5624,7 @@ function sendATICode(device, code)
 
 	local data = string.char(tonumber(string.sub(id, 8, 9), 16), tonumber(code), 0)
 	-- TODO toggle
-	sendCommand(tableMsgTypes.ATI_REMOTE_WONDER[1], subType, data, tableCmds)
+	sendCommand(tableMsgTypes.ATI_REMOTE_WONDER.type, subType, data, tableCmds)
 
 end
 
@@ -5621,7 +5648,7 @@ function setModeTarget(device, NewModeTarget)
 
 	if (category == 3) -- Mertik
 		then
-		type = tableMsgTypes.HEATER3_MERTIK1[1]
+		type = tableMsgTypes.HEATER3_MERTIK1.type
 		subType = tonumber(string.sub(id, 8, 8))
 		local cmdCode = nil
 		local currentState = getVariable(device, tabVars.VAR_HEATER) or "Off"
@@ -5669,7 +5696,7 @@ end
 function toggleState(device)
 	debug("toggleState: " .. device)
 	local devType = string.sub(luup.devices[device].id, 1, 2)
-	debug("Device Type: " .. devType)
+	debug("Device type: " .. devType)
 
 	-- Only implemented for Sonoff switches, Light Switches and Heaters so far
 	if (devType == "LS")
@@ -6113,25 +6140,25 @@ function sendUnusualCommand(deviceId, commandType)
 	local id = luup.devices[deviceId].id
 
 	local tableCommands = {
-		{ "L5.1/", "LEARN", tableMsgTypes.LIGHTING_EMW100[1], tableMsgTypes.LIGHTING_EMW100[2], 0x02 },
-		{ "L3.0/", "PROGRAM", tableMsgTypes.LIGHTING_KOPPLA[1], tableMsgTypes.LIGHTING_KOPPLA[2], 0x1C },
-		{ "C0/", "PROGRAM", tableMsgTypes.CURTAIN_HARRISON[1], tableMsgTypes.CURTAIN_HARRISON[2], 0x03 },
-		{ "B0/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T0[1], tableMsgTypes.BLIND_T0[2], 0x03 },
-		{ "B1/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T1[1], tableMsgTypes.BLIND_T1[2], 0x03 },
-		{ "B2/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T2[1], tableMsgTypes.BLIND_T2[2], 0x03 },
-		{ "B3/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T3[1], tableMsgTypes.BLIND_T3[2], 0x03 },
-		{ "B4/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T4[1], tableMsgTypes.BLIND_T4[2], 0x03 },
-		{ "B6/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T6[1], tableMsgTypes.BLIND_T6[2], 0x03 },
-		{ "B7/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T7[1], tableMsgTypes.BLIND_T7[2], 0x03 },
-		{ "RFY0/", "PROGRAM", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x07 },
-		{ "RFY0/", "LOWER_LIMIT", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x04 },
-		{ "RFY0/", "UPPER_LIMIT", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x02 },
-		{ "RFY0/", "VENETIAN_US_ANGLE_PLUS", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x11 },
-		{ "RFY0/", "VENETIAN_US_ANGLE_MINUS", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x12 },
-		{ "RFY0/", "VENETIAN_EU_ANGLE_PLUS", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x0F },
-		{ "RFY0/", "VENETIAN_EU_ANGLE_MINUS", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x10 },
-		{ "RFY0/", "ENABLE_DETECTOR", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x13 },
-		{ "RFY0/", "DISABLE_DETECTOR", tableMsgTypes.RFY0[1], tableMsgTypes.RFY0[2], 0x14 }
+		{ "L5.1/", "LEARN", tableMsgTypes.LIGHTING_EMW100.type, tableMsgTypes.LIGHTING_EMW100.subType, 0x02 },
+		{ "L3.0/", "PROGRAM", tableMsgTypes.LIGHTING_KOPPLA.type, tableMsgTypes.LIGHTING_KOPPLA.subType, 0x1C },
+		{ "C0/", "PROGRAM", tableMsgTypes.CURTAIN_HARRISON.type, tableMsgTypes.CURTAIN_HARRISON.subType, 0x03 },
+		{ "B0/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T0.type, tableMsgTypes.BLIND_T0.subType, 0x03 },
+		{ "B1/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T1.type, tableMsgTypes.BLIND_T1.subType, 0x03 },
+		{ "B2/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T2.type, tableMsgTypes.BLIND_T2.subType, 0x03 },
+		{ "B3/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T3.type, tableMsgTypes.BLIND_T3.subType, 0x03 },
+		{ "B4/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T4.type, tableMsgTypes.BLIND_T4.subType, 0x03 },
+		{ "B6/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T6.type, tableMsgTypes.BLIND_T6.subType, 0x03 },
+		{ "B7/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T7.type, tableMsgTypes.BLIND_T7.subType, 0x03 },
+		{ "RFY0/", "PROGRAM", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x07 },
+		{ "RFY0/", "LOWER_LIMIT", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x04 },
+		{ "RFY0/", "UPPER_LIMIT", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x02 },
+		{ "RFY0/", "VENETIAN_US_ANGLE_PLUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x11 },
+		{ "RFY0/", "VENETIAN_US_ANGLE_MINUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x12 },
+		{ "RFY0/", "VENETIAN_EU_ANGLE_PLUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x0F },
+		{ "RFY0/", "VENETIAN_EU_ANGLE_MINUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x10 },
+		{ "RFY0/", "ENABLE_DETECTOR", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x13 },
+		{ "RFY0/", "DISABLE_DETECTOR", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x14 }
 	}
 
 	local idxCmd = nil
@@ -6196,7 +6223,7 @@ function sendUnusualCommand(deviceId, commandType)
 	elseif (idxCmd >= 4 and idxCmd <= 10)
 		then
 		remoteId = string.sub(id, 7, 12)
-		if (tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T6[2] or tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T7[2])
+		if (tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T6.subType or tableCommands[idxCmd][4] == tableMsgTypes.BLIND_T7.subType)
 			then
 			id4 = tonumber(string.sub(id, 13, 13), 16)
 			unitcode = tonumber(string.sub(id, 15, 16)) % 16
@@ -6263,11 +6290,11 @@ function sendMessage(message)
 		msg = msg .. string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
 	end
 
-	local packetLength = string.byte(msg, 1)
+	local length = string.byte(msg, 1)
 	local type = string.byte(msg, 2)
 	local subType = string.byte(msg, 3)
 	local tableCmds = { { "", "", nil, 0 } }
-	sendCommand(type, subType, string.sub(msg, 5, packetLength+1), tableCmds)
+	sendCommand(type, subType, string.sub(msg, 5, length+1), tableCmds)
 
 end
 
@@ -6494,7 +6521,7 @@ local function setMode()
 	end
 
 	local data = string.char(3, typeRFX, 0, msg3, msg4, msg5, msg6, 0, 0, 0)
-	sendCommand(tableMsgTypes.MODE_COMMAND[1], tableMsgTypes.MODE_COMMAND[2], data, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, data, nil)
 
 end
 
