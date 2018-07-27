@@ -14,6 +14,7 @@ var RFX = {
 	typeTextColor: 'white',
 	userData: undefined,
 	mm2inch: 0.03937008,
+	tempUnit: '&deg;C',
 	lastMessage: "",
 	messageUpdateTimer: undefined,
 	lastRainReading: -1,
@@ -880,11 +881,7 @@ function RFX_updateDevicesTable(device) {
 				}
 
 				if (state != "" && RFX.deviceTypes[idxType][0] == 'TEMPERATURE_SENSOR') {
-					var unit = '&deg;C';
-					if (get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1) == '0') {
-						unit = '&deg;F';
-					}
-					state += ' ' + unit;
+					state += RFX.tempUnit;
 				}
 				else if (state != "" && RFX.deviceTypes[idxType][0] == 'WIND_SENSOR') {
 					var unit = 'km/h';
@@ -1339,9 +1336,7 @@ function RFX_showRainGaugeData(device) {
 }
 function RFX_raindataUpdateTimer() {
 	var newRainReading = get_device_state(RFX.rainDeviceID, RFX.rainGaugeSID, "CurrentTRain", 1);
-	console.log("raindataUpdateCheck");
     if(RFX.lastRainReading != newRainReading) {
-		console.log("new rain data");
 		RFX_updateRainGaugeData(RFX.rainDeviceID, RFX.deviceID);
 		RFX.lastRainReading = newRainReading;
 	}
@@ -1480,7 +1475,6 @@ function RFX_saveSettings(device) {
 }
 function RFX_messageUpdateTimer() {
 	var newLastMessage = get_device_state(RFX.deviceID, "urn:rfxcom-com:serviceId:rfxtrx1", "LastReceivedMsg", 1);
-//	console.log("messageUpdateCheck");
     if(RFX.lastMessage != newLastMessage) {
 		jQuery('#lastMessage').html(newLastMessage);
 		RFX.lastMessage = newLastMessage;
@@ -1986,15 +1980,13 @@ function RFX_selectAllDevices(state) {
 function RFX_checkSettings(device) {
 	if (RFX.browserIE == undefined) {
 		RFX.deviceID = device;
-		var temperatureUnit = ' &deg;C';
-		var tempUnit = get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1);
-		console.log("unit: " + tempUnit);
+		RFX.tempUnit = ' &deg;C';
 		if (get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1) == '0') {
-			temperatureUnit = ' &deg;F';
+			RFX.tempUnit = ' &deg;F';
 		}
 		for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
 			if (RFX.tempAndHumDeviceTypes[j][0] == "TEMPERATURE_SENSOR") {
-				RFX.tempAndHumDeviceTypes[j][11] = temperatureUnit;
+				RFX.tempAndHumDeviceTypes[j][11] = RFX.tempUnit;
 				break;
 			}
 		}
