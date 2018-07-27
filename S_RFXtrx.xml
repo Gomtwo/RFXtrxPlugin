@@ -6,6 +6,16 @@
 	</specVersion>
 	<serviceStateTable>
 		<stateVariable sendEvents="no">
+			<name>IPPort</name>
+			<dataType>ui6</dataType>
+			<defaultValue>10000</defaultValue>
+		</stateVariable>
+		<stateVariable sendEvents="no">
+			<name>DebugLogs</name>
+			<dataType>boolean</dataType>
+			<defaultValue>0</defaultValue>
+		</stateVariable>
+		<stateVariable sendEvents="no">
 			<name>PluginVersion</name>
 			<dataType>string</dataType>
 		</stateVariable>
@@ -49,11 +59,6 @@
 		<stateVariable sendEvents="no">
 			<name>VeraTime</name>
 			<dataType>ui12</dataType>
-			<defaultValue>0</defaultValue>
-		</stateVariable>
-		<stateVariable sendEvents="no">
-			<name>DebugLogs</name>
-			<dataType>boolean</dataType>
 			<defaultValue>0</defaultValue>
 		</stateVariable>
 		<stateVariable sendEvents="yes">
