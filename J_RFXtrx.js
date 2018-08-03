@@ -1649,6 +1649,35 @@ function RFX_showSettings(device) {
 
 	set_panel_html(html);
 }
+
+function RFX_testMessage(device) {
+	RFX_checkSettings(device);
+
+	html = '<b>Test Messages</b><br>';
+	html += '<table td { height: 50px };>';
+	html += '<tr>';
+	html += '<td>Use this dialog to send test messages to the transceiver. Use at your own risk!</td>';
+	html += '<tr>';
+	html += '<tr>';
+	html += '<td>Any response to messages sent can only be confirmed by actions of receiving devices or by viewing the Vera logs.</td>';
+	html += '<tr>';
+	html += '<tr>';
+	html += '<td>Enter the message data in the form of two-digit hexidecimal values with no delimiters of any kind.</td>';
+	html += '<tr>';
+	html += '<tr>';
+	html += '<td>A message must have a minimum of 5 bytes (10 characters). The first byte is the message length and is not included in the length value.</td>';
+	html += '<tr>';
+	html += '<td>Message Data: ';
+//	html += '<td>';
+	html += '<input id="msgData" type="text" size="40" maxlength="100" value=""/>';
+	html += '<button type="button" style="margin-left: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 50px; border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_sendMessage(' + device + ');">Send</button>';
+	html += '</td>';
+	html += '</tr>';
+	html += '</table>';
+
+	set_panel_html(html);
+}
+
 function RFX_showHelp(device) {
 	RFX_checkSettings(device);
 
@@ -2265,6 +2294,11 @@ function RFX_setAutoCreate(device) {
 	if (enable != undefined) {
 		RFX_callAction(device, RFX.RFXtrxSID, 'SetAutoCreate', { 'enable': enable });
 	}
+}
+
+function RFX_sendMessage(device) {
+	var msgData = jQuery('#msgData').val();
+	RFX_callAction(device, RFX.RFXtrxSID, 'SendMessage', { 'Message': msgData });
 }
 
 function RFX_callAction(device, sid, actname, args) {
