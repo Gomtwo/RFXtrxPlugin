@@ -4641,7 +4641,7 @@ function switchPower(deviceNum, newTargetValue)
 		then
 		type = tableMsgTypes.SECURITY_DOOR.type
 		subType = tableMsgTypes.SECURITY_DOOR.subType
-		nbTimes = 2
+		nbTimes = 1
 		remoteId = string.sub(id, 7, 12)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
 		tonumber(string.sub(remoteId, 3, 4), 16),
@@ -6275,8 +6275,7 @@ end
 
 function sendMessage(message)
 
---	if (#message < 10)
-	if (#message < 4)
+	if (#message < 10)
 		then
 		warning("Action SendMessage: invalid message - too short")
 		return
