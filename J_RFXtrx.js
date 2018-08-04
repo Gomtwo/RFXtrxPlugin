@@ -14,7 +14,6 @@ var RFX = {
 	typeTextColor: 'white',
 	userData: undefined,
 	mm2inch: 0.03937008,
-	tempUnit: '&deg;C',
 	lastMessage: "",
 	messageUpdateTimer: undefined,
 	lastRainReading: -1,
@@ -881,7 +880,11 @@ function RFX_updateDevicesTable(device) {
 				}
 
 				if (state != "" && RFX.deviceTypes[idxType][0] == 'TEMPERATURE_SENSOR') {
-					state += RFX.tempUnit;
+					var unit = '&deg;C';
+					if (get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1) == '0') {
+						unit = '&deg;F';
+					}
+					state += ' ' + unit;
 				}
 				else if (state != "" && RFX.deviceTypes[idxType][0] == 'WIND_SENSOR') {
 					var unit = 'km/h';
@@ -1336,7 +1339,9 @@ function RFX_showRainGaugeData(device) {
 }
 function RFX_raindataUpdateTimer() {
 	var newRainReading = get_device_state(RFX.rainDeviceID, RFX.rainGaugeSID, "CurrentTRain", 1);
+	console.log("raindataUpdateCheck");
     if(RFX.lastRainReading != newRainReading) {
+		console.log("new rain data");
 		RFX_updateRainGaugeData(RFX.rainDeviceID, RFX.deviceID);
 		RFX.lastRainReading = newRainReading;
 	}
@@ -1475,6 +1480,7 @@ function RFX_saveSettings(device) {
 }
 function RFX_messageUpdateTimer() {
 	var newLastMessage = get_device_state(RFX.deviceID, "urn:rfxcom-com:serviceId:rfxtrx1", "LastReceivedMsg", 1);
+//	console.log("messageUpdateCheck");
     if(RFX.lastMessage != newLastMessage) {
 		jQuery('#lastMessage').html(newLastMessage);
 		RFX.lastMessage = newLastMessage;
@@ -1649,35 +1655,6 @@ function RFX_showSettings(device) {
 
 	set_panel_html(html);
 }
-
-function RFX_testMessage(device) {
-	RFX_checkSettings(device);
-
-	html = '<b>Test Messages</b><br>';
-	html += '<table td { height: 50px };>';
-	html += '<tr>';
-	html += '<td>Use this dialog to send test messages to the transceiver. Use at your own risk!</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>Any response to messages sent can only be confirmed by actions of receiving devices or by viewing the Vera logs.</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>Enter the message data in the form of two-digit hexidecimal values with no delimiters of any kind.</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>A message must have a minimum of 5 bytes (10 characters). The first byte is the message length and is not included in the length value.</td>';
-	html += '<tr>';
-	html += '<td>Message Data: ';
-//	html += '<td>';
-	html += '<input id="msgData" type="text" size="40" maxlength="100" value=""/>';
-	html += '<button type="button" style="margin-left: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 50px; border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_sendMessage(' + device + ');">Send</button>';
-	html += '</td>';
-	html += '</tr>';
-	html += '</table>';
-
-	set_panel_html(html);
-}
-
 function RFX_showHelp(device) {
 	RFX_checkSettings(device);
 
@@ -2009,13 +1986,15 @@ function RFX_selectAllDevices(state) {
 function RFX_checkSettings(device) {
 	if (RFX.browserIE == undefined) {
 		RFX.deviceID = device;
-		RFX.tempUnit = ' &deg;C';
+		var temperatureUnit = ' &deg;C';
+		var tempUnit = get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1);
+		console.log("unit: " + tempUnit);
 		if (get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1) == '0') {
-			RFX.tempUnit = ' &deg;F';
+			temperatureUnit = ' &deg;F';
 		}
 		for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
 			if (RFX.tempAndHumDeviceTypes[j][0] == "TEMPERATURE_SENSOR") {
-				RFX.tempAndHumDeviceTypes[j][11] = RFX.tempUnit;
+				RFX.tempAndHumDeviceTypes[j][11] = temperatureUnit;
 				break;
 			}
 		}
@@ -2294,11 +2273,6 @@ function RFX_setAutoCreate(device) {
 	if (enable != undefined) {
 		RFX_callAction(device, RFX.RFXtrxSID, 'SetAutoCreate', { 'enable': enable });
 	}
-}
-
-function RFX_sendMessage(device) {
-	var msgData = jQuery('#msgData').val();
-	RFX_callAction(device, RFX.RFXtrxSID, 'SendMessage', { 'Message': msgData });
 }
 
 function RFX_callAction(device, sid, actname, args) {

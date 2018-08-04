@@ -69,20 +69,10 @@
 		},
 		{
 			"Label": {
-				"lang_tag": "tabname_testmsg",
-				"text": "Message Testing"
-			},
-			"Position": "5",
-			"TabType": "javascript",
-			"ScriptName": "J_RFXtrx.js",
-			"Function": "RFX_testMessage"
-		},
-		{
-			"Label": {
 				"lang_tag": "tabname_help",
 				"text": "Help"
 			},
-			"Position": "6",
+			"Position": "5",
 			"TabType": "javascript",
 			"ScriptName": "J_RFXtrx.js",
 			"Function": "RFX_showHelp"
@@ -92,7 +82,7 @@
 				"lang_tag": "advanced",
 				"text": "Advanced"
 			},
-			"Position": "7",
+			"Position": "6",
 			"TabType": "javascript",
 			"ScriptName": "shared.js",
 			"Function": "advanced_device"
