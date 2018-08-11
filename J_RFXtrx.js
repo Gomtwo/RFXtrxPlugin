@@ -817,6 +817,7 @@ function RFX_updateDevicesTable(device) {
 	html += '<th>Room</td>';
 	html += '<th>Type</td>';
 	html += '<th>State</td>';
+	html += '<th>Signal</td>';
 	html += '<th>Battery</td>';
 	html += '</tr>';
 
@@ -915,6 +916,14 @@ function RFX_updateDevicesTable(device) {
 				|| (selectedCategory == ('T=' + type2))
 				|| (selectedCategory == 'R=NONE' && room == '')
 				|| (selectedCategory == ('R=' + room))) {
+				var commStrength = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, 'CommStrength', 1);
+				if (commStrength != undefined) {
+					commStrength = -(15 - commStrength) * 8;
+					commStrength += 'dBm';
+				}
+				else {
+					commStrength = '';
+				}
 				var batteryLevel = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, "BatteryLevel", 1);
 				if (batteryLevel == undefined) {
 					batteryLevel = '';
@@ -929,6 +938,7 @@ function RFX_updateDevicesTable(device) {
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + room + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + type + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + state + '</td>';
+				html += '<td onclick="RFX_selectLine(' + nb + ');">' + commStrength + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + batteryLevel + '</td>';
 				html += '</tr>';
 				nb++;
@@ -1139,8 +1149,6 @@ function RFX_updateTempAndHumData(device) {
 	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Max 24Hr</th>';
 	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Minimum</th>';
 	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Min 24hr</th>';
-	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Signal</th>';
-	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Battery</th>';
 	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Age</th>';
 	html += '<th style="background-color:' + RFX.tableTitleBgColor + '; color:white">Reset</th>';
 	html += '</tr>';
@@ -1204,19 +1212,6 @@ function RFX_updateTempAndHumData(device) {
 				minValue24hr += RFX.tempAndHumDeviceTypes[idxType][11];
 			}
 
-			var commStrength = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, 'CommStrength', 1);
-			if (commStrength != undefined) {
-				commStrength = -(15 - commStrength) * 8;
-				commStrength += 'dBm';
-			}
-
-			var batteryLevel = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, "BatteryLevel", 1);
-			if (batteryLevel == undefined) {
-				batteryLevel = '';
-			}
-			else {
-				batteryLevel += ' %';
-			}
 			var lastUpdate = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, "BatteryDate", 1);
 			if (lastUpdate != undefined) {
 				elapsedTime = (dateValue < lastUpdate) ? 0 : dateValue - lastUpdate;
@@ -1243,8 +1238,6 @@ function RFX_updateTempAndHumData(device) {
 			rowhtml += '<td>' + maxValue24hr + '</td>';
 			rowhtml += '<td>' + minValue + '</td>';
 			rowhtml += '<td>' + minValue24hr + '</td>';
-			rowhtml += '<td>' + commStrength + '</td>';
-			rowhtml += '<td>' + batteryLevel + '</td>';
 			rowhtml += '<td>';
 			if (hours < 10) {
 				rowhtml += RFX_pad(hours, 2);
@@ -1649,35 +1642,6 @@ function RFX_showSettings(device) {
 
 	set_panel_html(html);
 }
-
-function RFX_testMessage(device) {
-	RFX_checkSettings(device);
-
-	html = '<b>Test Messages</b><br>';
-	html += '<table td { height: 50px };>';
-	html += '<tr>';
-	html += '<td>Use this dialog to send test messages to the transceiver. Use at your own risk!</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>Any response to messages sent can only be confirmed by actions of receiving devices or by viewing the Vera logs.</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>Enter the message data in the form of two-digit hexidecimal values with no delimiters of any kind.</td>';
-	html += '<tr>';
-	html += '<tr>';
-	html += '<td>A message must have a minimum of 5 bytes (10 characters). The first byte is the message length and is not included in the length value.</td>';
-	html += '<tr>';
-	html += '<td>Message Data: ';
-//	html += '<td>';
-	html += '<input id="msgData" type="text" size="40" maxlength="100" value=""/>';
-	html += '<button type="button" style="margin-left: 10px; background-color: ' + RFX.buttonBgColor + '; color: white; height: 25px; width: 50px; border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px" onclick="RFX_sendMessage(' + device + ');">Send</button>';
-	html += '</td>';
-	html += '</tr>';
-	html += '</table>';
-
-	set_panel_html(html);
-}
-
 function RFX_showHelp(device) {
 	RFX_checkSettings(device);
 
@@ -2294,11 +2258,6 @@ function RFX_setAutoCreate(device) {
 	if (enable != undefined) {
 		RFX_callAction(device, RFX.RFXtrxSID, 'SetAutoCreate', { 'enable': enable });
 	}
-}
-
-function RFX_sendMessage(device) {
-	var msgData = jQuery('#msgData').val();
-	RFX_callAction(device, RFX.RFXtrxSID, 'SendMessage', { 'Message': msgData });
 }
 
 function RFX_callAction(device, sid, actname, args) {
