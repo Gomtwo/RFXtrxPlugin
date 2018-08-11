@@ -1465,6 +1465,14 @@ local function decodeBatteryLevel( dataString, byte1 )
 	return battery
 end
 
+-- Extract the signal strength from the data string sent by the device
+-- byte1 is the location of the byte containing the battery level in the data string
+-- Signal strength is always the upper 4 bits of the byte
+local function decodeSignalStrength( dataString, byte1 )
+	-- it's always the upper 4 bits
+	local strength = bitw.rshift(string.byte(dataString, byte1), 4)
+	return strength
+end
 
 -- Decode bytes received from a device that contain the measured temperature
 -- dataString is the string received from the sensor
@@ -3084,7 +3092,7 @@ local function decodeTemp(subType, data)
 	-- Update if necessary the max and min temperatures detected by this device
 	checkMaxMinTemp( altid, tableCmds, temp )
 
-	local strength = bitw.rshift(string.byte(data, 5), 4)
+	local strength = decodeSignalStrength(data, 5)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 5)
@@ -3113,7 +3121,7 @@ local function decodeHum(subType, data)
 		debug("Dubious humidity reading: " .. hum .. "%" .. " altid=" .. altid .. " status=")
 	end
 
-	local strength = bitw.rshift(string.byte(data, 5), 4)
+	local strength = decodeSignalStrength(data, 5)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 5)
@@ -3149,7 +3157,7 @@ local function decodeTempHum(subType, data)
 		debug("Dubious humidity reading: " .. hum .. " altid=" .. altid .. " status=")
 	end
 
-	local strength = bitw.rshift(string.byte(data, 7), 4)
+	local strength = decodeSignalStrength(data, 7)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 7)
@@ -3189,7 +3197,7 @@ local function decodeBaro(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_FORECAST, strForecast, 0 ) )
 	end
 
-	local strength = bitw.rshift(string.byte(data, 6), 4)
+	local strength = decodeSignalStrength(data, 6)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 6)
@@ -3246,7 +3254,7 @@ local function decodeTempHumBaro(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_FORECAST, strForecast, 0 ) )
 	end
 
-	local strength = bitw.rshift(string.byte(data, 10), 4)
+	local strength = decodeSignalStrength(data, 10)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 10)
@@ -3431,7 +3439,7 @@ local function decodeRain(subType, data)
 		end
 	end
 
-	local strength = bitw.rshift(string.byte(data, 8), 4)
+	local strength = decodeSignalStrength(data, 8)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 8)
@@ -3457,7 +3465,7 @@ local function decodeTempRain(subType, data)
 	local total = (string.byte(data, 5) * 256 + string.byte(data, 6)) / 10
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, total, 0 ) )
 
-	local strength = bitw.rshift(string.byte(data, 7), 4)
+	local strength = decodeSignalStrength(data, 7)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 7)
@@ -3510,7 +3518,7 @@ local function decodeWind(subType, data)
 		checkMaxMinTemp( altid, tableCmds, temp )
 	end
 
-	local strength = bitw.rshift(string.byte(data, 13), 4)
+	local strength = decodeSignalStrength(data, 13)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 13)
@@ -3538,7 +3546,7 @@ local function decodeUV(subType, data)
 		checkMaxMinTemp( altid, tableCmds, temp )
 	end
 
-	local strength = bitw.rshift(string.byte(data, 6), 4)
+	local strength = decodeSignalStrength(data, 6)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	local battery = decodeBatteryLevel(data, 6)
@@ -3567,7 +3575,7 @@ local function decodeWeight(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_IMPEDANCE, impedance, 0 ) )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 5), 4)
+	-- local strength = decodeSignalStrength(data, 5)
 
 	local battery = decodeBatteryLevel(data, 5)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
@@ -3597,7 +3605,7 @@ local function decodeSecurity(subType, data)
 
 	table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
 
-	local strength = bitw.rshift(string.byte(data, 6), 4)
+	local strength = decodeSignalStrength(data, 6)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 
 	-- Don't know if these devices send battery status
@@ -3680,6 +3688,8 @@ local function decodeSecurityMS(subType, data)
 		--		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION.deviceType, tampered, tableCmds)
 	end
 
+	local strength = decodeSignalStrength(data, 5)
+	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 	local battery = decodeBatteryLevel(data, 5)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 
@@ -3726,6 +3736,8 @@ local function decodeSecurityDS(subType, data)
 			--			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR.deviceType, tampered, tableCmds)
 		end
 
+		local strength = decodeSignalStrength(data, 5)
+		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 		local battery = decodeBatteryLevel(data, 5)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 	end
@@ -4002,7 +4014,7 @@ local function decodeElec1(subType, data)
 	local watt = watt1 + watt2 + watt3
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_WATT, watt, 0 ) )
 
-	-- local strength = bitw.rshift(string.byte(data, 10), 4)
+	-- local strength = decodeSignalStrength(data, 10)
 
 	local battery = decodeBatteryLevel(data, 10)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
@@ -4031,7 +4043,7 @@ local function decodeElec2Elec3(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_KWH, kwh, 0 ) )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 14), 4)
+	-- local strength = decodeSignalStrength(data, 14)
 
 	local battery = decodeBatteryLevel(data, 14)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
@@ -4072,7 +4084,7 @@ local function decodeElec4(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_KWH, kwh, 0 ) )
 	end
 
-	-- local strength = bitw.rshift(string.byte(data, 16), 4)
+	-- local strength = decodeSignalStrength(data, 16)
 
 	local battery = decodeBatteryLevel(data, 16)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
@@ -4093,7 +4105,7 @@ local function decodeRFXSensor(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_TEMP, temp, 0 ) )
 		-- Update if necessary the max and min temperatures detected by this device
 		checkMaxMinTemp( altid, tableCmds, temp )
-		local strength = bitw.rshift(string.byte(data, 4), 4)
+		local strength = decodeSignalStrength(data, 4)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 	else
 		warning("RFXSensor subtype not yet implemented: " .. subType)
