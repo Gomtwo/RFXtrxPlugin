@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.50"
+local PLUGIN_VERSION = "1.51"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -1003,6 +1003,7 @@ local function setDefaultValue(deviceNum, variable, value)
 end
 
 local function setVariable(deviceNum, variable, value)
+		debug("deviceNum: "..deviceNum.." variable: "..variable.name.." value: "..tostring(value))
 	if (variable ~= nil and value ~= nil)
 		then
 		if (type(value) == "number")
@@ -5086,6 +5087,11 @@ function setArmed(deviceNum, newArmedValue)
 
 	local id = luup.devices[deviceNum].id
 	debug("setArmed " .. id .. " target " .. (newArmedValue or "nil"))
+	if(newArmedValue == "1") then
+		newArmedValue = true
+	else
+		newArmedValue = false
+	end
 
 	setVariable(deviceNum, tabVars.VAR_ARMED, newArmedValue)
 
