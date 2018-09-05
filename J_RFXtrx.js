@@ -676,7 +676,7 @@ var RFX = {
 
 	tempAndHumDeviceTypes: [
 		["TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", "MaxTemp", "MinTemp", "MaxTemp24hr", "MinTemp24hr", "MaxMinTemps", ""],
-		["HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", "MaxHum", "MinHum", "MaxHum24hr", "MinHum24hr", "MaxMinHum", " %"]
+		["HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", "MaxHum", "MinHum", "MaxHum24hr", "MinHum24hr", "MaxMinHum", "%"]
 	],
 
 	commands: [
@@ -892,7 +892,7 @@ function RFX_updateDevicesTable(device) {
 					state += ' ' + unit;
 				}
 				else if (state != "" && RFX.deviceTypes[idxType][9] != "") {
-					state += ' ' + RFX.deviceTypes[idxType][9];
+					state += RFX.deviceTypes[idxType][9];
 				}
 			}
 			var category = '';
@@ -929,7 +929,7 @@ function RFX_updateDevicesTable(device) {
 					batteryLevel = '';
 				}
 				else {
-					batteryLevel += ' %';
+					batteryLevel += '%';
 				}
 				html += '<tr align="center">';
 				html += '<td><input id="SelectDevice' + nb + '" type="checkbox" value="' + RFX.userData.devices[i].id + '" onchange="RFX_selectDevices();"></td>';
@@ -1911,7 +1911,7 @@ function RFX_selectDevices() {
 		else {
 			var lastUpdate = get_device_state(selectedIds, RFX.HADeviceSID, "BatteryDate", 1);
 			var last = new Date(lastUpdate * 1000);
-			batteryLevel += ' % (' + last.toLocaleString().replace(/\//g, ' ') + ')';
+			batteryLevel += '% (' + last.toLocaleString().replace(/\//g, ' ') + ')';
 		}
 
 		jQuery('#selDeviceID').html(id);
@@ -1973,9 +1973,9 @@ function RFX_selectAllDevices(state) {
 function RFX_checkSettings(device) {
 	if (RFX.browserIE == undefined) {
 		RFX.deviceID = device;
-		RFX.tempUnit = ' &deg;C';
+		RFX.tempUnit = '&deg;C';
 		if (get_device_state(device, RFX.RFXtrxSID2, "CelciusTemp", 1) == '0') {
-			RFX.tempUnit = ' &deg;F';
+			RFX.tempUnit = '&deg;F';
 		}
 		for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
 			if (RFX.tempAndHumDeviceTypes[j][0] == "TEMPERATURE_SENSOR") {
