@@ -799,7 +799,7 @@ function RFX_showManagedDevices(device) {
 	html += '</td>';
 	html += '</tr>';
 	html += '<tr><td>Discarded devices (auto-create):</td><td id="dicardedDevices"></td></tr>';
-	html += '</table>';
+	html += '</table><br>';
 
 	//html += '<p id="debug">';
 
@@ -1457,6 +1457,32 @@ function RFX_updateRainGaugeData(device, deviceParent) {
 
 	jQuery('#rainGaugeDataTable').html(html);
 }
+function RFX_getFrequency(device) {
+	var deviceData = api.getDeviceObject(device);
+	var deviceModel = 'unknown';
+	if (deviceData != undefined) {
+		deviceModel = deviceData.model;
+	}
+	var freqsel = deviceModel.search(/ at 43[34]\./);
+	if( freqsel > 0 ) {
+		freqsel = deviceModel.substr(freqsel+8,2);
+	}
+	return freqsel;
+}
+function RFX_setFrequency(device, freqselId) {
+	var frequency = undefined;
+	if (freqselId.checked) {
+		frequency = freqselId.value;
+	}
+	if (frequency != undefined) {
+		RFX_callAction(device, RFX.RFXtrxSID, 'SetupReceiving', { 'protocol': 'freqsel', 'enable': frequency });
+		// Display a message to the user
+		jQuery('#freqSwitchMsg').html("<b>Switching frequencies. Please wait ...</b>");
+		jQuery('#freqSwitchMsg').css({ 'color': 'red' });
+		// Redisplay the protocol settings after a delay to allow the change to be made
+		setTimeout(function(){RFX_showProtocols(device);},3500);
+	}
+}
 function RFX_setProtocol(device, checkBoxID) {
 	var state = checkBoxID.checked ? '1' : '0';
 	var id = checkBoxID.id;
@@ -1482,70 +1508,87 @@ function RFX_showProtocols(device) {
 	RFX_checkSettings(device);
 	var firmwareType = get_device_state(device, RFX.RFXtrxSID2, "FirmwareType", 1);
 	var firmwareVersion = get_device_state(device, RFX.RFXtrxSID2, "FirmwareVersion", 1);
+	var proFirmware = firmwareType.substr(0,3) == "Pro"
+	var freq43392 = true
+	var freqsel = '92'
 	RFX.messageUpdateTimer = setTimeout(RFX_messageUpdateTimer, 2000);
 	var html = RFX_addSimpleToggleStyle();
 	html += '<main id = "ProtocolsSettings">';
 	html += '<b>RECEIVING PROTOCOLS</b><br>';
 	html += '<b>Firmware Type: </b>' + firmwareType + '<b>&nbsp&nbsp&nbsp&nbsp&nbsp&nbspFirmware Version: </b>' + firmwareVersion + '<p/>';
-	html += '<style>td {height: 30px; padding: 5px; vertical-align: top;}</style>';
-	html += '<table><tr>';
-	html += RFX_addProtocolSwitch(device, "ARC", "ARCReceiving");
-	html += RFX_addProtocolSwitch(device, "X10", "X10Receiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "Byron SX / SelectPlus", "ByronSXReceiving");
-	html += RFX_addProtocolSwitch(device, "Lighting4", "Lighting4Receiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "FineOffset / Viking", "FineOffsetReceiving");
-	html += RFX_addProtocolSwitch(device, "La Crosse", "LaCrosseReceiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "Hideki / UPM", "HidekiReceiving");
-	html += RFX_addProtocolSwitch(device, "AD / LightwaveRF", "ADReceiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "Mertik", "MertikReceiving");
-	html += RFX_addProtocolSwitch(device, "Visonic", "VisonicReceiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "Oregon Scientific", "OregonReceiving");
-	html += RFX_addProtocolSwitch(device, "Meiantech / Atlantic", "MeiantechReceiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "HomeEasy EU", "HEUReceiving");
-	html += RFX_addProtocolSwitch(device, "AC / KAKU,DIO", "ACReceiving");
-	html += '</tr><tr>';
-	html += RFX_addProtocolSwitch(device, "Imagintronix / Opus", "ImagintronixReceiving");
-	html += RFX_addProtocolSwitch(device, "Undecoded", "UndecodedReceiving");
-	html += '</tr>';
-	if( firmwareType != "Unknown") {
-		html += '<tr>';
-		if( firmwareType == "Type2") {
-			html += RFX_addProtocolSwitch(device, "Blinds T0", "BlindsT0Receiving");
-		}
-		else {
-			html += RFX_addProtocolSwitch(device, "Rubicson/Alecto/Banggood", "RubicsonReceiving");
-		}
-		if( firmwareType != "Ext") {
-			html += RFX_addProtocolSwitch(device, "ATI/Cartelectronic", "ATIReceiving");
-			html += '</tr><tr>';
-			html += RFX_addProtocolSwitch(device, "Blinds T1/T2/T3/T4", "BlindsT1Receiving");
-			html += RFX_addProtocolSwitch(device, "RSL2 / Revolt", "RSLReceiving");
-		}
-		else {
-			html += RFX_addProtocolSwitch(device, "FS20 / Legrand CAD", "FS20Receiving");
-			html += '</tr><tr>';
-			html += RFX_addProtocolSwitch(device, "Homeconfort", "HomeConfortReceiving");
-			html += RFX_addProtocolSwitch(device, "Keeloq", "KeelogReceiving");
-		}
-		html += '</tr>';
-		if( firmwareType != "Ext2") {
-			html += '</tr>';
-			html += RFX_addProtocolSwitch(device, "AE / Blyss", "AEReceiving");
-			html += '</tr>';
-		}
-		html += '</table>';
+	if (proFirmware)  {
+		freqsel = RFX_getFrequency(device);
+		freq43392 = freqsel == '92'
 	}
+	if (proFirmware) {
+		html += 'Select the frequency to be used: ';
+		html += '<input type="radio" name="freqsel" id="Id43392" value=0x53 onChange="RFX_setFrequency('+device+',Id43392)"';
+		if( freqsel == '92') { html+= ' checked' }
+		html += '><label for="433.92Mhz">&nbsp433.92Mhz&nbsp&nbsp&nbsp&nbsp</label>';
+		html += '<input type="radio" name="freqsel" id="Id43342" value=0x54 onChange="RFX_setFrequency('+device+',Id43342)"';
+		if( freqsel == '42') { html+= ' checked' }
+		html += '><label for="433.42Mhz">&nbsp433.42Mhz&nbsp&nbsp&nbsp&nbsp</label>';
+		html += '<input type="radio" name="freqsel" id="Id43450" value=0x5F onChange="RFX_setFrequency('+device+',Id43450)"';
+		if( freqsel == '50') { html+= ' checked' }
+		html += '><label for="434.50Mhz">&nbsp434.50Mhz</label><br>';
+	}
+	html += '<style>td {height: 24px; padding: 5px; vertical-align: top;}</style>';
+	if (!proFirmware || freq43392) {
+		html += '<b>Note: </b>All receiving protocol settings are made available but some firmware types do not support all receiving protocols. ';
+		html += 'Refer to the RFXtrx User Guide to determine which firmware type supports the protocols needed to receive messages from your devices.<br>';
+		html += '<table><tr>';
+		html += RFX_addProtocolSwitch(device, "AC / KAKU,DIO", "ACReceiving");
+		html += RFX_addProtocolSwitch(device, "HomeEasy EU", "HEUReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "AD / LightwaveRF", "ADReceiving");
+		html += RFX_addProtocolSwitch(device, "Imagintronix / Opus", "ImagintronixReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "AE / Blyss", "AEReceiving");
+		html += RFX_addProtocolSwitch(device, "Keeloq", "KeelogReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "ARC", "ARCReceiving");
+		html += RFX_addProtocolSwitch(device, "La Crosse", "LaCrosseReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "ATI/Cartelectronic", "ATIReceiving");
+		html += RFX_addProtocolSwitch(device, "Lighting4", "Lighting4Receiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Blinds T0", "BlindsT0Receiving");
+		html += RFX_addProtocolSwitch(device, "Meiantech / Atlantic", "MeiantechReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Blinds Tx", "BlindsT1Receiving");
+		html += RFX_addProtocolSwitch(device, "Mertik", "MertikReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Byron SX / SelectPlus", "ByronSXReceiving");
+		html += RFX_addProtocolSwitch(device, "Oregon Scientific", "OregonReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "FineOffset / Viking", "FineOffsetReceiving");
+		html += RFX_addProtocolSwitch(device, "RSL2 / Revolt", "RSLReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "FS20 / Legrand CAD", "FS20Receiving");
+		html += RFX_addProtocolSwitch(device, "Rubicson/Alecto/Banggood", "RubicsonReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Hideki / UPM", "HidekiReceiving");
+		html += RFX_addProtocolSwitch(device, "Visonic", "VisonicReceiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Homeconfort", "HomeConfortReceiving");
+		html += RFX_addProtocolSwitch(device, "X10", "X10Receiving");
+		html += '</tr><tr>';
+		html += RFX_addProtocolSwitch(device, "Undecoded", "UndecodedReceiving");
+	} else if (freqsel == '42') {
+		html += '<table><tr>';
+		html += RFX_addProtocolSwitch(device, "Funkbus", "FunkbusReceiving");
+	} else {
+		html += '<table><tr>';
+		html += RFX_addProtocolSwitch(device, "MCZ", "MCZReceiving");
+	}
+	html += '</tr>';
+	html += '</table>';
 	html += '  Save in non-volatile memory (max 10000 write cycles)';
 	html += '<button type="button" style="margin-left: 10px; background-color: ' + RFX.buttonBgColor + ';';
 	html += 'color: white; height: 25px; border-radius: 6px; -khtml-border-radius: 6px; border-radius: 6px;"';
 	html += 'onclick="RFX_saveSettings(' + device +')">Save RFX Settings</button><br/>';
 	html += '<b>Last received message</b><div id="lastMessage"/>';
+	html += '<div id="freqSwitchMsg"/><br>';
 	html += '</main>';
 
 	set_panel_html(html);
