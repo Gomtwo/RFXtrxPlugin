@@ -182,6 +182,16 @@
 			<defaultValue>1</defaultValue>
 		</stateVariable>
 		<stateVariable sendEvents="yes">
+			<name>HomeFunkbusReceiving</name>
+			<dataType>boolean</dataType>
+			<defaultValue>1</defaultValue>
+		</stateVariable>
+		<stateVariable sendEvents="yes">
+			<name>HomeMCZReceiving</name>
+			<dataType>boolean</dataType>
+			<defaultValue>1</defaultValue>
+		</stateVariable>
+		<stateVariable sendEvents="yes">
 			<name>HomeConfortReceiving</name>
 			<dataType>boolean</dataType>
 			<defaultValue>1</defaultValue>
