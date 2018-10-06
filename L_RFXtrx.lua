@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.51"
+local PLUGIN_VERSION = "1.60"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -349,9 +349,9 @@ local tabVars = {
 	VAR_PRESSURE = Variable( "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, true, true ),
 	VAR_FORECAST = Variable( "urn:upnp-org:serviceId:BarometerSensor1", "Forecast", false, false, true ),
 	VAR_RAIN = Variable( "urn:upnp-org:serviceId:RainSensor1", "CurrentTRain", false, false, true ),
-	VAR_RAIN24HRS = Variable( "urn:upnp-org:serviceId:RainSensor1", "Rain24Hrs", false, false, false ),
+	VAR_RAIN24HRS = Variable( "urn:upnp-org:serviceId:RainSensor1", "Rain24Hrs", false, false, true ),
 	VAR_RAINRATE = Variable( "urn:upnp-org:serviceId:RainSensor1", "CurrentRain", false, false, true ),
-	VAR_WEEKNUM = Variable( "urn:upnp-org:serviceId:RainSensor1", "WeekNumber", false, false, false ),
+	VAR_WEEKNUM = Variable( "urn:upnp-org:serviceId:RainSensor1", "WeekNumber", false, false, true ),
 	VAR_RAINBYMINUTE = Variable( "urn:upnp-org:serviceId:RainSensor1", "MinuteRain", false, false, true ),
 	VAR_RAINBYHOUR = Variable( "urn:upnp-org:serviceId:RainSensor1", "HourlyRain", false, false, true ),
 	VAR_RAINBYDAY = Variable( "urn:upnp-org:serviceId:RainSensor1", "DailyRain", false, false, true ),
@@ -404,12 +404,10 @@ local tabVars = {
 	VAR_VOLTAGE = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "Voltage", false, false, true ),
 	VAR_VERATIME = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "VeraTime", false, false, false ),
 	VAR_VERAPORT = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "IPPort", false, false, true ),
-	VAR_BYRONSX_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "ByronSXReceiving", true, false, true ),
-	VAR_RSL_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "RSLReceiving", true, false, true ),
 	VAR_UNDECODED_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "UndecodedReceiving", true, false, true ),
 	VAR_IMAGINTRONIX_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "ImagintronixReceiving", true, false, true ),
-	VAR_KEELOQ_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "KeeloqReceiving", true, false, true ),
-	VAR_HOMECONFORT_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "HomeconfortReceiving", true, false, true ),
+	VAR_BYRONSX_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "ByronSXReceiving", true, false, true ),
+	VAR_RSL_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "RSLReceiving", true, false, true ),
 	VAR_LIGHTING4_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "Lighting4Receiving", true, false, true ),
 	VAR_FINEOFFSET_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "FineOffsetReceiving", true, false, true ),
 	VAR_RUBICSON_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "RubicsonReceiving", true, false, true ),
@@ -430,6 +428,10 @@ local tabVars = {
 	VAR_AC_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "ACReceiving", true, false, true ),
 	VAR_ARC_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "ARCReceiving", true, false, true ),
 	VAR_X10_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "X10Receiving", true, false, true ),
+	VAR_FUNKBUS_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "FunkbusReceiving", true, false, true ),
+	VAR_MCZ_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "MCZReceiving", true, false, true ),
+	VAR_HOMECONFORT_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "HomeconfortReceiving", true, false, true ),
+	VAR_KEELOQ_RECEIVING = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "KeeloqReceiving", true, false, true ),
 	VAR_ASSOCIATION = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "Association", false, false, true ),
 	VAR_LAST_RECEIVED_MSG = Variable( "urn:rfxcom-com:serviceId:rfxtrx1", "LastReceivedMsg", false, false, true ),
 	VAR_ADJUST_MULTIPLIER = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "AdjustMultiplier", false, false, true ),
@@ -803,6 +805,46 @@ local tableCategories = {
 	"L4/", "%s%06X/00", nil, nil, nil, nil	}
 }
 
+-- J_RFXtrx.js depends on the text of these table items
+local tableHardwareType = {
+	[0x50] = "RFXtrx315 at 310 MHz",
+	[0x51] = "RFXtrx315 at 315 MHz",
+	[0x52] = "RFXrec433 at 433.92 MHz",
+	[0x53] = "RFXtrx433 at 433.92 MHz",
+	[0x54] = "RFXtrx433 at 433.42 MHz",
+	[0x55] = "RFXtrx868X operating at 868 MHz",
+	[0x56] = "RFXtrx868X operating at 868.00 MHz FSK",
+	[0x57] = "RFXtrx868X operating at 868.30 MHz",
+	[0x58] = "RFXtrx868X operating at 868.30 MHz FSK",
+	[0x59] = "RFXtrx868X operating at 868.35 MHz",
+	[0x5A] = "RFXtrx868X operating at 868.35 MHz FSK",
+	[0x5B] = "RFXtrx868X operating at 868.95 MHz",
+	[0x5C] = "RFXtrx433IOT at 433.92 MHz",
+	[0x5D] = "RFXtrx433IOT at 868 MHz",
+	[0x5E] = "RFXtrx433IOT at 868 MHz",
+	[0x5F] = "RFXtrx433 at 434.50 MHz"
+	}
+	
+local tableFirmwareType = {
+	"Type1 receive only",
+	"Type1",
+	"Type2",
+	"Ext",
+	"Ext2",
+	"Pro1",
+	"Pro2",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"ProXL1"
+	}
+	
 -- A table used to find the device ID number using the AltId
 -- This table is initialized in deferredStartup and after devices
 -- are added or deleted.
@@ -1003,12 +1045,17 @@ local function setDefaultValue(deviceNum, variable, value)
 end
 
 local function setVariable(deviceNum, variable, value)
-		debug("deviceNum: "..deviceNum.." variable: "..variable.name.." value: "..tostring(value))
+	debug("deviceNum: "..deviceNum.." variable: "..variable.name.." value: "..tostring(value))
 	if (variable ~= nil and value ~= nil)
 		then
-		if (type(value) == "number")
-			then
+		if (type(value) == "number") then
 			value = tostring(value)
+		elseif (type(value) == 'boolean') then
+			if (value) then
+				value = '1'
+			else
+				value = '0'
+			end
 		end
 		local doChange = true
 		local currentValue = getVariable(deviceNum, variable)
@@ -1032,13 +1079,6 @@ local function setVariable(deviceNum, variable, value)
 			doChange = false
 		end
 		if (doChange) then
-			if(variable.isBoolean)
-				then
-				if(value)
-					then value = "1"
-					else value = "0"
-				end
-			end
 			luup.variable_set(variable.serviceId, variable.name, value, deviceNum)
 		end
 
@@ -1057,7 +1097,6 @@ local function initIDLookup()
 	devicedIdNumByAltId = {}
 	-- Build a table for selecting the device ID based on the altid
 	for deviceNum, veraDevice in pairs(luup.devices) do
-		debug("device: "..deviceNum)
 		if (deviceNum == THIS_DEVICE) then
 			devicedIdNumByAltId["RFXTRX"] = THIS_DEVICE
 		elseif (veraDevice.device_num_parent == THIS_DEVICE) then
@@ -2387,40 +2426,12 @@ local function decodeResponseMode(subType, data)
 			then
 			debug("Response to a Get Status command or Set Mode command")
 			typeRFX = string.byte(data, 2)
-			if (typeRFX == 0x50)
-				then
-				log("RFXtrx315 at 310 MHz")
-			elseif (typeRFX == 0x51)
-				then
-				log("RFXtrx315 at 315 MHz")
-			elseif (typeRFX == 0x52)
-				then
-				log("RFXrec433 at 433.92 MHz")
-			elseif (typeRFX == 0x53)
-				then
-				log("RFXtrx433e at 433.92 MHz")
-			elseif (typeRFX == 0x55)
-				then
-				log("RFXtrx868 at 868.00 MHz")
-			elseif (typeRFX == 0x56)
-				then
-				log("RFXtrx868 at 868.00 MHz FSK")
-			elseif (typeRFX == 0x57)
-				then
-				log("RFXtrx868 at 868.30 MHz")
-			elseif (typeRFX == 0x58)
-				then
-				log("RFXtrx868 at 868.30 MHz FSK")
-			elseif (typeRFX == 0x59)
-				then
-				log("RFXtrx868 at 868.35 MHz")
-			elseif (typeRFX == 0x5A)
-				then
-				log("RFXtrx868 at 868.35 MHz FSK")
-			elseif (typeRFX == 0x5B)
-				then
-				log("RFXtrx868 at 868.95 MHz")
+			local hdwType = tableHardwareType[typeRFX]
+			if(hdwType == nil) then
+				hdwType = "Unknown"
 			end
+			log("Hardware type: " .. hdwType)
+			luup.attr_set("model", hdwType, THIS_DEVICE, 0)
 
 			-- Add 1000 to the byte indicating the firmware version
 			--  so that the displayed version matches that of the firmware version
@@ -2430,32 +2441,20 @@ local function decodeResponseMode(subType, data)
 
 			-- Get the firmware type
 			local typeFirmware = string.byte(data, 11)
-			if (typeFirmware == 1)
-				then
-				log("Firmware type: Type1")
-				firmtype = "Type1"
-			elseif (typeFirmware == 2)
-				then
-				log("Firmware type: Type2")
-				firmtype = "Type2"
-			elseif (typeFirmware == 3)
-				then
-				log("Firmware type: Ext")
-				firmtype = "Ext"
-			elseif (typeFirmware == 4)
-				then
-				log("Firmware type: Ext2")
-				firmtype = "Ext2"
-			else
-				log("Unknown firmware type")
+			firmtype = tableFirmwareType[typeFirmware + 1]
+			if(firmtype == nil) then
 				firmtype = "Unknown"
 			end
+			log("Firmware type: " .. firmtype)
 			setVariable(THIS_DEVICE, tabVars.VAR_FIRMWARE_TYPE, firmtype)
 			-- Get the hardware version ;
 			--  the major and minor versions
 			hardware = string.byte(data, 8) .. "." .. string.byte(data, 9)
 			log("Hardware version: " .. hardware)
 			setVariable(THIS_DEVICE, tabVars.VAR_HARDWARE_VERSION, hardware)
+
+			log("Output power: " .. string.byte(data, 10))
+			log("Receiver noise level: " .. string.byte(data, 12))
 
 			log("RFXtrx setup to receive protocols:")
 			local msg3 = string.byte(data, 4)
@@ -2534,7 +2533,7 @@ local function decodeResponseMode(subType, data)
 			setVariable(THIS_DEVICE, tabVars.VAR_FS20_RECEIVING, isEnabled)
 			if(isEnabled)
 				then
-				log("   - FS20")
+				log("   - Legrand CAD")
 			end
 			isEnabled = (bitw.band(msg4, 0x08) == 0x08)
 			setVariable(THIS_DEVICE, tabVars.VAR_LACROSSE_RECEIVING, isEnabled)
@@ -2607,6 +2606,18 @@ local function decodeResponseMode(subType, data)
 			if(isEnabled)
 				then
 				log("   - X10")
+			end
+			isEnabled = (bitw.band(msg6, 0x80) == 0x80)
+			setVariable(THIS_DEVICE, tabVars.VAR_FUNKBUS_RECEIVING, isEnabled)
+			if(isEnabled)
+				then
+				log("   - Funkbus")
+			end
+			isEnabled = (bitw.band(msg6, 0x40) == 0x40)
+			setVariable(THIS_DEVICE, tabVars.VAR_MCZ_RECEIVING, isEnabled)
+			if(isEnabled)
+				then
+				log("   - MCZ")
 			end
 			isEnabled = (bitw.band(msg6, 0x02) == 0x02)
 			setVariable(THIS_DEVICE, tabVars.VAR_HOMECONFORT_RECEIVING, isEnabled)
@@ -3415,6 +3426,15 @@ local function decodeRain(subType, data)
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINBYHOUR, recursiveConcat(rainByHour), 0 ) )
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINBYMINUTE, recursiveConcat(rainByMinute), 0 ) )
 			local rate = nil
+			local calculatedRate = 0.0
+			-- Calculate the rain rate based on the last two readings in case the sensor doesn't provide it
+			local elapsedSeconds = currentSeconds - previousSeconds
+			if(elapsedSeconds > 0)
+				then
+				local periodsPerHour = 3600 / elapsedSeconds
+				calculatedRate = periodsPerHour * rainDiff
+				debug("Calculated rain rate: " .. calculatedRate .. " mm/hr")
+			end
 			if (subType == tableMsgTypes.RAIN1.subType)
 				then
 				rate = string.byte(data, 3) * 256 + string.byte(data, 4)
@@ -3424,18 +3444,20 @@ local function decodeRain(subType, data)
 			end
 			if (rate ~= nil)
 				then
+				debug("rain rate from the sensor: " .. rate .. " mm/hr")
 				table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, rate, 0 ) )
 			else
-				-- Calculate the rain rate based on the last two readings
-				local elapsedSeconds = currentSeconds - previousSeconds
-				if(elapsedSeconds > 0)
-					then
-					local periodsPerHour = 3600 / elapsedSeconds
-					rate = periodsPerHour * rainDiff
-					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, rate, 0 ) )
-				else
-					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, 0, 0 ) )
-				end
+				-- use the calculated rate
+
+
+
+
+
+
+
+
+				table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, calculatedRate, 0 ) )
+
 			end
 		end
 	end
@@ -6520,6 +6542,14 @@ local function setMode()
 	end
 
 	local msg6 = 0
+	if (getVariable(THIS_DEVICE, tabVars.VAR_FUNKBUS_RECEIVING))
+		then
+		msg6 = msg6 + 0x80
+	end
+	if (getVariable(THIS_DEVICE, tabVars.VAR_MCZ_RECEIVING))
+		then
+		msg6 = msg6 + 0x40
+	end
 	if (getVariable(THIS_DEVICE, tabVars.VAR_HOMECONFORT_RECEIVING))
 		then
 		msg6 = msg6 + 0x02
@@ -6537,64 +6567,76 @@ end
 function setupReceiving(protocol, enable)
 
 	debug("setupReceiving " .. (protocol or "nil") .. " " .. (enable or "nil"))
-
 	local tabProtocols = {
-		X10Receiving = "VAR_X10_RECEIVING",
-		ARCReceiving = "VAR_ARC_RECEIVING",
-		ACReceiving = "VAR_AC_RECEIVING",
-		HEUReceiving = "VAR_HEU_RECEIVING",
-		MeiantechReceiving = "VAR_MEIANTECH_RECEIVING",
-		OregonReceiving = "VAR_OREGON_RECEIVING",
-		ATIReceiving = "VAR_ATI_RECEIVING",
-		VisonicReceiving = "VAR_VISONIC_RECEIVING",
-		MertikReceiving = "VAR_MERTIK_RECEIVING",
-		ADReceiving = "VAR_AD_RECEIVING",
-		HidekiReceiving = "VAR_HIDEKI_RECEIVING",
-		LaCrosseReceiving = "VAR_LACROSSE_RECEIVING",
-		FS20Receiving = "VAR_FS20_RECEIVING",
-		ProGuardReceiving = "VAR_PROGUARD_RECEIVING",
-		BlindsT0Receiving = "VAR_BLINDST0_RECEIVING",
-		BlindsT1Receiving = "VAR_BLINDST1_RECEIVING",
-		AEReceiving = "VAR_AE_RECEIVING",
-		RubicsonReceiving = "VAR_RUBICSON_RECEIVING",
-		FineOffsetReceiving = "VAR_FINEOFFSET_RECEIVING",
-		Lighting4Receiving = "VAR_LIGHTING4_RECEIVING",
-		RSLReceiving = "VAR_RSL_RECEIVING",
-		ByronSXReceiving = "VAR_BYRONSX_RECEIVING",
+		UndecodedReceiving = "VAR_UNDECODED_RECEIVING",
 		ImagintronixReceiving = "VAR_IMAGINTRONIX_RECEIVING",
-		KeelogReceiving = "VAR_KEELOQ_RECEIVING",
+		ByronSXReceiving = "VAR_BYRONSX_RECEIVING",
+		RSLReceiving = "VAR_RSL_RECEIVING",
+		Lighting4Receiving = "VAR_LIGHTING4_RECEIVING",
+		FineOffsetReceiving = "VAR_FINEOFFSET_RECEIVING",
+		RubicsonReceiving = "VAR_RUBICSON_RECEIVING",
+		AEReceiving = "VAR_AE_RECEIVING",
+		BlindsT1Receiving = "VAR_BLINDST1_RECEIVING",
+		BlindsT0Receiving = "VAR_BLINDST0_RECEIVING",
+		ProGuardReceiving = "VAR_PROGUARD_RECEIVING",
+		FS20Receiving = "VAR_FS20_RECEIVING",
+		LaCrosseReceiving = "VAR_LACROSSE_RECEIVING",
+		HidekiReceiving = "VAR_HIDEKI_RECEIVING",
+		ADReceiving = "VAR_AD_RECEIVING",
+		MertikReceiving = "VAR_MERTIK_RECEIVING",
+		VisonicReceiving = "VAR_VISONIC_RECEIVING",
+		ATIReceiving = "VAR_ATI_RECEIVING",
+		OregonReceiving = "VAR_OREGON_RECEIVING",
+		MeiantechReceiving = "VAR_MEIANTECH_RECEIVING",
+		HEUReceiving = "VAR_HEU_RECEIVING",
+		ACReceiving = "VAR_AC_RECEIVING",
+		ARCReceiving = "VAR_ARC_RECEIVING",
+		X10Receiving = "VAR_X10_RECEIVING",
+		FunkbusReceiving = "VAR_FUNKBUS_RECEIVING",
+		MCZReceiving = "VAR_MCZ_RECEIVING",
 		HomeConfortReceiving = "VAR_HOMECONFORT_RECEIVING",
-		UndecodedReceiving = "VAR_UNDECODED_RECEIVING"
+		KeelogReceiving = "VAR_KEELOQ_RECEIVING"
 	}
 
 	local valid = true
 
-	if (protocol == nil or tabProtocols[protocol] == nil)
-		then
-		warning("SetupReceiving: unexpected value for first argument")
-		valid = false
-	end
+	if (protocol == "freqsel") then
+		-- If switching away from 433.42 or 434.50 make sure protocols used
+		-- at those frequencies are disabled.
+		if (typeRFX == 0x54) then
+			setVariable(THIS_DEVICE, tabVars[tabProtocols["FunkbusReceiving"]], "0")
+		elseif (typeRFX == 0x5F) then
+			setVariable(THIS_DEVICE, tabVars[tabProtocols["MCZReceiving"]], "0")
+		end
+		typeRFX = enable
+	else
+		if (protocol == nil or tabProtocols[protocol] == nil)
+			then
+			warning("SetupReceiving: unexpected value for first argument")
+			valid = false
+		end
 
-	if ((enable == "true") or (enable == "yes") or (enable == 1))
-		then
-		enable = "1"
-	elseif ((enable == "false") or (enable == "no") or (enable == 0))
-		then
-		enable = "0"
-	end
-	if ((enable ~= "0") and (enable ~= "1"))
-		then
-		warning("SetupReceiving: unexpected value for second argument")
-		valid = false
-	end
+		if ((enable == "true") or (enable == "yes") or (enable == 1))
+			then
+			enable = "1"
+		elseif ((enable == "false") or (enable == "no") or (enable == 0))
+			then
+			enable = "0"
+		end
+		if ((enable ~= "0") and (enable ~= "1"))
+			then
+			warning("SetupReceiving: unexpected value for second argument")
+			valid = false
+		end
 
-	if (not valid)
-		then
-		task("SetupReceiving: invalid arguments", TASK_ERROR)
-		return
-	end
+		if (not valid)
+			then
+			task("SetupReceiving: invalid arguments", TASK_ERROR)
+			return
+		end
 
-	setVariable(THIS_DEVICE, tabVars[tabProtocols[protocol]], enable)
+		setVariable(THIS_DEVICE, tabVars[tabProtocols[protocol]], enable)
+	end
 	setMode()
 
 end
