@@ -238,6 +238,15 @@ var RFX = {
 			false, undefined, undefined,
 			"L1.5/"
 		],
+		["KANGTAI", "Kangtai", true, false, false, false, false, false,
+			true, 1, 0xFFFF,
+			false, undefined, undefined,
+			false, undefined, undefined,
+			true, 1, 30,
+			false, undefined, undefined,
+			false, undefined, undefined,
+			"L5.B/"
+		],
 		["LIGHTWAVERF_SIEMENS", "LightwaveRF, Siemens", true, true, true, true, false, true,
 			true, 1, 0xFFFFFF,
 			false, undefined, undefined,
@@ -1349,8 +1358,8 @@ function RFX_updateRainGaugeData(device, deviceParent) {
 	// Retrieve the state values we need
 	var lengthUnit = get_device_state(deviceParent, RFX.RFXtrxSID2, "MMLength", 1);
 	try {
-		var units = (lengthUnit == 0) ? " inches" : " mm";
-		var conversionFactor = (lengthUnit == 0) ? RFX.mm2inch : 1.00;
+		var units = (lengthUnit == "0") ? " inches" : " mm";
+		var conversionFactor = (lengthUnit == "0") ? RFX.mm2inch : 1.00;
 		var currentWeek = get_device_state(device, RFX.rainGaugeSID, "WeekNumber", 1) - 1;
 		RFX.lastRainReading = get_device_state(device, RFX.rainGaugeSID, "CurrentTRain", 1);
 		var rateOfRain = get_device_state(device, RFX.rainGaugeSID, "CurrentRain", 1);
