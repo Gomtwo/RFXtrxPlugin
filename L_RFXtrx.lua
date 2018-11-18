@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.60"
+local PLUGIN_VERSION = "1.61"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -88,6 +88,9 @@ end)
 --	return (part1 .. part2)
 --end
 
+--function Message:LogKey()
+--	luup.log("MessageKey: "..self.key)
+--end
 -- Create the message types in a table so we can work with them as a group
 -- Each message is created with a type, subType and length
 local tableMsgTypes = {
@@ -239,7 +242,7 @@ local Command = class(function(a, name, deviceType, variable)
 end)
 
 -- A class method to print a command class object
---local function Command:__tostring()
+--function Command:__tostring()
 --	return("Command - name: " .. self.name .. " deviceType: " .. self.deviceType .. ' variable: ' .. self.variable or 'nil')
 --end
 
@@ -667,6 +670,14 @@ local tableCategories = {
 		false, nil, nil,
 		false, nil, nil,
 	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
+	KANGTAI = {	"Kangtai", true, false, false, false, false, false,
+		true, 1, 0xFFFF,
+		false, nil, nil,
+		false, nil, nil,
+		true, 1, 30,
+		false, nil, nil,
+		false, nil, nil,
+	"L5.B/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
 	RSL2 = {	"Conrad RSL2", true, false, false, false, false, false,
 		true, 1, 0xFFFFFF,
 		false, nil, nil,
@@ -1593,6 +1604,9 @@ local function getRainTableData(deviceNum, variable, size)
 		for v in string.gmatch(tableDataString, "(-?%d+%.?%d*)") do
 			rainTable[#rainTable + 1] = tonumber(v)
 		end
+		if(#rainTable ~= size) then
+			resetRainTable(rainTable, size)
+		end
 	end
 
 	return rainTable
@@ -2374,6 +2388,8 @@ local function decodeMessage(message)
 
 	-- If there is a method to decode this message
 	if(decodeFunction ~= nil) then
+--		debug("Msg decoded: "..tableMsgTypes[tableMsgSelect[key]].key)
+--tableMsgSelect[key].LogKey()
 		tableCmds = decodeFunction(tableMsgSelect[key].subType, data, seqNum)
 		actOnCommands(tableCmds)
 	else
@@ -3277,7 +3293,6 @@ local function decodeTempHumBaro(subType, data)
 end
 
 local function decodeRain(subType, data)
-
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
 	local altid = "R" .. subType .. "/" .. id
 
@@ -3294,12 +3309,14 @@ local function decodeRain(subType, data)
 		lengthConversionFactor = mm2inch
 		unitsSpecifier = " in"
 	end
+	-- If this is not a LaCrosse rain sensor
 	if (subType ~= tableMsgTypes.RAIN6.subType)
 		then
 		rainReading = (string.byte(data, 5) * 65536 + string.byte(data, 6) * 256 + string.byte(data, 7)) / 10
 	else
 		rainReading = string.byte(data, 7)
 	end
+	log("dbgRain: " .. rainReading)
 	-- Determine the device number of the rain sensor
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.RAIN.deviceType)
 	-- If the device doesn't exist just save the rain amount so it will be created
@@ -3309,7 +3326,6 @@ local function decodeRain(subType, data)
 	else
 		-- Get the last reading
 		local previousRain = getVariable(deviceNum, tabVars.VAR_RAIN)
-		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
 		if(previousRain ~= nil) then
 			--Get the old battery time
 			local previousSeconds = getVariable(deviceNum, tabVars.VAR_BATTERY_DATE)
@@ -3327,7 +3343,13 @@ local function decodeRain(subType, data)
 				if(rainDiff < 0) then
 					rainDiff = rainDiff + 16.0
 				end
+			else -- If the new reading is less than the old, assume the sensor has been reset
+				if(rainDiff < 0) then
+					rainDiff = 0.0
+					rainReading = 0
+				end				
 			end
+			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
 			rainDiff = rainDiff * readingConversionFactor
 			-- Get the saved rain data into tables
 			local rainByMinute  = getRainTableData(deviceNum, tabVars.VAR_RAINBYMINUTE, 60)
@@ -3448,16 +3470,7 @@ local function decodeRain(subType, data)
 				table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, rate, 0 ) )
 			else
 				-- use the calculated rate
-
-
-
-
-
-
-
-
 				table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, calculatedRate, 0 ) )
-
 			end
 		end
 	end
