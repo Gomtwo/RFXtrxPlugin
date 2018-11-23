@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.61"
+local PLUGIN_VERSION = "1.62"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -401,6 +401,7 @@ local tabVars = {
 	VAR_FIRMWARE_VERSION = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "FirmwareVersion", false, false, true ),
 	VAR_FIRMWARE_TYPE = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "FirmwareType", false, false, true ),
 	VAR_HARDWARE_VERSION = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "HardwareVersion", false, false, true ),
+	VAR_NOISE = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "NoiseLevel", false, false, true ),
 	VAR_TEMP_UNIT = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "CelciusTemp", true, false, true ),
 	VAR_LENGTH_UNIT = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "MMLength", true, false, true ),
 	VAR_SPEED_UNIT = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "KmhSpeed", true, false, true ),
@@ -516,6 +517,14 @@ local tableDeviceTypes = {
 -- PAIR (KD101/SA30) (activated only): 124
 -- CHIME (activated only): 131-146
 
+--   1-7) Category name = {Displayed name, is a SWITCH_LIGHT, is a DIMMIBLE_LIGHT, is a MOTION_SENSOR, is a DOOR_SENSOR, is a LIGHT_SENSOR, is a WINDOW_COVERING
+--  8-10) has an ID, ID min, ID max
+-- 11-13) has a HouseCode, HouseCode min, HouseCode max
+-- 14-16) has a GroupCode, GroupCode min, GroupCode max
+-- 17-19) has a UnitCode, UnitCode min, UnitCode, max
+-- 20-22) has a SystemCode, SystemCode min, SystemCode max
+-- 23-25) has a Channel, Channel min, Channel max
+-- 26-31) start of altid string, default altid string format, 2nd type, 2nd altid string format, third device type, third altid string format }
 
 local tableCategories = {
 	X10 = {	"X10 lighting", true, false, true, false, true, false,
@@ -2098,7 +2107,7 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 					parameters = parameters .. tabVars.VAR_LIGHT_LEVEL.serviceId .. "," .. tabVars.VAR_LIGHT_LEVEL.name .. "=0"
 				end
 				luup.chdev.append(THIS_DEVICE, child_devices, newDevice.prefix .. deviceId, name,
-				newDevice.deviceType, newDevice.deviceFile, "", parameters, false)
+					newDevice.deviceType, newDevice.deviceFile, "", parameters, false)
 				table.insert(tableDevices, { newDevice.prefix .. deviceId, devType, nil, name })
 			end
 		end
@@ -2470,7 +2479,10 @@ local function decodeResponseMode(subType, data)
 			setVariable(THIS_DEVICE, tabVars.VAR_HARDWARE_VERSION, hardware)
 
 			log("Output power: " .. string.byte(data, 10))
-			log("Receiver noise level: " .. string.byte(data, 12))
+			
+			noise = string.byte(data, 12)
+			log("Receiver noise level: " .. noise)
+			setVariable(THIS_DEVICE, tabVars.VAR_NOISE, noise)
 
 			log("RFXtrx setup to receive protocols:")
 			local msg3 = string.byte(data, 4)
@@ -3316,7 +3328,7 @@ local function decodeRain(subType, data)
 	else
 		rainReading = string.byte(data, 7)
 	end
-	log("dbgRain: " .. rainReading)
+	debug("rainReading: " .. rainReading)
 	-- Determine the device number of the rain sensor
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.RAIN.deviceType)
 	-- If the device doesn't exist just save the rain amount so it will be created
@@ -3326,6 +3338,7 @@ local function decodeRain(subType, data)
 	else
 		-- Get the last reading
 		local previousRain = getVariable(deviceNum, tabVars.VAR_RAIN)
+		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
 		if(previousRain ~= nil) then
 			--Get the old battery time
 			local previousSeconds = getVariable(deviceNum, tabVars.VAR_BATTERY_DATE)
@@ -3347,9 +3360,9 @@ local function decodeRain(subType, data)
 				if(rainDiff < 0) then
 					rainDiff = 0.0
 					rainReading = 0
+					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
 				end				
 			end
-			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
 			rainDiff = rainDiff * readingConversionFactor
 			-- Get the saved rain data into tables
 			local rainByMinute  = getRainTableData(deviceNum, tabVars.VAR_RAINBYMINUTE, 60)
@@ -4582,7 +4595,13 @@ function switchPower(deviceNum, newTargetValue)
 			end
 		else
 			type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-			subType = tonumber(string.sub(id, 7, 7))
+			-- This is a hack to handle subtypes > 15
+			subChar = string.sub(id, 7, 7)
+			if (subChar == "B") then
+				subType = 0x11
+			else
+				subType = tonumber(subchar)
+			end
 			if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
 				then
 				-- Livolo
@@ -5402,7 +5421,13 @@ function groupOff(deviceNum)
 	elseif (category == 5)
 		then
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		subType = tonumber(string.sub(id, 7, 7))
+		-- This is a hack to handle subtypes > 15
+		subChar = string.sub(id, 7, 7)
+		if (subChar == "B") then
+			subType = 0x11
+		else
+			subType = tonumber(subchar)
+		end
 		cmdCode = 0x02
 		if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
 			then
@@ -5547,7 +5572,13 @@ function groupOn(deviceNum)
 		then
 		cmd = tableCommandTypes.CMD_SCENE_ON
 		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		subType = tonumber(string.sub(id, 7, 7))
+		-- This is a hack to handle subtypes > 15
+		subChar = string.sub(id, 7, 7)
+		if (subChar == "B") then
+			subType = 0x11
+		else
+			subType = tonumber(subchar)
+		end
 		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
 		for _, v in pairs(tableCategories)
 			do
