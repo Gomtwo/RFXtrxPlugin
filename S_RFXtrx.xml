@@ -37,6 +37,11 @@
 			<dataType>string</dataType>
 		</stateVariable>
 		<stateVariable sendEvents="no">
+			<name>NoiseLevel</name>
+			<dataType>ui3</dataType>
+			<defaultValue>0</defaultValue>
+		</stateVariable>
+		<stateVariable sendEvents="no">
 			<name>CelciusTemp</name>
 			<dataType>boolean</dataType>
 			<defaultValue>1</defaultValue>
@@ -213,41 +218,43 @@
 			<name>A_ARG_TYPE_category</name>
 			<dataType>string</dataType>
 			<allowedValueList>
-				<allowedValue>X10</allowedValue>
-				<allowedValue>ARC</allowedValue>
-				<allowedValue>ELRO_AB400D</allowedValue>
-				<allowedValue>PHENIX</allowedValue>
-				<allowedValue>WAVEMAN</allowedValue>
-				<allowedValue>EMW200</allowedValue>
-				<allowedValue>IMPULS</allowedValue>
-				<allowedValue>RISINGSUN</allowedValue>
-				<allowedValue>PHILIPS_SBC</allowedValue>
-				<allowedValue>ENERGENIE_ENER010</allowedValue>
-				<allowedValue>ENERGENIE_5GANG</allowedValue>
-				<allowedValue>COCO</allowedValue>
+				<allowedValue>A_OK_AC114</allowedValue>
+				<allowedValue>A_OK_RF01</allowedValue>
 				<allowedValue>AC</allowedValue>
-				<allowedValue>HOMEEASY_EU</allowedValue>
 				<allowedValue>ANSLUT</allowedValue>
-				<allowedValue>IKEA_KOPPLA</allowedValue>
-				<allowedValue>LIGHTWAVERF_SIEMENS</allowedValue>
-				<allowedValue>EMW100</allowedValue>
+				<allowedValue>ARC</allowedValue>
 				<allowedValue>BBSB</allowedValue>
-				<allowedValue>RSL2</allowedValue>
+				<allowedValue>BLYSS</allowedValue>
+				<allowedValue>COCO</allowedValue>
+				<allowedValue>DC_RMF_YOODA</allowedValue>
+				<allowedValue>ELRO_AB400D</allowedValue>
+				<allowedValue>EMW100</allowedValue>
+				<allowedValue>EMW200</allowedValue>
+				<allowedValue>ENERGENIE_5GANG</allowedValue>
+				<allowedValue>ENERGENIE_ENER010</allowedValue>
+				<allowedValue>FOREST</allowedValue>
+				<allowedValue>HARRISON_CURTAIN</allowedValue>
+				<allowedValue>HASTA_NEW</allowedValue>
+				<allowedValue>HASTA_OLD</allowedValue>
+				<allowedValue>HOMEEASY_EU</allowedValue>
+				<allowedValue>IKEA_KOPPLA</allowedValue>
+				<allowedValue>IMPULS</allowedValue>
+				<allowedValue>KANGTAI</allowedValue>
+				<allowedValue>LIGHTWAVERF_SIEMENS</allowedValue>
 				<allowedValue>LIVOLO_1GANG</allowedValue>
 				<allowedValue>LIVOLO_2GANG</allowedValue>
 				<allowedValue>LIVOLO_3GANG</allowedValue>
-				<allowedValue>BLYSS</allowedValue>
-				<allowedValue>HARRISON_CURTAIN</allowedValue>
-				<allowedValue>ROLLERTROL</allowedValue>
-				<allowedValue>HASTA_NEW</allowedValue>
-				<allowedValue>HASTA_OLD</allowedValue>
-				<allowedValue>A_OK_RF01</allowedValue>
-				<allowedValue>A_OK_AC114</allowedValue>
-				<allowedValue>RAEX</allowedValue>
 				<allowedValue>MEDIA_MOUNT</allowedValue>
-				<allowedValue>DC_RMF_YOODA</allowedValue>
-				<allowedValue>FOREST</allowedValue>
+				<allowedValue>PHENIX</allowedValue>
+				<allowedValue>PHILIPS_SBC</allowedValue>
+				<allowedValue>RAEX</allowedValue>
 				<allowedValue>RFY</allowedValue>
+				<allowedValue>RISINGSUN</allowedValue>
+				<allowedValue>ROLLERTROL</allowedValue>
+				<allowedValue>RSL2</allowedValue>
+				<allowedValue>SONOFF</allowedValue>
+				<allowedValue>WAVEMAN</allowedValue>
+				<allowedValue>X10</allowedValue>
 			</allowedValueList>
 		</stateVariable>
 		<stateVariable sendEvents="no">
