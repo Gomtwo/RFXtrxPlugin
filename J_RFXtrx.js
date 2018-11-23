@@ -1713,6 +1713,10 @@ function RFX_showHelp(device) {
 	if (hardware == undefined) {
 		hardware = '';
 	}
+	var noise = get_device_state(device, RFX.RFXtrxSID2, "NoiseLevel", 1);
+	if (noise == undefined) {
+		noise = '';
+	}
 
 	var html = '';
 	html += '<table cellspacing="10">';
@@ -1729,9 +1733,11 @@ function RFX_showHelp(device) {
 	html += '<td>' + firmtype + '</td>';
 	html += '</tr>';
 	html += '<tr>';
-	html += '<td>RFXtrx hardware:</td>';
-	html += '<td>' + hardware + '</td>';
-	html += '</tr>';
+	if (noise > 0) {
+		html += '<td>RFXtrx noise level:</td>';
+		html += '<td>' + noise + '</td>';
+		html += '</tr>';
+	}
 	html += '<tr>';
 	html += '<td>Wiki:</td>';
 	html += '<td><a href="http://code.mios.com/trac/mios_rfxtrx#">link</a></td>';
