@@ -2,7 +2,7 @@ module("L_RFXtrx", package.seeall)
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.62"
+local PLUGIN_VERSION = "1.63"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -542,304 +542,337 @@ local tableDeviceTypes = {
 -- 23-25) has a Channel, Channel min, Channel max
 -- 26-31) start of altid string, default altid string format, 2nd type, 2nd altid string format, third device type, third altid string format }
 
+-- Define a class for parameter limits
+local Limit = class(function(a, minimum, maximum)
+	a.minimum = minimum			-- the minimum value for the parameter
+	a.maximum = maximum			-- the maximum value for the parameter
+end)
+
+-- Define a class for a device category
+-- A category is a specific subtype of one of the device types shown above
+local Category = class(function(a, displayName, isaLIGHT, isaDIMMER, isaMOTION_SENSOR, isaDOOR_SENSOR, isaLIGHT_SENSOR, isaWINDOW_COVERING,
+						idLimits, houseCodeLimits, groupCodeLimits, unitCodeLimits, systemCodeLimits, channelLimits,
+						subID, altidFmt, type2, altid2Fmt, type3, altid3Fmt)
+	a.displayName = displayName
+	a.isaLIGHT = isaLIGHT
+	a.isaDIMMER = isaDIMMER
+	a.isaMOTION_SENSOR = isaMOTION_SENSOR
+	a.isaDOOR_SENSOR = isaDOOR_SENSOR
+	a.isaLIGHT_SENSOR = isaLIGHT_SENSOR
+	a.isaWINDOW_COVERING = isaWINDOW_COVERING
+	a.idLimits = idLimits
+	a.houseCodeLimits = houseCodeLimits
+	a.groupCodeLimits = groupCodeLimits
+	a.unitCodeLimits = unitCodeLimits
+	a.systemCodeLimits = systemCodeLimits
+	a.channelLimits = channelLimits
+	a.subID = subID
+	a.altidFmt = altidFmt
+	a.type2 = type2
+	a.altid2Fmt = altid2Fmt
+	a.type3 = type3
+	a.altid3Fmt = altid3Fmt
+end)
+
 local tableCategories = {
-	A_OK_AC114 = {	"A-OK AC114", false, false, false, false, false, true,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"B3/", "%s%06X/00", nil, nil, nil, nil	},
-	A_OK_RF01 = {	"A-OK RF01", false, false, false, false, false, true,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"B2/", "%s%06X/00", nil, nil, nil, nil	},
-	AC = {	"AC", true, true, true, true, true, true,
-		true, 1, 0x3FFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
-	ANSLUT = {	"ANSLUT", true, true, false, false, false, false,
-		true, 1, 0x3FFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
-	ARC = {	"ARC", true, false, true, true, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
-	BBSB = {	"Bye Bye Standby (new)", true, false, false, false, false, false,
-		true, 1, 0x7FFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 6,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
-	BLYSS = {	"Blyss", true, false, true, true, false, false,
-		true, 0, 0xFFFF,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		true, 1, 5,
-		false, nil, nil,
-		false, nil, nil,
-	"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	},
-	COCO = {	"COCO GDR2-2000R", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x44,
-		false, nil, nil,
-		true, 1, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.A/", "%s%s%02d", nil, nil, nil, nil	},
-	DC_RMF_YOODA = {	"DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true,
-		true, 1, 0x0FFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 15,
-		false, nil, nil,
-		false, nil, nil,
-	"B6/", "%s%07X/%02d", nil, nil, nil, nil	},
-	ELRO_AB400D = {	"ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 64,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
-	EMW100 = {	"GAO/Everflourish EMW100", true, false, false, false, false, false,
-		true, 1, 0x3FFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	},
-	EMW200 = {	"Chacon EMW200", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x43,
-		false, nil, nil,
-		true, 1, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.4/", "%s%s%02d", nil, nil, nil, nil	},
-	ENERGENIE_5GANG = {	"Energenie 5 gang", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 10,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.9/", "%s%s%02d", nil, nil, nil, nil	},
-	ENERGENIE_ENER010 = {	"Energenie ENER010", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
-	FOREST = {	"Forest", false, false, false, false, false, true,
-		true, 1, 0x0FFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 15,
-		false, nil, nil,
-		false, nil, nil,
-	"B7/", "%s%07X/%02d", nil, nil, nil, nil	},
-	HARRISON_CURTAIN = {	"Harrison Curtain", false, false, false, false, false, true,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"C0/", "%s%s%02d", nil, nil, nil, nil	},
-	HASTA_NEW = {	"Hasta (new)", false, false, false, false, false, true,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 15,
-		false, nil, nil,
-		false, nil, nil,
-	"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
-	HASTA_OLD = {	"Hasta (old)", false, false, false, false, false, true,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 15,
-		false, nil, nil,
-		false, nil, nil,
-	"B1/", "%s%06X/%02d", nil, nil, nil, nil	},
-	HOMEEASY_EU = {	"HomeEasy EU", true, true, false, false, false, false,
-		true, 1, 0x3FFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	},
-	IKEA_KOPPLA = {	"Ikea Koppla", true, false, false, false, false, false,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		true, 1, 10,
-	"L3.0/", "%s%X%02d", nil, nil, nil, nil	},
-	IMPULS = {	"Impuls", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 64,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.5/", "%s%s%02d", nil, nil, nil, nil	},
-	KANGTAI = {	"Kangtai", true, false, false, false, false, false,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 30,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.B/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
-	LIGHTWAVERF_SIEMENS = {	"LightwaveRF, Siemens", true, true, true, true, false, true,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	},
-	LIVOLO_1GANG = {	"Livolo (1 gang)", true, true, false, false, false, false,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.5/", "%s%06X/1", nil, nil, nil, nil	},
-	LIVOLO_2GANG = {	"Livolo (2 gang)", true, false, false, false, false, false,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	},
-	LIVOLO_3GANG = {	"Livolo (3 gang)", true, false, false, false, false, false,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	},
-	MEDIA_MOUNT = {	"Media Mount projector screen", false, false, false, false, false, true,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"B5/", "%s%06X/00", nil, nil, nil, nil	},
-	PHENIX = {	"Phenix", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 32,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.2/", "%s%s%02d", nil, nil, nil, nil	},
-	PHILIPS_SBC = {	"Philips SBC", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 8,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	},
-	RAEX = {	"Raex YR1326 T16 motor", false, false, false, false, false, true,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"B4/", "%s%06X/00", nil, nil, nil, nil	},
-	RFY = {	"RFY", false, false, false, false, false, true,
-		true, 1, 0x0FFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	},
-	RISINGSUN = {	"RisingSun", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x44,
-		false, nil, nil,
-		true, 1, 4,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.6/", "%s%s%02d", nil, nil, nil, nil	},
-	ROLLERTROL = {	"RollerTrol", false, false, false, false, false, true,
-		true, 1, 0xFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 0, 15,
-		false, nil, nil,
-		false, nil, nil,
-	"B0/", "%s%06X/%02d", nil, nil, nil, nil	},
-	RSL2 = {	"Conrad RSL2", true, false, false, false, false, false,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	},
-	SONOFF = {	"Sonoff Smart Switch", true, false, false, false, false, false,
-		true, 1, 0xFFFFFF,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-		false, nil, nil,
-	"L4/", "%s%06X/00", nil, nil, nil, nil	},
-	WAVEMAN = {	"Waveman", true, false, false, false, false, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.3/", "%s%s%02d", nil, nil, nil, nil	},
-	X10 = {	"X10 lighting", true, false, true, false, true, false,
-		false, nil, nil,
-		true, 0x41, 0x50,
-		false, nil, nil,
-		true, 1, 16,
-		false, nil, nil,
-		false, nil, nil,
-	"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	}
+	A_OK_AC114 = Category(	"A-OK AC114", false, false, false, false, false, true,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B3/", "%s%06X/00", nil, nil, nil, nil	),
+	A_OK_RF01 = Category(	"A-OK RF01", false, false, false, false, false, true,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B2/", "%s%06X/00", nil, nil, nil, nil	),
+	AC = Category(	"AC", true, true, true, true, true, true,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	ANSLUT = Category(	"ANSLUT", true, true, false, false, false, false,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	ARC = Category(	"ARC", true, false, true, true, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	BBSB = Category(	"Bye Bye Standby (new)", true, false, false, false, false, false,
+		Limit(1, 0x7FFFF),
+		nil,
+		nil,
+		Limit(1, 6),
+		nil,
+		nil,
+	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	BLYSS = Category(	"Blyss", true, false, true, true, false, false,
+		Limit(0, 0xFFFF),
+		nil,
+		Limit(0x41, 0x50),
+		Limit(1, 5),
+		nil,
+		nil,
+	"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	),
+	COCO = Category(	"COCO GDR2-2000R", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x44),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.A/", "%s%s%02d", nil, nil, nil, nil	),
+	DC_RMF_YOODA = Category(	"DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true,
+		Limit(1, 0x0FFFFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B6/", "%s%07X/%02d", nil, nil, nil, nil	),
+	ELRO_AB400D = Category(	"ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 64),
+		nil,
+		nil,
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
+	EMW100 = Category(	"GAO/Everflourish EMW100", true, false, false, false, false, false,
+		Limit(1, 0x3FFF),
+		nil,
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	),
+	EMW200 = Category(	"Chacon EMW200", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x43),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.4/", "%s%s%02d", nil, nil, nil, nil	),
+	ENERGENIE_5GANG = Category(	"Energenie 5 gang", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 10),
+		nil,
+		nil,
+	"L1.9/", "%s%s%02d", nil, nil, nil, nil	),
+	ENERGENIE_ENER010 = Category(	"Energenie ENER010", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	FOREST = Category(	"Forest", false, false, false, false, false, true,
+		Limit(1, 0x0FFFFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B7/", "%s%07X/%02d", nil, nil, nil, nil	),
+	HARRISON_CURTAIN = Category(	"Harrison Curtain", false, false, false, false, false, true,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"C0/", "%s%s%02d", nil, nil, nil, nil	),
+	HASTA_NEW = Category(	"Hasta (new)", false, false, false, false, false, true,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
+	HASTA_OLD = Category(	"Hasta (old)", false, false, false, false, false, true,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B1/", "%s%06X/%02d", nil, nil, nil, nil	),
+	HOMEEASY_EU = Category(	"HomeEasy EU", true, true, false, false, false, false,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	IKEA_KOPPLA = Category(	"Ikea Koppla", true, false, false, false, false, false,
+		nil,
+		nil,
+		nil,
+		nil,
+		Limit(1, 16),
+		Limit(1, 10),
+	"L3.0/", "%s%X%02d", nil, nil, nil, nil	),
+	IMPULS = Category(	"Impuls", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 64),
+		nil,
+		nil,
+	"L1.5/", "%s%s%02d", nil, nil, nil, nil	),
+	KANGTAI = Category(	"Kangtai", true, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(1,30),
+		nil,
+		nil,
+	"L5.B/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	LIGHTWAVERF_SIEMENS = Category(	"LightwaveRF, Siemens", true, true, true, true, false, true,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	),
+	LIVOLO_1GANG = Category(	"Livolo (1 gang)", true, true, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", nil, nil, nil, nil	),
+	LIVOLO_2GANG = Category(	"Livolo (2 gang)", true, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	),
+	LIVOLO_3GANG = Category(	"Livolo (3 gang)", true, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	),
+	MEDIA_MOUNT = Category(	"Media Mount projector screen", false, false, false, false, false, true,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B5/", "%s%06X/00", nil, nil, nil, nil	),
+	PHENIX = Category(	"Phenix", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1,32),
+		nil,
+		nil,
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
+	PHILIPS_SBC = Category(	"Philips SBC", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 8),
+		nil,
+		nil,
+	"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	RAEX = Category(	"Raex YR1326 T16 motor", false, false, false, false, false, true,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B4/", "%s%06X/00", nil, nil, nil, nil	),
+	RFY = Category(	"RFY", false, false, false, false, false, true,
+		Limit(1, 0x0FFFFF),
+		nil,
+		nil,
+		Limit(0, 4),
+		nil,
+		nil,
+	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	),
+	RISINGSUN = Category(	"RisingSun", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x44),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.6/", "%s%s%02d", nil, nil, nil, nil	),
+	ROLLERTROL = Category(	"RollerTrol", false, false, false, false, false, true,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
+	RSL2 = Category(	"Conrad RSL2", true, false, false, false, false, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	SONOFF = Category(	"Sonoff Smart Switch", true, false, false, false, false, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L4/", "%s%06X/00", nil, nil, nil, nil	),
+	WAVEMAN = Category(	"Waveman", true, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.3/", "%s%s%02d", nil, nil, nil, nil	),
+	X10 = Category(	"X10 lighting", true, false, true, false, true, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	)
 }
+
 
 -- J_RFXtrx.js depends on the text of these table items
 local tableHardwareType = {
@@ -1059,9 +1092,9 @@ local function setDefaultValue(deviceNum, variable, value)
 end
 
 local function setVariable(deviceNum, variable, value)
-	debug("deviceNum: "..deviceNum.." variable: "..variable.name.." value: "..tostring(value))
 	if (variable ~= nil and value ~= nil)
 		then
+		debug("setVariable - deviceNum: "..deviceNum.." variable: "..(variable.name or "nil").." value: "..tostring(value))
 		if (type(value) == "number") then
 			value = tostring(value)
 		elseif (type(value) == 'boolean') then
@@ -1103,6 +1136,8 @@ local function setVariable(deviceNum, variable, value)
 			then
 			setVariable(deviceNum, tabVars.VAR_BATTERY_DATE, os.time())
 		end
+	else
+		debug("setVariable - deviceNum: "..deviceNum.." variable: no variable given none set")
 	end
 end
 
@@ -5840,18 +5875,18 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 		then
 		warning("action CreateNewDevice: invalid value for the DeviceType argument")
 		valid = false
-	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category][2])
-		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
-		or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
-		or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
-		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
-		or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
+	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category].isaLIGHT)
+		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category].isaDIMMER)
+		or (deviceType == "MOTION_SENSOR" and not tableCategories[category].isaMOTION_SENSOR)
+		or (deviceType == "DOOR_SENSOR" and not tableCategories[category].isaDOOR_SENSOR)
+		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category].isaLIGHT_SENSOR)
+		or (deviceType == "WINDOW_COVERING" and not tableCategories[category].isaWINDOW_COVERING))
 		then
 		warning("action CreateNewDevice: DeviceType value not accepted for this category")
 		valid = false
 	end
 
-	if (tableCategories[category][8])
+	if (tableCategories[category].idLimits)
 		then
 		if (id == nil)
 			then
@@ -5861,19 +5896,19 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the Id argument")
 			valid = false
-		elseif (tableCategories[category][9] ~= nil and tableCategories[category][10] ~= nil
-			and (tonumber(id) < tableCategories[category][9]
-			or tonumber(id) > tableCategories[category][10]))
+		elseif (tableCategories[category].idLimits.minimum ~= nil and tableCategories[category].idLimits.maximum ~= nil
+			and (tonumber(id) < tableCategories[category].idLimits.minimum
+			or tonumber(id) > tableCategories[category].idLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the Id argument must be in range %d - %d",
-			tableCategories[category][9],
-			tableCategories[category][10]))
+			tableCategories[category].idLimits.minimum,
+			tableCategories[category].idLimits.maximum))
 			valid = false
 		else
 			table.insert(params, tonumber(id))
 		end
 	end
-	if (tableCategories[category][11])
+	if (tableCategories[category].houseCodeLimits)
 		then
 		if (houseCode == nil)
 			then
@@ -5883,19 +5918,19 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the HouseCode argument")
 			valid = false
-		elseif (tableCategories[category][12] ~= nil and tableCategories[category][13] ~= nil
-			and (string.byte(houseCode) < tableCategories[category][12]
-			or string.byte(houseCode) > tableCategories[category][13]))
+		elseif (tableCategories[category].houseCodeLimits.minimum ~= nil and tableCategories[category].houseCodeLimits.maximum ~= nil
+			and (string.byte(houseCode) < tableCategories[category].houseCodeLimits.minimum
+			or string.byte(houseCode) > tableCategories[category].houseCodeLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the HouseCode argument must be in range %s - %s",
-			string.char(tableCategories[category][12]),
-			string.char(tableCategories[category][13])))
+			string.char(tableCategories[category].houseCodeLimits.minimum),
+			string.char(tableCategories[category].houseCodeLimits.maximum)))
 			valid = false
 		else
 			table.insert(params, houseCode)
 		end
 	end
-	if (tableCategories[category][14])
+	if (tableCategories[category].groupCodeLimits)
 		then
 		if (groupCode == nil)
 			then
@@ -5905,19 +5940,19 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the GroupCode argument")
 			valid = false
-		elseif (tableCategories[category][15] ~= nil and tableCategories[category][16] ~= nil
-			and (string.byte(groupCode) < tableCategories[category][15]
-			or string.byte(groupCode) > tableCategories[category][16]))
+		elseif (tableCategories[category].groupCodeLimits.minimum ~= nil and tableCategories[category].groupCodeLimits.maximum ~= nil
+			and (string.byte(groupCode) < tableCategories[category].groupCodeLimits.minimum
+			or string.byte(groupCode) > tableCategories[category].groupCodeLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the GroupCode argument must be in range %s - %s",
-			string.char(tableCategories[category][15]),
-			string.char(tableCategories[category][16])))
+			string.char(tableCategories[category].groupCodeLimits.minimum),
+			string.char(tableCategories[category].groupCodeLimits.maximum)))
 			valid = false
 		else
 			table.insert(params, groupCode)
 		end
 	end
-	if (tableCategories[category][17])
+	if (tableCategories[category].unitCodeLimits)
 		then
 		if (unitCode == nil)
 			then
@@ -5927,19 +5962,19 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the UnitCode argument")
 			valid = false
-		elseif (tableCategories[category][18] ~= nil and tableCategories[category][19] ~= nil
-			and (tonumber(unitCode) < tableCategories[category][18]
-			or tonumber(unitCode) > tableCategories[category][19]))
+		elseif (tableCategories[category].unitCodeLimits.minimum ~= nil and tableCategories[category].unitCodeLimits.maximum ~= nil
+			and (tonumber(unitCode) < tableCategories[category].unitCodeLimits.minimum
+			or tonumber(unitCode) > tableCategories[category].unitCodeLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the UnitCode argument must be in range %d - %d",
-			tableCategories[category][18],
-			tableCategories[category][19]))
+			tableCategories[category].unitCodeLimits.minimum,
+			tableCategories[category].unitCodeLimits.maximum))
 			valid = false
 		else
 			table.insert(params, unitCode)
 		end
 	end
-	if (tableCategories[category][20])
+	if (tableCategories[category].systemCodeLimits)
 		then
 		if (systemCode == nil)
 			then
@@ -5949,19 +5984,19 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the SystemCode argument")
 			valid = false
-		elseif (tableCategories[category][21] ~= nil and tableCategories[category][22] ~= nil
-			and (tonumber(systemCode) < tableCategories[category][21]
-			or tonumber(systemCode) > tableCategories[category][22]))
+		elseif (tableCategories[category].systemCodeLimits.minimum ~= nil and tableCategories[category].systemCodeLimits.maximum ~= nil
+			and (tonumber(systemCode) < tableCategories[category].systemCodeLimits.minimum
+			or tonumber(systemCode) > tableCategories[category].systemCodeLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the SystemCode argument must be in range %d - %d",
-			tableCategories[category][21],
-			tableCategories[category][22]))
+			tableCategories[category].systemCodeLimits.minimum,
+			tableCategories[category].systemCodeLimits.maximum))
 			valid = false
 		else
 			table.insert(params, tonumber(systemCode-1))
 		end
 	end
-	if (tableCategories[category][23])
+	if (tableCategories[category].channelLimits)
 		then
 		if (channel == nil)
 			then
@@ -5971,13 +6006,13 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the Channel argument")
 			valid = false
-		elseif (tableCategories[category][24] ~= nil and tableCategories[category][25] ~= nil
-			and (tonumber(channel) < tableCategories[category][24]
-			or tonumber(channel) > tableCategories[category][25]))
+		elseif (tableCategories[category].channelLimits.minimum ~= nil and tableCategories[category].channelLimits.maximum ~= nil
+			and (tonumber(channel) < tableCategories[category].channelLimits.minimum
+			or tonumber(channel) > tableCategories[category].channelLimits.maximum))
 			then
 			warning(string.format("action CreateNewDevice: value for the Channel argument must be in range %d - %d",
-			tableCategories[category][24],
-			tableCategories[category][25]))
+			tableCategories[category].channelLimits.minimum,
+			tableCategories[category].channelLimits.maximum))
 			valid = false
 		else
 			table.insert(params, tonumber(channel))
@@ -6021,28 +6056,28 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 	end
 
 	local devices = {}
-	local altid = string.format(tableCategories[category][27], tableCategories[category][26],
+	local altid = string.format(tableCategories[category].altidFmt, tableCategories[category].subID,
 	params[1], params[2], params[3])
 	if (findChild(THIS_DEVICE, altid, nil) == nil)
 		then
 		table.insert(devices, { name, nil, altid, devType })
 	end
-	if (tableCategories[category][28] ~= nil and tableCategories[category][29] ~= nil)
+	if (tableCategories[category].type2 ~= nil and tableCategories[category].altid2Fmt ~= nil)
 		then
-		altid = string.format(tableCategories[category][29], tableCategories[category][26],
+		altid = string.format(tableCategories[category].altid2Fmt, tableCategories[category].subID,
 		params[1], params[2], params[3])
 		if (findChild(THIS_DEVICE, altid, nil) == nil)
 			then
-			table.insert(devices, { name, nil, altid, tableCategories[category][28] })
+			table.insert(devices, { name, nil, altid, tableCategories[category].type2 })
 		end
 	end
-	if (tableCategories[category][30] ~= nil and tableCategories[category][31] ~= nil)
+	if (tableCategories[category].type3 ~= nil and tableCategories[category].altid3Fmt ~= nil)
 		then
-		altid = string.format(tableCategories[category][31], tableCategories[category][26],
+		altid = string.format(tableCategories[category].altid3Fmt, tableCategories[category].subID,
 		params[1], params[2], params[3])
 		if (findChild(THIS_DEVICE, altid, nil) == nil)
 			then
-			table.insert(devices, { name, nil, altid, tableCategories[category][30] })
+			table.insert(devices, { name, nil, altid, tableCategories[category].type3 })
 		end
 	end
 	if (#devices > 0)
@@ -6125,12 +6160,12 @@ function changeDeviceType(deviceId, deviceType, name)
 		warning("action ChangeDeviceType: invalid value for the DeviceType argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
-	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category][2])
-		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category][3])
-		or (deviceType == "MOTION_SENSOR" and not tableCategories[category][4])
-		or (deviceType == "DOOR_SENSOR" and not tableCategories[category][5])
-		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category][6])
-		or (deviceType == "WINDOW_COVERING" and not tableCategories[category][7]))
+	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category].isaLIGHT)
+		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category].isaDIMMER)
+		or (deviceType == "MOTION_SENSOR" and not tableCategories[category].isaMOTION_SENSOR)
+		or (deviceType == "DOOR_SENSOR" and not tableCategories[category].isaDOOR_SENSOR)
+		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category].isaLIGHT_SENSOR)
+		or (deviceType == "WINDOW_COVERING" and not tableCategories[category].isaWINDOW_COVERING))
 		then
 		warning("action ChangeDeviceType: DeviceType value not accepted for the device " .. deviceId)
 		task("ChangeDeviceType: new type forbidden for this device", TASK_ERROR)
@@ -6217,7 +6252,7 @@ function sendUnusualCommand(deviceId, commandType)
 
 	local id = luup.devices[deviceId].id
 
-	local tableCommandTypes = {
+	local tableUnusualCmds = {
 		{ "L5.1/", "LEARN", tableMsgTypes.LIGHTING_EMW100.type, tableMsgTypes.LIGHTING_EMW100.subType, 0x02 },
 		{ "L3.0/", "PROGRAM", tableMsgTypes.LIGHTING_KOPPLA.type, tableMsgTypes.LIGHTING_KOPPLA.subType, 0x1C },
 		{ "C0/", "PROGRAM", tableMsgTypes.CURTAIN_HARRISON.type, tableMsgTypes.CURTAIN_HARRISON.subType, 0x03 },
@@ -6240,7 +6275,7 @@ function sendUnusualCommand(deviceId, commandType)
 	}
 
 	local idxCmd = nil
-	for k, v in pairs(tableCommandTypes)
+	for k, v in pairs(tableUnusualCmds)
 		do
 		if ((string.find(id, v[1], 4) == 4) and (commandType == v[2]))
 			then
@@ -6255,7 +6290,7 @@ function sendUnusualCommand(deviceId, commandType)
 		return
 	end
 
-	debug("Command " .. tableCommandTypes[idxCmd].name .. " " .. tableCommandTypes[idxCmd].deviceType)
+	debug("Command " .. tableUnusualCmds[idxCmd][1] .. " " .. tableUnusualCmds[idxCmd][2])
 
 	local remoteId
 	local housecode
@@ -6270,7 +6305,7 @@ function sendUnusualCommand(deviceId, commandType)
 		tonumber(string.sub(remoteId, 3, 4), 16),
 		tonumber(string.sub(remoteId, 5, 6), 16),
 		tonumber(string.sub(remoteId, 8, 9)),
-		tableCommandTypes[idxCmd][5], 0, 0)
+		tableUnusualCmds[idxCmd][5], 0, 0)
 	elseif (idxCmd == 2)
 		then
 		remoteId = tonumber(string.sub(id, 9, 9), 16)
@@ -6292,16 +6327,16 @@ function sendUnusualCommand(deviceId, commandType)
 				channel2 = bitw.lshift(channel2, unitcode-9)
 			end
 		end
-		data = string.char(remoteId, channel1, channel2, tableCommandTypes[idxCmd][5], 0)
+		data = string.char(remoteId, channel1, channel2, tableUnusualCmds[idxCmd][5], 0)
 	elseif (idxCmd == 3)
 		then
 		housecode = string.sub(id, 7, 7)
 		unitcode = tonumber(string.sub(id, 8, 9))
-		data = housecode .. string.char(unitcode, tableCommandTypes[idxCmd][5], 0)
+		data = housecode .. string.char(unitcode, tableUnusualCmds[idxCmd][5], 0)
 	elseif (idxCmd >= 4 and idxCmd <= 10)
 		then
 		remoteId = string.sub(id, 7, 12)
-		if (tableCommandTypes[idxCmd][4] == tableMsgTypes.BLIND_T6.subType or tableCommandTypes[idxCmd][4] == tableMsgTypes.BLIND_T7.subType)
+		if (tableUnusualCmds[idxCmd][4] == tableMsgTypes.BLIND_T6.subType or tableUnusualCmds[idxCmd][4] == tableMsgTypes.BLIND_T7.subType)
 			then
 			id4 = tonumber(string.sub(id, 13, 13), 16)
 			unitcode = tonumber(string.sub(id, 15, 16)) % 16
@@ -6312,7 +6347,7 @@ function sendUnusualCommand(deviceId, commandType)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
 		tonumber(string.sub(remoteId, 3, 4), 16),
 		tonumber(string.sub(remoteId, 5, 6), 16),
-		id4 * 16 + unitcode, tableCommandTypes[idxCmd][5], 0)
+		id4 * 16 + unitcode, tableUnusualCmds[idxCmd][5], 0)
 	elseif (idxCmd >= 11 and idxCmd <= 19)
 		then
 		remoteId = string.sub(id, 9, 13)
@@ -6320,14 +6355,14 @@ function sendUnusualCommand(deviceId, commandType)
 		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
 		tonumber(string.sub(remoteId, 2, 3), 16),
 		tonumber(string.sub(remoteId, 4, 5), 16),
-		unitcode, tableCommandTypes[idxCmd][5], 0, 0, 0, 0)
+		unitcode, tableUnusualCmds[idxCmd][5], 0, 0, 0, 0)
 	end
 
 	if (data ~= nil)
 		then
 		local tableCmds = {}
 		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), "", nil, 0 ))
-		sendCommand(tableCommandTypes[idxCmd][3], tableCommandTypes[idxCmd][4], data, tableCmds)
+		sendCommand(tableUnusualCmds[idxCmd][3], tableUnusualCmds[idxCmd][4], data, tableCmds)
 	end
 
 end
