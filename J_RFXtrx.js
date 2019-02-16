@@ -15,6 +15,7 @@ var RFX = {
 	userData: undefined,
 	mm2inch: 0.03937008,
 	tempUnit: '&deg;C',
+	speedUnit: ' km/h',
 	lastMessage: "",
 	messageUpdateTimer: undefined,
 	lastRainReading: -1,
@@ -40,678 +41,714 @@ var RFX = {
 	// 23 enable a channel number selection between values of items 24 and 25
 	// 26 the device subtype
  	categories: [
-		["AC", "AC", true, true, true, true, true, true,
-			true, 1, 0x3FFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L2.0/"
-		],
-		["ANSLUT", "ANSLUT", true, true, false, false, false, false,
-			true, 1, 0x3FFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L2.2/"
-		],
-		["A_OK_AC114", "A-OK AC114", false, false, false, false, false, true,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B3/"
-		],
-		["A_OK_RF01", "A-OK RF01", false, false, false, false, false, true,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B2/"
-		],
-		["ARC", "ARC", true, false, true, true, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.1/"
-		],
-		["BLYSS", "Blyss", true, false, true, true, false, false,
-			true, 0, 0xFFFF,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			true, 1, 5,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L6.0/"
-		],
-		["BBSB", "Bye Bye Standby (new)", true, false, false, false, false, false,
-			true, 1, 0x7FFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 6,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.2/"
-		],
-		["EMW200", "Chacon EMW200", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'C',
-			false, undefined, undefined,
-			true, 1, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.4/"
-		],
-		["COCO", "COCO GDR2-2000R", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'D',
-			false, undefined, undefined,
-			true, 1, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.A/"
-		],
-		["RSL2", "Conrad RSL2", true, false, false, false, false, false,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.4/"
-		],
-		["DC_RMF_YOODA", "DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true,
-			true, 1, 0x0FFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 15,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B6/"
-		],
-		["ELRO_AB400D", "ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 64,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.2/"
-		],
-		["ENERGENIE_5GANG", "Energenie 5 gang", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 10,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.9/"
-		],
-		["ENERGENIE_ENER010", "Energenie ENER010", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.8/"
-		],
-		["FOREST", "Forest", false, false, false, false, false, true,
-			true, 1, 0x0FFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 15,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B7/"
-		],
-		["EMW100", "GAO/Everflourish EMW100", true, false, false, false, false, false,
-			true, 1, 0x3FFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.1/"
-		],
-		["HARRISON_CURTAIN", "Harrison Curtain", false, false, false, false, false, true,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"C0/"
-		],
-		["HASTA_NEW", "Hasta (new)", false, false, false, false, false, true,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 15,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B0/"
-		],
-		["HASTA_OLD", "Hasta (old)", false, false, false, false, false, true,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 15,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B1/"
-		],
-		["HOMEEASY_EU", "HomeEasy EU", true, true, false, false, false, false,
-			true, 1, 0x3FFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L2.1/"
-		],
-		["IKEA_KOPPLA", "Ikea Koppla", true, false, false, false, false, false,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			true, 1, 10,
-			"L3.0/"
-		],
-		["IMPULS", "Impuls", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 64,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.5/"
-		],
-		["KANGTAI", "Kangtai", true, false, false, false, false, false,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 30,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.B/"
-		],
-		["LIGHTWAVERF_SIEMENS", "LightwaveRF, Siemens", true, true, true, true, false, true,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.0/"
-		],
-		["LIVOLO_1GANG", "Livolo (1 gang)", true, true, false, false, false, false,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.5/"
-		],
-		["LIVOLO_2GANG", "Livolo (2 gang)", true, false, false, false, false, false,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.5/"
-		],
-		["LIVOLO_3GANG", "Livolo (3 gang)", true, false, false, false, false, false,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L5.5/"
-		],
-		["MEDIA_MOUNT", "Media Mount projector screen", false, false, false, false, false, true,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B5/"
-		],
-		["PHENIX", "Phenix", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 32,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.2/"
-		],
-		["PHILIPS_SBC", "Philips SBC", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 8,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.7/"
-		],
-		["RAEX", "Raex YR1326 T16 motor", false, false, false, false, false, true,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B4/"
-		],
-		["RFY", "RFY", false, false, false, false, false, true,
-			true, 1, 0x0FFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"RFY0/"
-		],
-		["RISINGSUN", "RisingSun", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'D',
-			false, undefined, undefined,
-			true, 1, 4,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.6/"
-		],
-		["ROLLERTROL", "RollerTrol", false, false, false, false, false, true,
-			true, 1, 0xFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			true, 0, 15,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"B0/"
-		],
-		// A new device in the SONOFF category will be created as a LIGHT_SWITCH device
-		//  Adding a new type of creatable device will require changing of indexes all
-		//  over the place. Some redesign is neede here. This will do for now.
-		["SONOFF", "Sonoff Smart Switch", true, false, false, false, false, false,
-			true, 1, 0xFFFFFF,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L4/"
-		],
-		["WAVEMAN", "Waveman", true, false, false, false, false, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.3/"
-		],
-		["X10", "X10 lighting", true, false, true, false, true, false,
-			false, undefined, undefined,
-			true, 'A', 'P',
-			false, undefined, undefined,
-			true, 1, 16,
-			false, undefined, undefined,
-			false, undefined, undefined,
-			"L1.0/"
-		],
-		["TEMP1", "Oregon THR128/138, THC138", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T1/"],
-		["TEMP2", "Oregon THC238/268, ...", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T2/"],
-		["TEMP3", "Oregon THWR800", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T3/"],
-		["TEMP4", "Oregon RTHN318", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T4/"],
-		["TEMP5", "La Crosse temp", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T5/"],
-		["TEMP6", "Honeywell TS15C", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T6/"],
-		["TEMP7", "Viking 02811, Proove TSS330/311346", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T7/"],
-		["TEMP8", "La Crosse WS2300 (temp)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T8/"],
-		["TEMP9", "Rubicson temp", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T9/"],
-		["TEMP10", "TFA 30.3133, 30.3160", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T10/"],
-		["TEMP11", "Swimming pool WT0122", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"T10/"],
-		["HUM1", "La Crosse hum", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"H1/"],
-		["HUM2", "La Crosse WS2300 (hum)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"H2/"],
-		["TEMP_HUM1", "Oregon THGN122, ...", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH1/"],
-		["TEMP_HUM2", "Oregon THGR810, THGN800", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH2/"],
-		["TEMP_HUM3", "Oregon RTGR328", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH3/"],
-		["TEMP_HUM4", "Oregon THGR328", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH4/"],
-		["TEMP_HUM5", "Oregon WTGR800 (TempHum)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH5/"],
-		["TEMP_HUM6", "Oregon THGR918, THGRN228, ...", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH6/"],
-		["TEMP_HUM7", "TFA TS34C, Cresta", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH7/"],
-		["TEMP_HUM8", "UPM WT450H", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH8/"],
-		["TEMP_HUM9", "Viking 02035/02038, Proove TSS320/311501", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH9/"],
-		["TEMP_HUM10", "Rubicson TempHum", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH10/"],
-		["TEMP_HUM11", "Oregon EW109", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH11/"],
-		["TEMP_HUM12", "Imagintronix Soil sensor", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH12/"],
-		["TEMP_HUM13", "Alecto WS1700", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH13/"],
-		["TEMP_HUM14", "Alecto WS4500", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TH14/"],
-		["BARO1", "Barometer", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"B1/"],
-		["TEMP_HUM_BARO1", "Oregon BTHR918, BTHGN129", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"THB1/"],
-		["TEMP_HUM_BARO2", "Oregon BTHR918N, BTHR968", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"THB2/"],
-		["RAIN1", "Oregon RGR126/682/918", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R1/"],
-		["RAIN2", "Oregon PCR800", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R2/"],
-		["RAIN3", "TFA rain", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R3/"],
-		["RAIN4", "UPM RG700", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R4/"],
-		["RAIN5", "La Crosse WS2300 (rain)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R5/"],
-		["RAIN7", "Alecto WS4500", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"R7/"],
-		["TEMP_RAIN1", "Alecto WS1200", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"TR1/"],
-		["WIND1", "Oregon WTGR800 (wind)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W1/"],
-		["WIND2", "Oregon WGR800", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W2/"],
-		["WIND3", "Oregon STR918, WGR918", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W3/"],
-		["WIND4", "TFA wind", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W4/"],
-		["WIND5", "UPM WDS500", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W5/"],
-		["WIND6", "La Crosse WS2300 (wind)", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W6/"],
-		["WIND7", "Alecto WS4500", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"W7/"],
-		["UV1", "Oregon UVN128, UV138", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"U1/"],
-		["UV2", "Oregon UVN800", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"U2/"],
-		["UV3", "TFA UV", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"U3/"],
-		["WEIGHT1", "Oregon BWR101, BWR102", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"WT1/"],
-		["WEIGHT2", "Oregon GR101", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"WT2/"],
-		["MERTIK_G6R_H4T1", "Mertik Maxitrol G6R-H4T1", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"HT3.0/"],
-		["MERTIK_G6R_H4TB", "Mertik Maxitrol G6R-H4TB", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"HT3.1/"],
-		["OWL_CM113", "OWL CM113, Electrisave, ...", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"ELEC1/"],
-		["OWL_CM119_160", "OWL CM119/160", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"ELEC2/"],
-		["OWL_CM180", "OWL CM180", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"ELEC3/"],
-		["OWL_CM180I", "OWL CM180i", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"ELEC4/"],
-		["RFXSENSOR", "RFXSensor", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RFXSENSOR0/"],
-		["RFXMETER", "RFXMeter", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RFXMETER1/"],
-		["ATI_REMOTE_WONDER", "ATI Remote Wonder", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RC0/"],
-		["ATI_REMOTE_WONDER_PLUS", "ATI Remote Wonder Plus", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RC1/"],
-		["MEDION_REMOTE", "Medion Remote", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RC2/"],
-		["X10_PC_REMOTE", "X10 PC remote", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RC3/"],
-		["ATI_REMOTE_WONDER_II", "ATI Remote Wonder II", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"RC4/"],
-		["X10_MEIANTECH_POWERCODE_DS", "X10/Meiantech/PowerCode door", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"D/"],
-		["X10_MEIANTECH_POWERCODE_MS", "X10/Meiantech/PowerCode motion", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"M/"],
-		["X10_SECURITY_REMOTE", "X10 security remote", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"X10/SR/"],
-		["MEIANTECH_SECURITY_REMOTE", "Meiantech security remote", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"MEI/SR/"],
-		["KD101_SMOKE", "KD101 smoke detector", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"KD1/"],
-		["SA30_SMOKE", "Alecto SA30 smoke detector", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"S30/"],
-		["X10_SECURITY_LIGHT1", "X10 security light 1", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"X10/L1/"],
-		["X10_SECURITY_LIGHT2", "X10 security light 2", false, false, false, false, false, false,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			false, undefined, undefined, false, undefined, undefined, false, undefined, undefined,
-			"X10/L2/"]
+		AC = new category("AC", "AC", true, true, true, true, true, true, false,
+			[1, 0x3FFFFFF],
+			undefined,
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L2.0/"),
+		ANSLUT = new category("ANSLUT", "ANSLUT", true, true, false, false, false, false, false,
+			[1, 0x3FFFFFF],
+			undefined,
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L2.2/"),
+		A_OK_AC114 = new category("A_OK_AC114", "A-OK AC114", false, false, false, false, false, true, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"B3/"),
+		A_OK_RF01 = new category("A_OK_RF01", "A-OK RF01", false, false, false, false, false, true, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"B2/"),
+		ARC = new category("ARC", "ARC", true, false, true, true, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L1.1/"),
+		ASA = new category("ASA", "ASA", false, false, false, false, false, true, false,
+			[1, 0x0FFFFF],
+			undefined,
+			undefined,
+			[1, 5],
+			undefined,
+			undefined,
+			"RFY.3/"),
+		BLYSS = new category("BLYSS", "Blyss", true, false, true, true, false, false, false,
+			[0, 0xFFFF],
+			undefined,
+			['A', 'P'],
+			[1, 5],
+			undefined,
+			undefined,
+			"L6.0/"),
+		BBSB = new category("BBSB", "Bye Bye Standby (new)", true, false, false, false, false, false, false,
+			[1, 0x7FFFF],
+			undefined,
+			undefined,
+			[1, 6],
+			undefined,
+			undefined,
+			"L5.2/"),
+		CASAFAN = new category("CASAFAN", "Casafan", false, false, false, false, false, false, true,
+			[0, 0x0F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F6/"),
+		EMW200 = new category("EMW200", "Chacon EMW200", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'C'],
+			undefined,
+			[1, 4],
+			undefined,
+			undefined,
+			"L1.4/"),
+		COCO = new category("COCO", "COCO GDR2-2000R", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'D'],
+			undefined,
+			[1, 4],
+			undefined,
+			undefined,
+			"L1.A/"),
+		RSL2 = new category("RSL2", "Conrad RSL2", true, false, false, false, false, false, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L5.4/"),
+		DC_RMF_YOODA = new category("DC_RMF_YOODA", "DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true, false,
+			[1, 0x0FFFFFFF],
+			undefined,
+			undefined,
+			[0, 15],
+			undefined,
+			undefined,
+			"B6/"),
+		ELRO_AB400D = new category("ELRO_AB400D", "ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 64],
+			undefined,
+			undefined,
+			"L1.2/"),
+		ENERGENIE_5GANG = new category("ENERGENIE_5GANG", "Energenie 5 gang", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 10],
+			undefined,
+			undefined,
+			"L1.9/"),
+		ENERGENIE_ENER010 = new category("ENERGENIE_ENER010", "Energenie ENER010", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 4],
+			undefined,
+			undefined,
+			"L1.8/"),
+		FALMEC_FAN = new category("FALMEC_FAN", "Falmec Fan", false, false, false, false, false, false, true,
+			[0, 0x00000F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F8/"),
+		FT1211R = new category("FT1211R_FAN", "FT211R Fan", false, false, false, false, false, false, true,
+			[1, 0x00FFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F7/"),
+		FOREST = new category("FOREST", "Forest", false, false, false, false, false, true, false,
+			[1, 0x0FFFFFFF],
+			undefined,
+			undefined,
+			[0, 15],
+			undefined,
+			undefined,
+			"B7/"),
+		EMW100 = new category("EMW100", "GAO/Everflourish EMW100", true, false, false, false, false, false, false,
+			[1, 0x3FFF],
+			undefined,
+			undefined,
+			[1, 4],
+			undefined,
+			undefined,
+			"L5.1/"),
+		HARRISON_CURTAIN = new category("HARRISON_CURTAIN", "Harrison Curtain", false, false, false, false, false, true, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"C0/"),
+		HASTA_NEW = new category("HASTA_NEW", "Hasta (new)", false, false, false, false, false, true, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			[0, 15],
+			undefined,
+			undefined,
+			"B0/"),
+		HASTA_OLD = new category("HASTA_OLD", "Hasta (old)", false, false, false, false, false, true, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			[0, 15],
+			undefined,
+			undefined,
+			"B1/"),
+		HOMEEASY_EU = new category("HOMEEASY_EU", "HomeEasy EU", true, true, false, false, false, false, false,
+			[1, 0x3FFFFFF],
+			undefined,
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L2.1/"),
+		IKEA_KOPPLA = new category("IKEA_KOPPLA", "Ikea Koppla", true, false, false, false, false, false, false,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			[1, 16],
+			[1, 10],
+			"L3.0/"),
+		IMPULS = new category("IMPULS", "Impuls", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 64],
+			undefined,
+			undefined,
+			"L1.5/"),
+		KANGTAI = new category("KANGTAI", "Kangtai", true, false, false, false, false, false, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			[1, 30],
+			undefined,
+			undefined,
+			"L5.11/"),
+		LIGHTWAVERF_SIEMENS = new category("LIGHTWAVERF_SIEMENS", "LightwaveRF, Siemens", true, true, true, true, false, true, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L5.0/"),
+		LIVOLO_1GANG = new category("LIVOLO_1GANG", "Livolo (1 gang)", true, true, false, false, false, false, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"L5.5/"),
+		LIVOLO_2GANG = new category("LIVOLO_2GANG", "Livolo (2 gang)", true, false, false, false, false, false, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"L5.5/"),
+		LIVOLO_3GANG = new category("LIVOLO_3GANG", "Livolo (3 gang)", true, false, false, false, false, false, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"L5.5/"),
+		LUCCI_AIR_DC = new category("LUCCI_AIR_DC", "Lucci Air DC", false, false, false, false, false, false, true,
+			[1, 0x00000F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F5/"),
+		LUCCI_AIR_DCII = new category("LUCCI_AIR_DCII", "Lucci Air DCII", false, false, false, false, false, false, true,
+			[0, 0x0F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F9/"),
+		LUCCI_AIR_FAN = new category("LUCCI_AIR_FAN", "Lucci Air Fan", false, false, false, false, false, false, true,
+			[0, 0x0F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F2/"),
+		MEDIA_MOUNT = new category("MEDIA_MOUNT", "Media Mount projector screen", false, false, false, false, false, true, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"B5/"),
+		PHENIX = new category("PHENIX", "Phenix", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 32],
+			undefined,
+			undefined,
+			"L1.2/"),
+		PHILIPS_SBC = new category("PHILIPS_SBC", "Philips SBC", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 8],
+			undefined,
+			undefined,
+			"L1.7/"),
+		RAEX = new category("RAEX", "Raex YR1326 T16 motor", false, false, false, false, false, true, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"B4/"),
+		RISINGSUN = new category("RISINGSUN", "RisingSun", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'D'],
+			undefined,
+			[1, 4],
+			undefined,
+			undefined,
+			"L1.6/"),
+		ROLLERTROL = new category("ROLLERTROL", "RollerTrol", false, false, false, false, false, true, false,
+			[1, 0xFFFF],
+			undefined,
+			undefined,
+			[0, 15],
+			undefined,
+			undefined,
+			"B0/"),
+		RFY_ = new category("RFY", "Somfy RTS", false, false, false, false, false, true, false,
+			[1, 0x0FFFFF],
+			undefined,
+			undefined,
+			[0, 4],
+			undefined,
+			undefined,
+			"RFY.0/"),
+		SIEMENS_WAVE = new category("SIEMENS_WAVE", "Siemens/Wave Design Fan", false, false, false, false, false, false, true,
+			[0, 0x0FFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F0/"),
+		SONOFF = new category("SONOFF", "Sonoff Smart Switch", true, false, false, false, false, false, false,
+			[1, 0xFFFFFF],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"L4.0/"),
+		WAVEMAN = new category("WAVEMAN", "Waveman", true, false, false, false, false, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L1.3/"),
+		WESTINGHOUSE_FAN = new category("WESTINGHOUSE_FAN", "Westinghouse Fan", false, false, false, false, false, false, true,
+			[0, 0x0F],
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"F4/"),
+		X10 = new category("X10", "X10 lighting", true, false, true, false, true, false, false,
+			undefined,
+			['A', 'P'],
+			undefined,
+			[1, 16],
+			undefined,
+			undefined,
+			"L1.0/"),
+		TEMP1 = new category("TEMP1", "Oregon THR128/138, THC138", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T1/"),
+		TEMP2 = new category("TEMP2", "Oregon THC238/268, ...", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T2/"),
+		TEMP3 = new category("TEMP3", "Oregon THWR800", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T3/"),
+		TEMP4 = new category("TEMP4", "Oregon RTHN318", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T4/"),
+		TEMP5 = new category("TEMP5", "La Crosse temp", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T5/"),
+		TEMP6 = new category("TEMP6", "Honeywell TS15C", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T6/"),
+		TEMP7 = new category("TEMP7", "Viking 02811, Proove TSS330/311346", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T7/"),
+		TEMP8 = new category("TEMP8", "La Crosse WS2300 (temp)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T8/"),
+		TEMP9 = new category("TEMP9", "Rubicson temp", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T9/"),
+		TEMP10 = new category("TEMP10", "TFA 30.3133, 30.3160", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T10/"),
+		TEMP11 = new category("TEMP11", "Swimming pool WT0122", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"T10/"),
+		HUM1 = new category("HUM1", "La Crosse hum", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"H1/"),
+		HUM2 = new category("HUM2", "La Crosse WS2300 (hum)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"H2/"),
+		TEMP_HUM1 = new category("TEMP_HUM1", "Oregon THGN122, ...", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH1/"),
+		TEMP_HUM2 = new category("TEMP_HUM2", "Oregon THGR810, THGN800", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH2/"),
+		TEMP_HUM3 = new category("TEMP_HUM3", "Oregon RTGR328", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH3/"),
+		TEMP_HUM4 = new category("TEMP_HUM4", "Oregon THGR328", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH4/"),
+		TEMP_HUM5 = new category("TEMP_HUM5", "Oregon WTGR800 (TempHum)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH5/"),
+		TEMP_HUM6 = new category("TEMP_HUM6", "Oregon THGR918, THGRN228, ...", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH6/"),
+		TEMP_HUM7 = new category("TEMP_HUM7", "TFA TS34C, Cresta", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH7/"),
+		TEMP_HUM8 = new category("TEMP_HUM8", "UPM WT450H", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH8/"),
+		TEMP_HUM9 = new category("TEMP_HUM9", "Viking 02035/02038, Proove TSS320/311501", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH9/"),
+		TEMP_HUM10 = new category("TEMP_HUM10", "Rubicson TempHum", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH10/"),
+		TEMP_HUM11 = new category("TEMP_HUM11", "Oregon EW109", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH11/"),
+		TEMP_HUM12 = new category("TEMP_HUM12", "Imagintronix Soil sensor", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH12/"),
+		TEMP_HUM13 = new category("TEMP_HUM13", "Alecto WS1700", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH13/"),
+		TEMP_HUM14 = new category("TEMP_HUM14", "Alecto WS4500", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TH14/"),
+		BARO1 = new category("BARO1", "Barometer", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"B1/"),
+		TEMP_HUM_BARO1 = new category("TEMP_HUM_BARO1", "Oregon BTHR918, BTHGN129", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"THB1/"),
+		TEMP_HUM_BARO2 = new category("TEMP_HUM_BARO2", "Oregon BTHR918N, BTHR968", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"THB2/"),
+		RAIN1 = new category("RAIN1", "Oregon RGR126/682/918", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R1/"),
+		RAIN2 = new category("RAIN2", "Oregon PCR800", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R2/"),
+		RAIN3 = new category("RAIN3", "TFA rain", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R3/"),
+		RAIN4 = new category("RAIN4", "UPM RG700", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R4/"),
+		RAIN5 = new category("RAIN5", "La Crosse WS2300 (rain)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R5/"),
+		RAIN7 = new category("RAIN7", "Alecto WS4500", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"R7/"),
+		TEMP_RAIN1 = new category("TEMP_RAIN1", "Alecto WS1200", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"TR1/"),
+		WIND1 = new category("WIND1", "Oregon WTGR800 (wind)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W1/"),
+		WIND2 = new category("WIND2", "Oregon WGR800", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W2/"),
+		WIND3 = new category("WIND3", "Oregon STR918, WGR918", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W3/"),
+		WIND4 = new category("WIND4", "TFA wind", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W4/"),
+		WIND5 = new category("WIND5", "UPM WDS500", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W5/"),
+		WIND6 = new category("WIND6", "La Crosse WS2300 (wind)", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W6/"),
+		WIND7 = new category("WIND7", "Alecto WS4500", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"W7/"),
+		UV1 = new category("UV1", "Oregon UVN128, UV138", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"U1/"),
+		UV2 = new category("UV2", "Oregon UVN800", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"U2/"),
+		UV3 = new category("UV3", "TFA UV", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"U3/"),
+		WEIGHT1 = new category("WEIGHT1", "Oregon BWR101, BWR102", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"WT1/"),
+		WEIGHT2 = new category("WEIGHT2", "Oregon GR101", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"WT2/"),
+		MERTIK_G6R_H4T1 = new category("MERTIK_G6R_H4T1", "Mertik Maxitrol G6R-H4T1", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"HT3.0/"),
+		MERTIK_G6R_H4TB = new category("MERTIK_G6R_H4TB", "Mertik Maxitrol G6R-H4TB", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"HT3.1/"),
+		OWL_CM113 = new category("OWL_CM113", "OWL CM113, Electrisave, ...", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"ELEC1/"),
+		OWL_CM119_160 = new category("OWL_CM119_160", "OWL CM119/160", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"ELEC2/"),
+		OWL_CM180 = new category("OWL_CM180", "OWL CM180", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"ELEC3/"),
+		OWL_CM180I = new category("OWL_CM180I", "OWL CM180i", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"ELEC4/"),
+		RFXSENSOR = new category("RFXSENSOR", "RFXSensor", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RFXSENSOR0/"),
+		RFXMETER = new category("RFXMETER", "RFXMeter", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RFXMETER1/"),
+		ATI_REMOTE_WONDER = new category("ATI_REMOTE_WONDER", "ATI Remote Wonder", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RC0/"),
+		ATI_REMOTE_WONDER_PLUS = new category("ATI_REMOTE_WONDER_PLUS", "ATI Remote Wonder Plus", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RC1/"),
+		MEDION_REMOTE = new category("MEDION_REMOTE", "Medion Remote", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RC2/"),
+		X10_PC_REMOTE = new category("X10_PC_REMOTE", "X10 PC remote", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RC3/"),
+		ATI_REMOTE_WONDER_II = new category("ATI_REMOTE_WONDER_II", "ATI Remote Wonder II", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"RC4/"),
+		X10_MEIANTECH_POWERCODE_DS = new category("X10_MEIANTECH_POWERCODE_DS", "X10/Meiantech/PowerCode door", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"D/"),
+		X10_MEIANTECH_POWERCODE_MS = new category("X10_MEIANTECH_POWERCODE_MS", "X10/Meiantech/PowerCode motion", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"M/"),
+		X10_SECURITY_REMOTE = new category("X10_SECURITY_REMOTE", "X10 security remote", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"X10/SR/"),
+		MEIANTECH_SECURITY_REMOTE = new category("MEIANTECH_SECURITY_REMOTE", "Meiantech security remote", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"MEI/SR/"),
+		KD101_SMOKE = new category("KD101_SMOKE", "KD101 smoke detector", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"KD1/"),
+		SA30_SMOKE = new category("SA30_SMOKE", "Alecto SA30 smoke detector", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"S30/"),
+		X10_SECURITY_LIGHT1 = new category("X10_SECURITY_LIGHT1", "X10 security light 1", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"X10/L1/"),
+		X10_SECURITY_LIGHT2 = new category("X10_SECURITY_LIGHT2", "X10 security light 2", false, false, false, false, false, false, false,
+				undefined, undefined, undefined, undefined, undefined, undefined,
+				"X10/L2/")
 	],
 
 	deviceTypes: [
-		["SWITCH_LIGHT", "Switch light", "urn:schemas-upnp-org:device:BinaryLight:1", "LS/", "urn:upnp-org:serviceId:SwitchPower1", "Status", true, "ON", "OFF", ""],
-		["DIMMABLE_LIGHT", "Dimmable light", "urn:schemas-upnp-org:device:DimmableLight:1", "DL/", "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, "", "", "%"],
-		["MOTION_SENSOR", "Motion sensor", "urn:schemas-micasaverde-com:device:MotionSensor:1", "MS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Motion", "No motion", ""],
-		["DOOR_SENSOR", "Door sensor", "urn:schemas-micasaverde-com:device:DoorSensor:1", "DS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Opened", "Closed", ""],
-		["LIGHT_SENSOR", "Light sensor", "urn:schemas-micasaverde-com:device:LightSensor:1", "LL/", "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, "", "", "%"],
-		["WINDOW_COVERING", "Window covering", "urn:schemas-micasaverde-com:device:WindowCovering:1", "WC/", "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, "", "", "%"],
-		["SMOKE_SENSOR", "Smoke sensor", "urn:schemas-micasaverde-com:device:SmokeSensor:1", "SS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Smoke", "No smoke", ""],
-		["TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", false, "", "", ""],
-		["HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", false, "", "", "%"],
-		["BAROMETER_SENSOR", "Barometric sensor", "urn:schemas-micasaverde-com:device:BarometerSensor:1", "BS/", "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, "", "", "hPa"],
-		["WIND_SENSOR", "Wind sensor", "urn:schemas-micasaverde-com:device:WindSensor:1", "WS/", "urn:upnp-org:serviceId:WindSensor1", "AvgSpeed", false, "", "", ""],
-		["RAIN_SENSOR", "Rain sensor", "urn:schemas-micasaverde-com:device:RainSensor:1", "RS/", "urn:upnp-org:serviceId:RainSensor1", "CurrentTRain", false, "", "", "mm"],
-		["UV_SENSOR", "UV sensor", "urn:schemas-micasaverde-com:device:UvSensor:1", "UV/", "urn:upnp-org:serviceId:UvSensor1", "CurrentLevel", false, "", "", ""],
-		["WEIGHT_SENSOR", "Weight sensor", "urn:schemas-micasaverde-com:device:ScaleSensor:1", "WT/", "urn:micasaverde-com:serviceId:ScaleSensor1", "Weight", false, "", "", "kg"],
-		["POWER_SENSOR", "Power sensor", "urn:schemas-micasaverde-com:device:PowerMeter:1", "PM/", "urn:micasaverde-com:serviceId:EnergyMetering1", "KWH", false, "", "", "kWh"],
-		["RFXMETER", "RFXmeter", "urn:casa-delanghe-com:device:RFXMeter:1", "RM/", "urn:delanghe-com:serviceId:RFXMetering1", "Pulsen", false, "", "", ""],
-		["SECURITY_REMOTE", "Security remote", "urn:rfxcom-com:device:SecurityRemote:1", "SR/", "urn:micasaverde-com:serviceId:AlarmPartition2", "DetailedArmMode", false, "", "", ""],
-		["X10_REMOTE", "Group control", "urn:rfxcom-com:device:X10ChaconRemote:1", "RC/", "", "", false, "", "", ""],
-		["LWRF_REMOTE", "Group control", "urn:rfxcom-com:device:LWRFRemote:1", "RC/", "", "", false, "", "", ""],
-		["ATI_REMOTE", "Remote control", "urn:rfxcom-com:device:ATIRemote:1", "RC/", "", "", false, "", "", ""],
-		["HEATER", "Heater", "urn:schemas-upnp-org:device:Heater:1", "HT/", "urn:upnp-org:serviceId:HVAC_UserOperatingMode1", "ModeStatus", false, "", "", ""],
-		["SONOFF", "Sonoff Switch", "urn:rfxcom-com:device:SwitchToggle:1", "L4/", "urn:upnp-org:serviceId:SwitchPower1", "Status", true, "ON", "OFF", ""]
+		LIGHT = new device("LIGHT", "Switch light", "urn:schemas-upnp-org:device:BinaryLight:1", "LS/", "urn:upnp-org:serviceId:SwitchPower1", "Status", true, "ON", "OFF", ""),
+		DIMMER = new device("DIMMER", "Dimmable light", "urn:schemas-upnp-org:device:DimmableLight:1", "DL/", "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, "", "", "%"),
+		MOTION = new device("MOTION", "Motion sensor", "urn:schemas-micasaverde-com:device:MotionSensor:1", "MS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Motion", "No motion", ""),
+		DOOR = new device("DOOR", "Door sensor", "urn:schemas-micasaverde-com:device:DoorSensor:1", "DS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Opened", "Closed", ""),
+		LIGHT_LEVEL = new device("LIGHT_LEVEL", "Light sensor", "urn:schemas-micasaverde-com:device:LightSensor:1", "LL/", "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, "", "", "%"),
+		COVER = new device("COVER", "Window covering", "urn:schemas-micasaverde-com:device:WindowCovering:1", "WC/", "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, "", "", "%"),
+		FAN = new device("FAN", "Fan", "urn:rfxcom-com:device:Fan:1", "FN/", "urn:rfxcom-com:serviceId:Fan1", "Speed", false, "", "", ""),
+		SMOKE_SENSOR = new device("SMOKE_SENSOR", "Smoke sensor", "urn:schemas-micasaverde-com:device:SmokeSensor:1", "SS/", "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped", true, "Smoke", "No smoke", ""),
+		TEMPERATURE_SENSOR = new device("TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", false, "", "", ""),
+		HUMIDITY_SENSOR = new device("HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", false, "", "", "%"),
+		BAROMETER_SENSOR = new device("BAROMETER_SENSOR", "Barometric sensor", "urn:schemas-micasaverde-com:device:BarometerSensor:1", "BS/", "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, "", "", "hPa"),
+		WIND_SENSOR = new device("WIND_SENSOR", "Wind sensor", "urn:schemas-micasaverde-com:device:WindSensor:1", "WS/", "urn:upnp-org:serviceId:WindSensor1", "AvgSpeed", false, "", "", ""),
+		RAIN_SENSOR = new device("RAIN_SENSOR", "Rain sensor", "urn:schemas-micasaverde-com:device:RainSensor:1", "RS/", "urn:upnp-org:serviceId:RainSensor1", "CurrentTRain", false, "", "", "mm"),
+		UV_SENSOR = new device("UV_SENSOR", "UV sensor", "urn:schemas-micasaverde-com:device:UvSensor:1", "UV/", "urn:upnp-org:serviceId:UvSensor1", "CurrentLevel", false, "", "", ""),
+		WEIGHT_SENSOR = new device("WEIGHT_SENSOR", "Weight sensor", "urn:schemas-micasaverde-com:device:ScaleSensor:1", "WT/", "urn:micasaverde-com:serviceId:ScaleSensor1", "Weight", false, "", "", "kg"),
+		POWER_SENSOR = new device("POWER_SENSOR", "Power sensor", "urn:schemas-micasaverde-com:device:PowerMeter:1", "PM/", "urn:micasaverde-com:serviceId:EnergyMetering1", "KWH", false, "", "", "kWh"),
+		RFXMETER = new device("RFXMETER", "RFXmeter", "urn:casa-delanghe-com:device:RFXMeter:1", "RM/", "urn:delanghe-com:serviceId:RFXMetering1", "Pulsen", false, "", "", ""),
+		SECURITY_REMOTE = new device("SECURITY_REMOTE", "Security remote", "urn:rfxcom-com:device:SecurityRemote:1", "SR/", "urn:micasaverde-com:serviceId:AlarmPartition2", "DetailedArmMode", false, "", "", ""),
+		X10_REMOTE = new device("X10_REMOTE", "Group control", "urn:rfxcom-com:device:X10ChaconRemote:1", "RC/", "", "", false, "", "", ""),
+		LWRF_REMOTE = new device("LWRF_REMOTE", "Group control", "urn:rfxcom-com:device:LWRFRemote:1", "RC/", "", "", false, "", "", ""),
+		ATI_REMOTE = new device("ATI_REMOTE", "Remote control", "urn:rfxcom-com:device:ATIRemote:1", "RC/", "", "", false, "", "", ""),
+		HEATER = new device("HEATER", "Heater", "urn:schemas-upnp-org:device:Heater:1", "HT/", "urn:upnp-org:serviceId:HVAC_UserOperatingMode1", "ModeStatus", false, "", "", ""),
+		SONOFF = new device("SONOFF", "Sonoff Switch", "urn:rfxcom-com:device:SwitchToggle:1", "LS/", "urn:upnp-org:serviceId:SwitchPower1", "Status", true, "ON", "OFF", "")
 	],
 
 	tempAndHumDeviceTypes: [
-		["TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", "MaxTemp", "MinTemp", "MaxTemp24hr", "MinTemp24hr", "MaxMinTemps", ""],
-		["HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", "MaxHum", "MinHum", "MaxHum24hr", "MinHum24hr", "MaxMinHum", "%"]
+		TEMPERATURE_SENSOR = new th_device("TEMPERATURE_SENSOR", "Temperature sensor", "urn:schemas-micasaverde-com:device:TemperatureSensor:1", "TS/", "urn:upnp-org:serviceId:TemperatureSensor1", "CurrentTemperature", "MaxTemp", "MinTemp", "MaxTemp24hr", "MinTemp24hr", "MaxMinTemps", ""),
+		HUMIDITY_SENSOR = new th_device("HUMIDITY_SENSOR", "Humidity sensor", "urn:schemas-micasaverde-com:device:HumiditySensor:1", "HS/", "urn:micasaverde-com:serviceId:HumiditySensor1", "CurrentLevel", "MaxHum", "MinHum", "MaxHum24hr", "MinHum24hr", "MaxMinHum", "%")
 	],
 
 	commands: [
-		["L5.1/", "LEARN", "Learn"],
-		["L3.0/", "PROGRAM", "Program"],
-		["C0/", "PROGRAM", "Program"],
-		["B0/", "CONFIRM_PAIR", "Confirm pair"],
-		["B1/", "CONFIRM_PAIR", "Confirm pair"],
-		["B2/", "CONFIRM_PAIR", "Confirm pair"],
-		["B3/", "CONFIRM_PAIR", "Confirm pair"],
-		["B4/", "CONFIRM_PAIR", "Confirm pair"],
-		["B6/", "CONFIRM_PAIR", "Confirm pair"],
-		["B7/", "CONFIRM_PAIR", "Confirm pair"],
-		["RFY0/", "PROGRAM", "Program"],
-		["RFY0/", "LOWER_LIMIT", "Set lower limit"],
-		["RFY0/", "UPPER_LIMIT", "Set upper limit"],
-		["RFY0/", "VENETIAN_US_ANGLE_PLUS", "Change angle + (Venetian US)"],
-		["RFY0/", "VENETIAN_US_ANGLE_MINUS", "Change angle - (Venetian US)"],
-		["RFY0/", "VENETIAN_EU_ANGLE_PLUS", "Change angle + (Venetian EU)"],
-		["RFY0/", "VENETIAN_EU_ANGLE_MINUS", "Change angle - (Venetian EU)"],
-		["RFY0/", "ENABLE_DETECTOR", "Enable sun/wind detector"],
-		["RFY0/", "DISABLE_DETECTOR", "Disable sun detector"]
+		L51 = new command("L5.1/", "Learn", "Learn"),
+		L30 = new command("L3.0/", "Program", "Program"),
+		L1C = new command("L1.C/", "Program", "Program"),
+		C0 = new command("C0/", "Program", "Program"),
+		B0 = new command("B0/", "Confirm_Pair", "Confirm pair"),
+		B1 = new command("B1/", "Confirm_Pair", "Confirm pair"),
+		B2 = new command("B2/", "Confirm_Pair", "Confirm pair"),
+		B3 = new command("B3/", "Confirm_Pair", "Confirm pair"),
+		B4 = new command("B4/", "Confirm_Pair", "Confirm pair"),
+		B6 = new command("B6/", "Confirm_Pair", "Confirm pair"),
+		B7 = new command("B7/", "Confirm_Pair", "Confirm pair"),
+		RFY0 = new command("RFY.0/", "Program", "Program"),
+		RFY1 = new command("RFY.0/", "LowerLimit", "Set lower limit"),
+		RFY2 = new command("RFY.0/", "UpperLimit", "Set upper limit"),
+		RFY3 = new command("RFY.0/", "Angle+", "Change angle + (Venetian US)"),
+		RFY4 = new command("RFY.0/", "Angle-", "Change angle - (Venetian US)"),
+		RFY5 = new command("RFY.0/", "Angle+", "Change angle + (Venetian EU)"),
+		RFY6 = new command("RFY.0/", "Angle-", "Change angle - (Venetian EU)"),
+		RFY7 = new command("RFY.0/", "Enable", "Enable sun/wind detector"),
+		RFY8 = new command("RFY.0/", "Disable", "Disable sun detector"),
+		RFY9 = new command("RFY.3/", "Program", "Program"),
+		RFYA = new command("RFY.3/", "LowerLimit", "Set lower limit"),
+		RFYB = new command("RFY.3/", "UpperLimit", "Set upper limit"),
+		RFYC = new command("RFY.3/", "Enable", "Enable sun/wind detector"),
+		RFYD = new command("RFY.3/", "Disable", "Disable sun detector")
 	]
 
 };
-
+// functions that define custom types
+function limits(lower, upper)
+	{
+		this.lower = lower;
+		this.upper = upper;
+	}
+function category(id, displayName, isLightSwitch, isDimableLight, isMotionSensor, isDoorSensor, isLightSensor, isWindowCovering, isFan,
+	idLimits, houseCodeLimits, groupCodeLimits, unitCodeLimits, systemCodeLimits, channelLimits, idPrefix)
+	{
+		this.id = id;
+		this.displayName = displayName;
+		this.isLightSwitch = isLightSwitch;
+		this.isDimableLight = isDimableLight;
+		this.isMotionSensor = isMotionSensor;
+		this.isDoorSensor = isDoorSensor;
+		this.isLightSensor = isLightSensor;
+		this.isWindowCovering = isWindowCovering;
+		this.isFan = isFan;
+		this.isCreatable = isLightSwitch || isDimableLight || isMotionSensor || isDoorSensor || isLightSensor || isWindowCovering || isFan;
+		if(idLimits) { this.idLimits = new limits( idLimits[0], idLimits[1]);}
+		else { this.idLimits = undefined; }
+		if(houseCodeLimits) { this.houseCodeLimits = new limits( houseCodeLimits[0], houseCodeLimits[1]);}
+		else { this.houseCodeLimits = undefined; }
+		if(groupCodeLimits) { this.groupCodeLimits = new limits( groupCodeLimits[0], groupCodeLimits[1]);}
+		else { this.groupCodeLimits = undefined; }
+		if(unitCodeLimits) { this.unitCodeLimits = new limits( unitCodeLimits[0], unitCodeLimits[1]);}
+		else { this.unitCodeLimits = undefined; }
+		if(systemCodeLimits) { this.systemCodeLimits = new limits( systemCodeLimits[0], systemCodeLimits[1]);}
+		else { this.systemCodeLimits = undefined; }
+		if(channelLimits) { this.channelLimits = new limits( channelLimits[0], channelLimits[1]);}
+		else { this.channelLimits = undefined; }
+		this.idPrefix = idPrefix;
+	}
+function device(devType, devDisplayName, upnpType, idPrefix, serviceId, devVarName, isBinaryState, varDisplayState1, varDisplayState0, varUnits)
+{
+	this.devType = devType;
+	this.devDisplayName = devDisplayName;
+	this.upnpType = upnpType;
+	this.idPrefix = idPrefix;
+	this.serviceId = serviceId;
+	this.devVarName = devVarName;
+	this.isBinaryState = isBinaryState;
+	this.varDisplayState1 = varDisplayState1;
+	this.varDisplayState0 = varDisplayState0;
+	this.varUnits = varUnits;
+}
+function th_device(devType, devDisplayName, upnpType, idPrefix, serviceId, devVarName, maxVarName, minVarName, max24HrVarName, min24HrVarName, minMaxVarName, units)
+{
+	this.devType = devType;
+	this.devDisplayName = devDisplayName;
+	this.upnpType = upnpType;
+	this.idPrefix = idPrefix;
+	this.serviceId = serviceId;
+	this.devVarName = devVarName;
+	this.maxVarName = maxVarName;
+	this.minVarName = minVarName;
+	this.max24HrVarName = max24HrVarName;
+	this.min24HrVarName = min24HrVarName;
+	this.minMaxVarName = minMaxVarName;
+	this.units = units;
+}
+function command(idPrefix, name, displayName)
+{
+	this.idPrefix = idPrefix;
+	this.name = name;
+	this.displayName = displayName;
+}
+// end of type definitions
 function RFX_showNewDevice(device) {
 	RFX_checkSettings(device);
 	var html = '';
@@ -722,13 +759,12 @@ function RFX_showNewDevice(device) {
 	html += '<td>';
 	html += '<select id="category" onChange="RFX_selectCategory();">';
 	for (i = 0; i < RFX.categories.length; i++) {
-		if (RFX.categories[i][2] || RFX.categories[i][3] || RFX.categories[i][4]
-			|| RFX.categories[i][5] || RFX.categories[i][6] || RFX.categories[i][7]) {
+		if (RFX.categories[i].isCreatable) {
 			html += '<option';
 			if (i === 0) {
 				html += ' selected';
 			}
-			html += ' value="' + RFX.categories[i][0] + '">' + RFX.categories[i][1] + '</option>';
+			html += ' value="' + RFX.categories[i].id + '">' + RFX.categories[i].displayName + '</option>';
 		}
 	}
 	html += '</select>';
@@ -859,30 +895,30 @@ function RFX_updateDevicesTable(device) {
 			if (rooms.indexOf(room) < 0) {
 				rooms.push(room);
 			}
-			var type = '';
-			var type2 = '';
+			var devDisplayName = '';
+			var devType = '';
 			var idxType = -1;
 			for (j = 0; j < RFX.deviceTypes.length; j++) {
-				if (RFX.deviceTypes[j][2] == RFX.userData.devices[i].device_type) {
+				if (RFX.deviceTypes[j].upnpType == RFX.userData.devices[i].device_type) {
 					idxType = j;
-					type = RFX.deviceTypes[idxType][1];
-					type2 = RFX.deviceTypes[idxType][0];
-					if (types.indexOf(type2) < 0) {
-						types.push(type2);
+					devDisplayName = RFX.deviceTypes[idxType].devDisplayName;
+					devType = RFX.deviceTypes[idxType].devType;
+					if (types.indexOf(devType) < 0) {
+						types.push(devType);
 					}
 					break;
 				}
 			}
 			var state = '';
-			if (idxType >= 0 && RFX.deviceTypes[idxType][4] != "" && RFX.deviceTypes[idxType][5] != "") {
-				var value = get_device_state(RFX.userData.devices[i].id, RFX.deviceTypes[idxType][4], RFX.deviceTypes[idxType][5], 1);
+			if (idxType >= 0 && RFX.deviceTypes[idxType].serviceId != "" && RFX.deviceTypes[idxType].devVarName != "") {
+				var value = get_device_state(RFX.userData.devices[i].id, RFX.deviceTypes[idxType].serviceId, RFX.deviceTypes[idxType].devVarName, 1);
 				if (value != undefined) {
-					if (RFX.deviceTypes[idxType][6]) {
+					if (RFX.deviceTypes[idxType].isBinaryState) {
 						if (value == "1") {
-							state = RFX.deviceTypes[idxType][7];
+							state = RFX.deviceTypes[idxType].varDisplayState1;
 						}
 						else if (value == "0") {
-							state = RFX.deviceTypes[idxType][8];
+							state = RFX.deviceTypes[idxType].varDisplayState0;
 						}
 					}
 					else {
@@ -890,39 +926,35 @@ function RFX_updateDevicesTable(device) {
 					}
 				}
 
-				if (state != "" && RFX.deviceTypes[idxType][0] == 'TEMPERATURE_SENSOR') {
+				if (state != "" && RFX.deviceTypes[idxType].devType == 'TEMPERATURE_SENSOR') {
 					state += RFX.tempUnit;
 				}
-				else if (state != "" && RFX.deviceTypes[idxType][0] == 'WIND_SENSOR') {
-					var unit = 'km/h';
-					if (get_device_state(device, RFX.RFXtrxSID2, "KmhSpeed", 1) == '0') {
-						unit = 'mph';
-					}
-					state += ' ' + unit;
+				else if (state != "" && RFX.deviceTypes[idxType].devType == 'WIND_SENSOR') {
+					state += RFX.speedUnit;
 				}
-				else if (state != "" && RFX.deviceTypes[idxType][9] != "") {
-					state += RFX.deviceTypes[idxType][9];
+				else if (state != "" && RFX.deviceTypes[idxType].varUnits != "") {
+					state += RFX.deviceTypes[idxType].varUnits;
 				}
 			}
-			var category = '';
-			var category2 = '';
+			var catDisplayName = '';
+			var catId = '';
 			for (j = 0; j < RFX.categories.length; j++) {
-				if (RFX.categories[j][26] == RFX.userData.devices[i].altid.substr(3, RFX.categories[j][26].length)) {
-					category = RFX.categories[j][1];
-					category2 = RFX.categories[j][0];
-					if (categories.indexOf(category2) < 0) {
-						categories.push(category2);
+				if (RFX.categories[j].idPrefix == RFX.userData.devices[i].altid.substr(3, RFX.categories[j].idPrefix.length)) {
+					catDisplayName = RFX.categories[j].displayName;
+					catId = RFX.categories[j].id;
+					if (categories.indexOf(catId) < 0) {
+						categories.push(catId);
 					}
 					break;
 				}
 			}
-			if (category == '' && category2 == '' && categories.indexOf('UNDEFINED') < 0) {
+			if (catDisplayName == '' && catId == '' && categories.indexOf('UNDEFINED') < 0) {
 				categories.push('UNDEFINED');
 			}
 			if (selectedCategory == 'ALL'
-				|| (selectedCategory == 'C=UNDEFINED' && category2 == '')
-				|| (selectedCategory == ('C=' + category2))
-				|| (selectedCategory == ('T=' + type2))
+				|| (selectedCategory == 'C=UNDEFINED' && catId == '')
+				|| (selectedCategory == ('C=' + catId))
+				|| (selectedCategory == ('T=' + devType))
 				|| (selectedCategory == 'R=NONE' && room == '')
 				|| (selectedCategory == ('R=' + room))) {
 				var commStrength = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, 'CommStrength', 1);
@@ -945,7 +977,7 @@ function RFX_updateDevicesTable(device) {
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + RFX.userData.devices[i].id + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + RFX.userData.devices[i].name + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + room + '</td>';
-				html += '<td onclick="RFX_selectLine(' + nb + ');">' + type + '</td>';
+				html += '<td onclick="RFX_selectLine(' + nb + ');">' + devDisplayName + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + state + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + commStrength + '</td>';
 				html += '<td onclick="RFX_selectLine(' + nb + ');">' + batteryLevel + '</td>';
@@ -979,14 +1011,14 @@ function RFX_updateDevicesTable(device) {
 				html += ' selected';
 				validSelection = true;
 			}
-			var category = categories[i];
+			var catDisplayName = categories[i];
 			for (j = 0; j < RFX.categories.length; j++) {
-				if (RFX.categories[j][0] == categories[i]) {
-					category = RFX.categories[j][1];
+				if (RFX.categories[j].id == categories[i]) {
+					catDisplayName = RFX.categories[j].displayName;
 					break;
 				}
 			}
-			html += '>' + category + '</option>';
+			html += '>' + catDisplayName + '</option>';
 		}
 	}
 	if (undefCategory) {
@@ -1004,14 +1036,14 @@ function RFX_updateDevicesTable(device) {
 			html += ' selected';
 			validSelection = true;
 		}
-		var type = types[i];
+		var devType = types[i];
 		for (j = 0; j < RFX.deviceTypes.length; j++) {
-			if (RFX.deviceTypes[j][0] == types[i]) {
-				type = RFX.deviceTypes[j][1];
+			if (RFX.deviceTypes[j].devType == types[i]) {
+				devType = RFX.deviceTypes[j].devDisplayName;
 				break;
 			}
 		}
-		html += '>' + type + '</option>';
+		html += '>' + devType + '</option>';
 	}
 	html += '<option disabled>---------- Rooms ----------</option>';
 	rooms.sort();
@@ -1176,7 +1208,7 @@ function RFX_updateTempAndHumData(device) {
 			var urnType = RFX.userData.devices[i].device_type;
 			var idxType = -1;
 			for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
-				if (RFX.tempAndHumDeviceTypes[j][2] == urnType) {
+				if (RFX.tempAndHumDeviceTypes[j].upnpType == urnType) {
 					idxType = j;
 					break;
 				}
@@ -1184,7 +1216,7 @@ function RFX_updateTempAndHumData(device) {
 			if (idxType < 0)
 				continue;
 			// Get the name of the sensor type
-			var typeName = RFX.tempAndHumDeviceTypes[idxType][1];
+			var typeName = RFX.tempAndHumDeviceTypes[idxType].devDisplayName;
 			// Determine the room the sensor is assigned to
 			var roomName = 'NONE';
 			for (j = 0; j < RFX.userData.rooms.length; j++) {
@@ -1194,31 +1226,31 @@ function RFX_updateTempAndHumData(device) {
 				}
 			}
 			// Get the values of the state variables and add the units indicator for temperatures
-			var currentValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][5], 1);
+			var currentValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].devVarName, 1);
 			if (currentValue != undefined) {
-				currentValue += RFX.tempAndHumDeviceTypes[idxType][11];
+				currentValue += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 			// For just-created sensors the values may not exist yet - so skip this device.
 			else continue;
 
-			var maxValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][6], 1);
+			var maxValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].maxVarName, 1);
 			if (maxValue != undefined) {
-				maxValue += RFX.tempAndHumDeviceTypes[idxType][11];
+				maxValue += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 
-			var minValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][7], 1);
+			var minValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].maxVarName, 1);
 			if (minValue != undefined) {
-				minValue += RFX.tempAndHumDeviceTypes[idxType][11];
+				minValue += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 
-			var maxValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][8], 1);
+			var maxValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].max24HrVarName, 1);
 			if (maxValue24hr != undefined) {
-				maxValue24hr += RFX.tempAndHumDeviceTypes[idxType][11];
+				maxValue24hr += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 
-			var minValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][9], 1);
+			var minValue24hr = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].min24HrVarName, 1);
 			if (minValue24hr != undefined) {
-				minValue24hr += RFX.tempAndHumDeviceTypes[idxType][11];
+				minValue24hr += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 
 			var lastUpdate = get_device_state(RFX.userData.devices[i].id, RFX.HADeviceSID, "BatteryDate", 1);
@@ -1281,20 +1313,20 @@ function RFX_resetTempAndHumData(idx) {
 		if (urnType != undefined && device != undefined) {
 			var idxType = -1;
 			for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
-				if (RFX.tempAndHumDeviceTypes[j][2] == urnType) {
+				if (RFX.tempAndHumDeviceTypes[j].upnpType == urnType) {
 					idxType = j;
 					break;
 				}
 			}
 			if (idxType >= 0) {
-				var currentValue = get_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][5], 1);
+				var currentValue = get_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].devVarName, 1);
 				if (currentValue == undefined)
 					return;
-				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][6], currentValue, 1);
-				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][7], currentValue, 1);
-				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][8], currentValue, 1);
-				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][9], currentValue, 1);
-				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType][4], RFX.tempAndHumDeviceTypes[idxType][10], undefined, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].maxVarName, currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].minVarName, currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].max24HrVarName, currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].min24HrVarName, currentValue, 1);
+				set_device_state(RFX.userData.devices[idx].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].minMaxVarName, undefined, 1);
 				setTimeout(function () { RFX_updateTempAndHumData(device); }, 2000);
 			}
 		}
@@ -1759,41 +1791,44 @@ function RFX_selectCategory() {
 	var html2 = '';
 	var idx = jQuery('#category option:selected').index();
 	var idxParam = 1;
-	if (RFX.categories[idx][2]) {
-		html += '<option value="' + RFX.deviceTypes[0][0] + '">' + RFX.deviceTypes[0][1] + '</option>';
+	if (RFX.categories[idx].isLightSwitch) {
+		html += '<option value="' + RFX.deviceTypes[0].devType + '">' + RFX.deviceTypes[0].devDisplayName + '</option>';
 	}
-	if (RFX.categories[idx][3]) {
-		html += '<option value="' + RFX.deviceTypes[1][0] + '">' + RFX.deviceTypes[1][1] + '</option>';
+	if (RFX.categories[idx].isDimableLight) {
+		html += '<option value="' + RFX.deviceTypes[1].devType + '">' + RFX.deviceTypes[1].devDisplayName + '</option>';
 	}
-	if (RFX.categories[idx][4]) {
-		html += '<option value="' + RFX.deviceTypes[2][0] + '">' + RFX.deviceTypes[2][1] + '</option>';
+	if (RFX.categories[idx].isMotionSensor) {
+		html += '<option value="' + RFX.deviceTypes[2].devType + '">' + RFX.deviceTypes[2].devDisplayName + '</option>';
 	}
-	if (RFX.categories[idx][5]) {
-		html += '<option value="' + RFX.deviceTypes[3][0] + '">' + RFX.deviceTypes[3][1] + '</option>';
+	if (RFX.categories[idx].isDoorSensor) {
+		html += '<option value="' + RFX.deviceTypes[3].devType + '">' + RFX.deviceTypes[3].devDisplayName + '</option>';
 	}
-	if (RFX.categories[idx][6]) {
-		html += '<option value="' + RFX.deviceTypes[4][0] + '">' + RFX.deviceTypes[4][1] + '</option>';
+	if (RFX.categories[idx].isLightSensor) {
+		html += '<option value="' + RFX.deviceTypes[4].devType + '">' + RFX.deviceTypes[4].devDisplayName + '</option>';
 	}
-	if (RFX.categories[idx][7]) {
-		html += '<option value="' + RFX.deviceTypes[5][0] + '">' + RFX.deviceTypes[5][1] + '</option>';
+	if (RFX.categories[idx].isWindowCovering) {
+		html += '<option value="' + RFX.deviceTypes[5].devType + '">' + RFX.deviceTypes[5].devDisplayName + '</option>';
+	}
+	if (RFX.categories[idx].isFan) {
+		html += '<option value="' + RFX.deviceTypes[6].devType + '">' + RFX.deviceTypes[6].devDisplayName + '</option>';
 	}
 	jQuery('#deviceType').html(html);
 
-	if (RFX.categories[idx][8]) {
+	if (RFX.categories[idx].idLimits) {
 		html = 'Id:';
 		html2 = '<input id="id" type="text" size="9" maxlength="9"/>';
-		if (RFX.categories[idx][9] != undefined && RFX.categories[idx][10] != undefined) {
-			html2 += '<label style="margin-left: 10px">Decimal value in range ' + RFX.categories[idx][9]
-				+ ' - ' + RFX.categories[idx][10] + '</label>';
+		if (RFX.categories[idx].idLimits.lower != undefined && RFX.categories[idx].idLimits.upper != undefined) {
+			html2 += '<label style="margin-left: 10px">Decimal value in range ' + RFX.categories[idx].idLimits.lower
+				+ ' - ' + RFX.categories[idx].idLimits.upper + '</label>';
 		}
 		jQuery('#labelParam' + idxParam).html(html);
 		jQuery('#valueParam' + idxParam).html(html2);
 		idxParam += 1;
 	}
-	if (RFX.categories[idx][11]) {
+	if (RFX.categories[idx].houseCodeLimits) {
 		html = 'House code:';
 		html2 = '<select id="houseCode">';
-		for (i = RFX.categories[idx][12].charCodeAt(0); i <= RFX.categories[idx][13].charCodeAt(0); i++) {
+		for (i = RFX.categories[idx].houseCodeLimits.lower.charCodeAt(0); i <= RFX.categories[idx].houseCodeLimits.upper.charCodeAt(0); i++) {
 			html2 += '<option>' + String.fromCharCode(i) + '</option>';
 		}
 		html2 += '</select>';
@@ -1801,10 +1836,10 @@ function RFX_selectCategory() {
 		jQuery('#valueParam' + idxParam).html(html2);
 		idxParam += 1;
 	}
-	if (RFX.categories[idx][14]) {
+	if (RFX.categories[idx].groupCodeLimits) {
 		html = 'Group code:';
 		html2 = '<select id="groupCode">';
-		for (i = RFX.categories[idx][15].charCodeAt(0); i <= RFX.categories[idx][16].charCodeAt(0); i++) {
+		for (i = RFX.categories[idx].groupCodeLimits.lower.charCodeAt(0); i <= RFX.categories[idx].groupCodeLimits.upper.charCodeAt(0); i++) {
 			html2 += '<option>' + String.fromCharCode(i) + '</option>';
 		}
 		html2 += '</select>';
@@ -1812,10 +1847,10 @@ function RFX_selectCategory() {
 		jQuery('#valueParam' + idxParam).html(html2);
 		idxParam += 1;
 	}
-	if (RFX.categories[idx][17]) {
+	if (RFX.categories[idx].unitCodeLimits) {
 		html = 'Unit code:';
 		html2 = '<select id="unitCode">';
-		for (i = RFX.categories[idx][18]; i <= RFX.categories[idx][19]; i++) {
+		for (i = RFX.categories[idx].unitCodeLimits.lower; i <= RFX.categories[idx].unitCodeLimits.upper; i++) {
 			html2 += '<option>' + i + '</option>';
 		}
 		html2 += '</select>';
@@ -1823,10 +1858,10 @@ function RFX_selectCategory() {
 		jQuery('#valueParam' + idxParam).html(html2);
 		idxParam += 1;
 	}
-	if (RFX.categories[idx][20]) {
+	if (RFX.categories[idx].systemCodeLimits) {
 		html = 'System code:';
 		html2 = '<select id="systemCode">';
-		for (i = RFX.categories[idx][21]; i <= RFX.categories[idx][22]; i++) {
+		for (i = RFX.categories[idx].systemCodeLimits.lower; i <= RFX.categories[idx].systemCodeLimits.upper; i++) {
 			html2 += '<option>' + i + '</option>';
 		}
 		html2 += '</select>';
@@ -1834,10 +1869,10 @@ function RFX_selectCategory() {
 		jQuery('#valueParam' + idxParam).html(html2);
 		idxParam += 1;
 	}
-	if (RFX.categories[idx][23]) {
+	if (RFX.categories[idx].channelLimits) {
 		html = 'Channel:';
 		html2 = '<select id="channel">';
-		for (i = RFX.categories[idx][24]; i <= RFX.categories[idx][25]; i++) {
+		for (i = RFX.categories[idx].channelLimits.lower; i <= RFX.categories[idx].channelLimits.upper; i++) {
 			html2 += '<option>' + i + '</option>';
 		}
 		html2 += '</select>';
@@ -1888,7 +1923,7 @@ function RFX_selectDevices() {
 
 		var idx = -1;
 		for (i = 0; i < RFX.categories.length; i++) {
-			if (RFX.categories[i][26] == altid.substr(3, RFX.categories[i][26].length)) {
+			if (RFX.categories[i].idPrefix == altid.substr(3, RFX.categories[i].idPrefix.length)) {
 				idx = i;
 				break;
 			}
@@ -1896,57 +1931,63 @@ function RFX_selectDevices() {
 
 		var idxType = -1;
 		for (i = 0; i < RFX.deviceTypes.length; i++) {
-			if (RFX.deviceTypes[i][3] == altid.substr(0, 3)) {
+			if (RFX.deviceTypes[i].idPrefix == altid.substr(0, 3)) {
 				idxType = i;
 				break;
 			}
 		}
 
 		var html = '';
-		var curType = '';
+		var displayedTypeName = '';
 		var disabled = true;
 		if (idxDevice >= 0 && idxType >= 0) {
 			var devType = RFX.userData.devices[idxDevice].device_type;
-			if (devType == RFX.deviceTypes[idxType][2]) {
-				curType = RFX.deviceTypes[idxType][1];
+			if (devType == RFX.deviceTypes[idxType].upnpType) {
+				displayedTypeName = RFX.deviceTypes[idxType].devDisplayName;
 			}
 		}
 		if (idxDevice >= 0 && idx >= 0 && idxType >= 0 && idxType <= 5) {
 			var devType = RFX.userData.devices[idxDevice].device_type;
-			if (RFX.categories[idx][2]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[0][0]
-					|| devType != RFX.deviceTypes[0][2])) {
-				html += '<option value="' + RFX.deviceTypes[0][0] + '">' + RFX.deviceTypes[0][1] + '</option>';
+			if (RFX.categories[idx].isLightSwitch
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[0].devType
+					|| devType != RFX.deviceTypes[0].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[0].devType + '">' + RFX.deviceTypes[0].devDisplayName + '</option>';
 				disabled = false;
 			}
-			if (RFX.categories[idx][3]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[1][0]
-					|| devType != RFX.deviceTypes[1][2])) {
-				html += '<option value="' + RFX.deviceTypes[1][0] + '">' + RFX.deviceTypes[1][1] + '</option>';
+			if (RFX.categories[idx].isDimableLight
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[1].devType
+					|| devType != RFX.deviceTypes[1].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[1].devType + '">' + RFX.deviceTypes[1].devDisplayName + '</option>';
 				disabled = false;
 			}
-			if (RFX.categories[idx][4]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[2][0]
-					|| devType != RFX.deviceTypes[2][2])) {
-				html += '<option value="' + RFX.deviceTypes[2][0] + '">' + RFX.deviceTypes[2][1] + '</option>';
+			if (RFX.categories[idx].isMotionSensor
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[2].devType
+					|| devType != RFX.deviceTypes[2].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[2].devType + '">' + RFX.deviceTypes[2].devDisplayName + '</option>';
 				disabled = false;
 			}
-			if (RFX.categories[idx][5]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[3][0]
-					|| devType != RFX.deviceTypes[3][2])) {
-				html += '<option value="' + RFX.deviceTypes[3][0] + '">' + RFX.deviceTypes[3][1] + '</option>';
+			if (RFX.categories[idx].isDoorSensor
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[3].devType
+					|| devType != RFX.deviceTypes[3].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[3].devType + '">' + RFX.deviceTypes[3].devDisplayName + '</option>';
 				disabled = false;
 			}
-			if (RFX.categories[idx][6]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[4][0]
-					|| devType != RFX.deviceTypes[4][2])) {
-				html += '<option value="' + RFX.deviceTypes[4][0] + '">' + RFX.deviceTypes[4][1] + '</option>';
+			if (RFX.categories[idx].isLightSensor
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[4].devType
+					|| devType != RFX.deviceTypes[4].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[4].devType + '">' + RFX.deviceTypes[4].devDisplayName + '</option>';
 				disabled = false;
 			}
-			if (RFX.categories[idx][7]
-				&& (RFX.deviceTypes[idxType][0] != RFX.deviceTypes[5][0]
-					|| devType != RFX.deviceTypes[5][2])) {
-				html += '<option value="' + RFX.deviceTypes[5][0] + '">' + RFX.deviceTypes[5][1] + '</option>';
+			if (RFX.categories[idx].isWindowCovering
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[5].devType
+					|| devType != RFX.deviceTypes[5].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[5].devType + '">' + RFX.deviceTypes[5].devDisplayName + '</option>';
+				disabled = false;
+			}
+			if (RFX.categories[idx].isFan
+				&& (RFX.deviceTypes[idxType].devType != RFX.deviceTypes[6].devType
+					|| devType != RFX.deviceTypes[6].upnpType)) {
+				html += '<option value="' + RFX.deviceTypes[6].devType + '">' + RFX.deviceTypes[6].devDisplayName + '</option>';
 				disabled = false;
 			}
 		}
@@ -1955,8 +1996,8 @@ function RFX_selectDevices() {
 		var disabled2 = true;
 		if (idxDevice >= 0) {
 			for (i = 0; i < RFX.commands.length; i++) {
-				if (RFX.commands[i][0] == altid.substr(3, RFX.commands[i][0].length)) {
-					html2 += '<option value="' + RFX.commands[i][1] + '">' + RFX.commands[i][2] + '</option>';
+				if (RFX.commands[i].idPrefix == altid.substr(3, RFX.commands[i].idPrefix.length)) {
+					html2 += '<option value="' + RFX.commands[i].name + '">' + RFX.commands[i].displayName + '</option>';
 					disabled2 = false;
 				}
 			}
@@ -1974,7 +2015,7 @@ function RFX_selectDevices() {
 
 		jQuery('#selDeviceID').html(id);
 		jQuery('#newName').val(name);
-		jQuery('#curDeviceType').html(curType);
+		jQuery('#curDeviceType').html(displayedTypeName);
 		jQuery('#newDeviceType').html(html);
 		jQuery('#changeType').get(0).disabled = disabled;
 		jQuery('#commands').html(html2);
@@ -2036,10 +2077,14 @@ function RFX_checkSettings(device) {
 			RFX.tempUnit = '&deg;F';
 		}
 		for (j = 0; j < RFX.tempAndHumDeviceTypes.length; j++) {
-			if (RFX.tempAndHumDeviceTypes[j][0] == "TEMPERATURE_SENSOR") {
-				RFX.tempAndHumDeviceTypes[j][11] = RFX.tempUnit;
+			if (RFX.tempAndHumDeviceTypes[j].devType == "TEMPERATURE_SENSOR") {
+				RFX.tempAndHumDeviceTypes[j].units = RFX.tempUnit;
 				break;
 			}
+		}
+		RFX.speedUnit = ' km/h';
+		if (get_device_state(device, RFX.RFXtrxSID2, "KmhSpeed", 1) == '0') {
+			RFX.speedUnit = ' mph';
 		}
 
 		if (navigator.userAgent.toLowerCase().indexOf('msie') >= 0
@@ -2066,7 +2111,7 @@ function RFX_checkSettings(device) {
 }
 function RFX_createDevice(device) {
 	var idx = jQuery('#category option:selected').index();
-	var category = RFX.categories[idx][0];
+	var category = RFX.categories[idx].id;
 	var deviceType = jQuery('#deviceType').val();
 	var name = encodeURIComponent(jQuery('#name').val());
 	var id = undefined;
@@ -2077,19 +2122,19 @@ function RFX_createDevice(device) {
 	var channel = undefined;
 	var controlOk = true;
 	var reg1;
-	if (RFX.categories[idx][8]) {
+	if (RFX.categories[idx].idLimits) {
 		reg1 = new RegExp('^\\d+$', '');
 		if (jQuery('#id').val() == undefined || jQuery('#id').val() == ''
 			|| !jQuery('#id').val().match(reg1)
-			|| (RFX.categories[idx][9] != undefined && jQuery('#id').val() < RFX.categories[idx][9])
-			|| (RFX.categories[idx][10] != undefined && jQuery('#id').val() > RFX.categories[idx][10])) {
+			|| (RFX.categories[idx].idLimits.lower != undefined && jQuery('#id').val() < RFX.categories[idx].idLimits.lower)
+			|| (RFX.categories[idx].idLimits.upper != undefined && jQuery('#id').val() > RFX.categories[idx].idLimits.upper)) {
 			controlOk = false;
 		}
 		else {
 			id = jQuery('#id').val();
 		}
 	}
-	if (RFX.categories[idx][11]) {
+	if (RFX.categories[idx].houseCodeLimits) {
 		if (jQuery('#houseCode option:selected').index() >= 0) {
 			houseCode = jQuery('#houseCode').val();
 		}
@@ -2097,7 +2142,7 @@ function RFX_createDevice(device) {
 			controlOk = false;
 		}
 	}
-	if (RFX.categories[idx][14]) {
+	if (RFX.categories[idx].groupCodeLimits) {
 		if (jQuery('#groupCode option:selected').index() >= 0) {
 			groupCode = jQuery('#groupCode').val();
 		}
@@ -2105,7 +2150,7 @@ function RFX_createDevice(device) {
 			controlOk = false;
 		}
 	}
-	if (RFX.categories[idx][17]) {
+	if (RFX.categories[idx].unitCodeLimits) {
 		if (jQuery('#unitCode option:selected').index() >= 0) {
 			unitCode = jQuery('#unitCode').val();
 		}
@@ -2113,7 +2158,7 @@ function RFX_createDevice(device) {
 			controlOk = false;
 		}
 	}
-	if (RFX.categories[idx][20]) {
+	if (RFX.categories[idx].systemCodeLimits) {
 		if (jQuery('#systemCode option:selected').index() >= 0) {
 			systemCode = jQuery('#systemCode').val();
 		}
@@ -2121,7 +2166,7 @@ function RFX_createDevice(device) {
 			controlOk = false;
 		}
 	}
-	if (RFX.categories[idx][23]) {
+	if (RFX.categories[idx].channelLimits) {
 		if (jQuery('#channel option:selected').index() >= 0) {
 			channel = jQuery('#channel').val();
 		}
