@@ -331,5 +331,5 @@
             ]
         }
     ],
-    "DeviceType": "urn:schemas-micasaverde-com:device:ScaleSensor:1"
+    "device_type": "urn:schemas-micasaverde-com:device:ScaleSensor:1"
 }

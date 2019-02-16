@@ -345,5 +345,5 @@
             ]
         }
     ],
-  "DeviceType": "urn:schemas-micasaverde-com:device:WindSensor:1"
+  "device_type": "urn:schemas-micasaverde-com:device:WindSensor:1"
 }

@@ -629,5 +629,5 @@
             ]
         }
     ],
-    "DeviceType": "urn:rfxcom-com:device:SecurityRemote:1"
+    "device_type": "urn:rfxcom-com:device:SecurityRemote:1"
 }

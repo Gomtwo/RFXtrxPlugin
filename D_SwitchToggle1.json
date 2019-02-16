@@ -1,135 +1,158 @@
 {
-	"default_icon": "relay_default.png",
-	"state_icons": [
-		{
-			"img": "relay_default.png",
-			"conditions": [
-				{
-					"service": "urn:upnp-org:serviceId:SwitchPower1",
-					"variable": "Status",
-					"operator": "==",
-					"value": 0
-				}
-			]
-		},
-		{
-			"img": "relay_active.png",
-			"conditions": [
-				{
-					"service": "urn:upnp-org:serviceId:SwitchPower1",
-					"variable": "Status",
-					"operator": "==",
-					"value": 1
-				}
-			]
-		}
-	],
-	"x": "2",
-	"y": "4",
-	"inScene": "1",
-	"ToggleButton": 1,
-	"Tabs": [
-		{
-			"Label": {
-				"lang_tag": "ui7_tabname_control",
-				"text": "Control"
-			},
-			"Position": "0",
-			"TabType": "flash",
-			"top_navigation_tab": 1,
-			"ControlGroup": [
-				{
-					"id":"1",
-					"isSingle":"1",
-					"scenegroup":"1"
-				}
-			],
-			"SceneGroup": [
-				{
-					"id": "1",
-					"top": "2",
-					"left": "0",
-					"x": "2",
-					"y": "1"
-				}
-			],
-			"Control": [
-				{
-					"ControlGroup":"1",
-					"ControlType": "button",
-					"top": "0",
-					"left": "0",
-					"Label": {
-						"lang_tag": "cmd_toggle",
-						"text": "Toggle"
-					},
-					"Display": {
-						"Service": "urn:upnp-org:serviceId:SwitchPower1",
-						"Variable": "Status",
-						"Value": "0",
-						"Top": 60,
-						"Left": 50,
-						"Width": 75,
-						"Height": 20
-					},
-					"Command": {
-						"Service": "urn:micasaverde-com:serviceId:HaDevice1",
-						"Action": "ToggleState"
-					}
-				}
-			]
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_settings",
-				"text": "Settings"
-			},
-			"Position": "1",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "simple_device"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_advanced",
-				"text": "Advanced"
-			},
-			"Position": "2",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "advanced_device"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_device_options",
-				"text": "Device Options"
-			},
-			"Position": "3",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_zwave_options"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_logs",
-				"text": "Logs"
-			},
-			"Position": "4",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_logs"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_device_scenes",
-				"text": "Scenes"
-			},
-			"Position": "6",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_scenes"
-		}
-	],
-	"DeviceType": "urn:rfxcom-com:device:SwitchToggle:1",
-	"device_type": "urn:rfxcom-com:device:SwitchToggle:1"
+    "default_icon": "relay_default.png",
+    "state_icons": [{
+            "img": "relay_default.png",
+            "conditions": [{
+                "service": "urn:upnp-org:serviceId:SwitchPower1",
+                "variable": "Status",
+                "operator": "==",
+                "value": 0
+            }]
+        },
+        {
+            "img": "relay_active.png",
+            "conditions": [{
+                "service": "urn:upnp-org:serviceId:SwitchPower1",
+                "variable": "Status",
+                "operator": "==",
+                "value": 1
+            }]
+        }
+    ],
+    "x": "2",
+    "y": "4",
+    "inScene": "1",
+    "ToggleButton": 1,
+    "Tabs": [{
+            "Label": {
+                "lang_tag": "ui7_tabname_control",
+                "text": "Control"
+            },
+            "Position": "0",
+            "TabType": "flash",
+            "top_navigation_tab": 1,
+            "ControlGroup": [{
+                "id": "1",
+                "isSingle": "1",
+                "scenegroup": "1"
+            }],
+            "SceneGroup": [{
+                "id": "1",
+                "top": "2",
+                "left": "0",
+                "x": "2",
+                "y": "1"
+            }],
+            "Control": [{
+                "ControlGroup": "1",
+				"ControlCode": "button_1",
+                "ControlType": "button",
+                "top": "0",
+                "left": "0",
+                "Label": {
+                    "lang_tag": "cmd_toggle",
+                    "text": "Toggle"
+                },
+                "Display": {
+                    "Service": "urn:upnp-org:serviceId:SwitchPower1",
+                    "Variable": "Status",
+                    "Value": "0",
+                    "Top": 60,
+                    "Left": 50,
+                    "Width": 75,
+                    "Height": 20
+                },
+                "Command": {
+                    "Service": "urn:micasaverde-com:serviceId:HaDevice1",
+                    "Action": "ToggleState"
+                }
+            }]
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_settings",
+                "text": "Settings"
+            },
+            "Position": "1",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "simple_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_advanced",
+                "text": "Advanced"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "advanced_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_device_options",
+                "text": "Device Options"
+            },
+            "Position": "3",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_zwave_options"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_logs",
+                "text": "Logs"
+            },
+            "Position": "4",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_logs"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_device_scenes",
+                "text": "Scenes"
+            },
+            "Position": "6",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_scenes"
+        }
+    ],
+    "eventList2": [{
+        "id": 1,
+        "label": {
+            "lang_tag": "ui7_a_device_is_turned_on_off",
+            "text": "A device is turned on or off"
+        },
+        "serviceId": "urn:upnp-org:serviceId:SwitchPower1",
+        "argumentList": [{
+            "id": 1,
+            "dataType": "boolean",
+            "defaultValue": "1",
+            "allowedValueList": [{
+                    "Off": "0",
+                    "HumanFriendlyText": {
+                        "lang_tag": "ui7_hft_device_turned_off",
+                        "text": "Whenever the _DEVICE_NAME_ is turned off"
+                    }
+                },
+                {
+                    "On": "1",
+                    "HumanFriendlyText": {
+                        "lang_tag": "ui7_hft_device_turned_on",
+                        "text": "Whenever the _DEVICE_NAME_ is turned on"
+                    }
+                }
+            ],
+            "name": "Status",
+            "comparisson": "=",
+            "prefix": {
+                "lang_tag": "ui7_which_mode",
+                "text": "Which mode"
+            },
+            "suffix": {}
+        }]
+    }],
+    "device_type": "urn:rfxcom-com:device:SwitchToggle:1"
 }

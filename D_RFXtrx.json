@@ -88,5 +88,5 @@
 			"Function": "RFX_showHelp"
 		}
 	],
-	"DeviceType": "urn:schemas-rfxcom-com:device:rfxtrx:1"
+	"device_type": "urn:schemas-rfxcom-com:device:rfxtrx:1"
 }

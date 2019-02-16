@@ -263,5 +263,5 @@
             ]
         }
     ],
-  "DeviceType": "urn:casa-delanghe-com:device:RFXMeter:1"
+  "device_type": "urn:casa-delanghe-com:device:RFXMeter:1"
 }
