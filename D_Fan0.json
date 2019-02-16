@@ -1,0 +1,846 @@
+{
+	"default_icon": "FanIcon0",
+	"state_icons": [
+		{
+			"img": "FanIcon0.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "Off"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon1.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "1"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon2.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "2"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon3.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "3"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon4.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "4"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon5.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "5"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon6.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "6"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 0
+				}
+			]
+		},
+		{
+			"img": "FanIcon0L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "Off"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon1L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "1"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon2L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "2"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon3L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "3"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon4L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "4"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon5L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "5"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		},
+		{
+			"img": "FanIcon6L.png",
+			"conditions": [
+				{
+					"service": "urn:rfxcom-com:serviceId:Fan1",
+					"variable": "Speed",
+					"operator": "==",
+					"value": "6"
+				},
+				{
+					"service": "urn:upnp-org:serviceId:SwitchPower1",
+					"variable": "Status",
+					"operator": "==",
+					"value": 1
+				}
+			]
+		}
+	],
+	"x": "2",
+	"y": "4",
+	"iconText": "1",
+	"inScene": "1",
+	"ToggleButton": 1,
+	"Tabs": [
+		{
+			"Label": {
+				"lang_tag": "ui7_tabname_control",
+				"text": "Control"
+			},
+			"Position": "0",
+			"TabType": "flash",
+			"top_navigation_tab": 1,
+			"ControlGroup": [
+				{
+					"id": "1",
+					"isSingle": "1",
+					"scenegroup": "1"
+				},
+				{
+					"id": "2",
+					"isSingle": "1",
+					"scenegroup": "1"
+				},
+				{
+					"id": "3",
+					"isSingle": "1",
+					"scenegroup": "1"
+				}
+			],
+			"SceneGroup": [
+				{
+					"id": "1",
+					"top": "0.5",
+					"left": "0",
+					"x": "2",
+					"y": "2.5"
+				}
+			],
+			"Control": [
+				{
+					"ControlGroup": "1",
+					"ControlCode": "spacer_1",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "5",
+					"ControlType": "spacer"
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_1",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.4",
+					"top": "0",
+					"left": "0",
+					"Label": {
+						"lang_tag": "cmd_+",
+						"text": "+"
+					},
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Variable": "Speed",
+						"Value": "",
+						"Top": 30,
+						"Left": 200,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "FanAction",
+						"Parameters": [
+							{
+								"Name": "newAction",
+								"Value": "SpeedUp"
+							}
+						]
+					}
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_2",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.4",
+					"top": "0",
+					"left": "1",
+					"Label": {
+						"lang_tag": "cmd_-",
+						"text": "-"
+					},
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Variable": "Speed",
+						"Value": "",
+						"Top": 30,
+						"Left": 125,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "FanAction",
+						"Parameters": [
+							{
+								"Name": "newAction",
+								"Value": "SpeedDown"
+							}
+						]
+					}
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_3",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.7",
+					"top": "0",
+					"left": "0",
+					"Label": {
+						"lang_tag": "cmd_light",
+						"text": "Light"
+					},
+					"Display": {
+						"Service": "urn:upnp-org:serviceId:SwitchPower1",
+						"Variable": "Status",
+						"Value": "1",
+						"Top": 30,
+						"Left": 350,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "ToggleLight",
+						"Parameters": []
+					}
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "line_break_1",
+					"no_control_panel": "1",
+					"ControlType": "line_break"
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "spacer_2",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "3",
+					"ControlType": "spacer"
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_4",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.8",
+					"top": "0",
+					"left": "1",
+					"Label": {
+						"lang_tag": "cmd_timer",
+						"text": "Timer"
+					},
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Variable": "Speed",
+						"Value": "",
+						"Top": 30,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "FanAction",
+						"Parameters": [
+							{
+								"Name": "newAction",
+								"Value": "Timer"
+							}
+						]
+					}
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_5",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.85",
+					"top": "0",
+					"left": "0",
+					"Label": {
+						"lang_tag": "cmd_learn",
+						"text": "Learn"
+					},
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Variable": "Reversed",
+						"Value": "",
+						"Top": 60,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "FanAction",
+						"Parameters": [
+							{
+								"Name": "newAction",
+								"Value": "Learn"
+							}
+						]
+					}
+				},
+				{
+					"ControlGroup": "1",
+					"ControlCode": "button_6",
+					"ControlType": "button",
+					"no_control_panel": "1",
+					"HorizontalMultiplier": "0.85",
+					"top": "0",
+					"left": "0",
+					"Label": {
+						"lang_tag": "cmd_confirm",
+						"text": "Pair"
+					},
+					"Display": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Variable": "Confirm",
+						"Value": "",
+						"Top": 60,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					},
+					"Command": {
+						"Service": "urn:rfxcom-com:serviceId:Fan1",
+						"Action": "FanAction",
+						"Parameters": [
+							{
+								"Name": "newAction",
+								"Value": "Confirm"
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_settings",
+				"text": "Settings"
+			},
+			"Position": "1",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "simple_device"
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_advanced",
+				"text": "Advanced"
+			},
+			"Position": "2",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "advanced_device"
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_device_options",
+				"text": "Device Options"
+			},
+			"Position": "3",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_zwave_options"
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_logs",
+				"text": "Logs"
+			},
+			"Position": "4",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_logs"
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_notifications",
+				"text": "Notifications"
+			},
+			"Position": "5",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_notifications"
+		},
+		{
+			"Label": {
+				"lang_tag": "ui7_device_scenes",
+				"text": "Scenes"
+			},
+			"Position": "6",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_scenes"
+		}
+	],
+	"eventList2": [
+		{
+			"id": 1,
+			"label": {
+				"lang_tag": "fan_speed_changes",
+				"text": "Fan Speed Changes"
+			},
+			"serviceId": "urn:rfxcom-com:serviceId:Fan1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "string",
+					"defaultValue": "",
+					"allowedValueList": [
+						{
+							"Off": "Off",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_turned_off",
+								"text": "_DEVICE_NAME_ is turned off"
+							}
+						},
+						{
+							"One": "1",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_1",
+								"text": "_DEVICE_NAME_ speed is set to 1"
+							}
+						},
+						{
+							"Two": "2",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_2",
+								"text": "_DEVICE_NAME_ speed is set to 2"
+							}
+						},
+						{
+							"Three": "3",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_3",
+								"text": "_DEVICE_NAME_ speed is set to 3"
+							}
+						},
+						{
+							"Four": "4",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_4",
+								"text": "_DEVICE_NAME_ speed is set to 4"
+							}
+						},
+						{
+							"Five": "5",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_5",
+								"text": "_DEVICE_NAME_ speed is set to 5"
+							}
+						},
+						{
+							"Six": "6",
+							"HumanFriendlyText": {
+								"lang_tag": "hft_fan_speed_set_to_6",
+								"text": "_DEVICE_NAME_ speed is set to 6"
+							}
+						}
+					],
+					"name": "Speed",
+					"comparisson": "=",
+					"prefix": {
+						"lang_tag": "speed",
+						"text": "Speed"
+					},
+					"suffix": {}
+				}
+			]
+		},
+		{
+			"id": 2,
+			"label": {
+				"lang_tag": "ui7_a_fan_light_is_turned_on_off",
+				"text": "The light is turned on or off"
+			},
+			"serviceId": "urn:upnp-org:serviceId:SwitchPower1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "boolean",
+					"defaultValue": "1",
+					"allowedValueList": [
+						{
+							"Off": "0",
+							"HumanFriendlyText": {
+								"lang_tag": "ui7_hft_fan_light_turned_off",
+								"text": "Whenever the _DEVICE_NAME_ light is turned off"
+							}
+						},
+						{
+							"On": "1",
+							"HumanFriendlyText": {
+								"lang_tag": "ui7_hft_fan_light_turned_on",
+								"text": "Whenever the _DEVICE_NAME_ light is turned on"
+							}
+						}
+					],
+					"name": "Status",
+					"comparisson": "=",
+					"prefix": {
+						"lang_tag": "ui7_which_mode",
+						"text": "Which mode"
+					},
+					"suffix": {}
+				}
+			]
+		},
+		{
+			"id": 3,
+			"label": {
+				"lang_tag": "ui7_energy_usage_goes_above",
+				"text": "Energy usage goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"norepeat": "1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "Watts",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "ui7_general_ucase_watts",
+						"text": "Watts"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_hft_energy_usage_goes_above",
+						"text": "Energy usage for _DEVICE_NAME_ goes above _ARGUMENT_VALUE_ Watts"
+					}
+				}
+			]
+		},
+		{
+			"id": 4,
+			"label": {
+				"lang_tag": "ui7_energy_usage_goes_below",
+				"text": "Energy usage goes below"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"norepeat": "1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "Watts",
+					"comparisson": "<",
+					"prefix": {
+						"lang_tag": "ui7_general_ucase_watts",
+						"text": "Watts"
+					},
+					"suffix": {},
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_hft_energy_usage_goes_below",
+						"text": "Whenever the energy usage for _DEVICE_NAME_ goes below _ARGUMENT_VALUE_ Watts"
+					},
+                    "minValue": 1
+				}
+			]
+		},
+		{
+			"id": 5,
+			"label": {
+				"lang_tag": "ui7_wh_energy_usage_24_goes_above",
+				"text": "Device energy usage for last 24 hours goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "DayKWH",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "kwh",
+						"text": "KWH"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_kwh_usage_goes_above_day_dev",
+						"text": "Total energy usage for _DEVICE_NAME_ goes over _ARGUMENT_VALUE_ KWH in the last day"
+					}
+				}
+			]
+		},
+		{
+			"id": 6,
+			"label": {
+				"lang_tag": "ui7_wh_energy_usage_7_goes_above",
+				"text": "Device energy usage for last week goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "WeekKWH",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "kwh",
+						"text": "KWH"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_kwh_usage_goes_above_week_dev",
+						"text": "Total energy usage for _DEVICE_NAME_ goes over _ARGUMENT_VALUE_ KWH in the last week"
+					}
+				}
+			]
+		},
+		{
+			"id": 7,
+			"label": {
+				"lang_tag": "ui7_wh_energy_usage_30_goes_below",
+				"text": "Device energy usage for last 30 days goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "MonthKWH",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "kwh",
+						"text": "KWH"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_kwh_usage_goes_below_month_dev",
+						"text": "Total energy usage for _DEVICE_NAME_ goes above _ARGUMENT_VALUE_ KWH in the last 30 days"
+					}
+				}
+			]
+		},
+		{
+			"id": 8,
+			"label": {
+				"lang_tag": "ui7_wh_energy_usage_365_goes_below",
+				"text": "Device energy usage for last year goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "YearKWH",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "kwh",
+						"text": "KWH"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_kwh_usage_goes_below_year_dev",
+						"text": "Total energy usage for _DEVICE_NAME_ goes above _ARGUMENT_VALUE_ KWH in the last year"
+					}
+				}
+			]
+		},
+		{
+			"id": 9,
+			"label": {
+				"lang_tag": "ui7_wh_energy_usage_life_goes_below",
+				"text": "Lifetime device energy usage goes above"
+			},
+			"serviceId": "urn:micasaverde-com:serviceId:EnergyMetering1",
+			"argumentList": [
+				{
+					"id": 1,
+					"dataType": "i4",
+					"name": "LifeKWH",
+					"comparisson": ">",
+					"prefix": {
+						"lang_tag": "kwh",
+						"text": "KWH"
+					},
+					"suffix": "",
+					"HumanFriendlyText": {
+						"lang_tag": "ui7_kwh_usage_goes_below_lifetime_dev",
+						"text": "Lifetime energy usage for _DEVICE_NAME_ goes above _ARGUMENT_VALUE_ KWH"
+					}
+				}
+			]
+		}
+	],
+	"device_type": "urn:rfxcom-com:device:Fan:1"
+}

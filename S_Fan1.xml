@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+	<specVersion>
+		<major>1</major>
+		<minor>0</minor>
+	</specVersion>
+	<serviceStateTable>
+		<stateVariable sendEvents="yes">
+			<name>Reversed</name>
+			<dataType>boolean</dataType>
+			<defaultValue>0</defaultValue>
+			<shortCode>reversed</shortCode>
+		</stateVariable>
+		<stateVariable sendEvents="yes">
+			<name>Speed</name>
+			<dataType>string</dataType>
+			<shortCode>speed</shortCode>
+		</stateVariable>
+	</serviceStateTable>
+	<actionList>
+		<action>
+			<name>ToggleReversed</name>
+		</action>
+		<action>
+			<name>ToggleLight</name>
+		</action>
+		<action>
+			<name>FanAction</name>
+			<argumentList>
+				<argument>
+					<name>newAction</name>
+					<direction>in</direction>
+				</argument>
+			</argumentList>
+		</action>
+	</actionList>
+</scpd>
