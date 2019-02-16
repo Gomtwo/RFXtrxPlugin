@@ -51,11 +51,6 @@
 	  		<run>if (pluginLib ~= nil) then pluginLib.switchPower(lul_device, lul_settings.newTargetValue) end</run>
 	    </action>
 		<action>
-			<serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
-			<name>ToggleState</name>
-			<run>if (pluginLib ~= nil) then pluginLib.toggleState(lul_device) end</run>
-		</action>
-		<action>
 			<serviceId>urn:upnp-org:serviceId:Dimming1</serviceId>
 			<name>SetLoadLevelTarget</name>
 			<run>if (pluginLib ~= nil) then pluginLib.setDimLevel(lul_device, lul_settings.newLoadlevelTarget) end</run>
@@ -63,17 +58,32 @@
 		<action>
 			<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
 			<name>Up</name>
-			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Up") end</run>
+			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Open") end</run>
 		</action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
 			<name>Down</name>
-			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Down") end</run>
+			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Close") end</run>
 		</action>
 		<action>
 			<serviceId>urn:upnp-org:serviceId:WindowCovering1</serviceId>
 			<name>Stop</name>
 			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Stop") end</run>
+		</action>
+	    <action>
+	  		<serviceId>urn:rfxcom-com:serviceId:Fan1</serviceId>
+	  		<name>FanAction</name>
+	  		<run>if (pluginLib ~= nil and lul_settings~= nil) then pluginLib.controlFan(lul_device, lul_settings.newAction) end</run>
+	    </action>
+	    <action>
+	  		<serviceId>urn:rfxcom-com:serviceId:Fan1</serviceId>
+	  		<name>ToggleLight</name>
+	  		<run>if (pluginLib ~= nil) then pluginLib.controlFan(lul_device, 'Light') end</run>
+	    </action>
+		<action>
+			<serviceId>urn:rfxcom-com:serviceId:RFYControl1</serviceId>
+			<name>Program</name>
+			<run>if (pluginLib ~= nil) then pluginLib.windowCovering(lul_device, "Program") end</run>
 		</action>
 		<action>
 			<serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
