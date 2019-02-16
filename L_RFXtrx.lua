@@ -1,8 +1,55 @@
 module("L_RFXtrx", package.seeall)
 
+-- class.lua
+-- Compatible with Lua 5.1 (not 5.0).
+-- This class definition is copied from http://lua-users.org/wiki/SimpleLuaClasses
+local function class(base, init)
+	local c = {}	-- a new class instance
+	if not init and type(base) == 'function' then
+		init = base
+		base = nil
+	elseif type(base) == 'table' then
+		-- our new class is a shallow copy of the base class!
+		for i,v in pairs(base) do
+			c[i] = v
+		end
+		c._base = base
+	end
+	-- the class will be the metatable for all its objects,
+	-- and they will look up their methods in it.
+	c.__index = c
+
+	-- expose a constructor which can be called by <classname>(<args>)
+	local mt = {}
+	mt.__call = function(class_tbl,...)
+		local obj = {}
+		setmetatable(obj,c)
+		if init then
+			init(obj,...)
+		else
+			-- make sure that any stuff from the base class is initialized!
+			if base and base.init then
+				base.init(obj,...)
+			end
+		end
+		return obj
+	end
+	c.init = init
+	c.is_a = function(self, klass)
+		local m = getmetatable(self)
+		while m do
+			if m == klass then return true end
+			m = m._base
+		end
+		return false
+	end
+	setmetatable(c, mt)
+	return c
+end
+
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.63"
+local PLUGIN_VERSION = "1.80"
 
 local THIS_DEVICE = 0
 local buffer = ""
@@ -27,229 +74,61 @@ local LacrosseMMPerCount = 0.2667
 
 local DEBUG_MODE = false
 
-local function log(text, level)
-	luup.log("RFXtrx: " .. text, (level or 50))
-end
-
-local function warning(stuff)
-	log("warning: " .. stuff, 2)
-end
-
-local function error(stuff)
-	log("error: " .. stuff, 1)
-end
-
-local function debug(stuff)
-	if (DEBUG_MODE) then
-		log("dbg: " .. stuff)
-	end
-end
-
--- class.lua
--- Compatible with Lua 5.1 (not 5.0).
--- This class definition is copied from http://lua-users.org/wiki/SimpleLuaClasses
-local function class(base, init)
-	local c = {}	-- a new class instance
-	if not init and type(base) == 'function' then
-		init = base
-		base = nil
-	elseif type(base) == 'table' then
-		-- our new class is a shallow copy of the base class!
-		for i,v in pairs(base) do
-			c[i] = v
-		end
-		c._base = base
-	end
-	-- the class will be the metatable for all its objects,
-	-- and they will look up their methods in it.
-	c.__index = c
-
-	-- expose a constructor which can be called by <classname>(<args>)
-	local mt = {}
-	mt.__call = function(class_tbl, ...)
-		local obj = {}
-		setmetatable(obj,c)
-		if init then
-			init(obj,...)
-		else
-			-- make sure that any stuff from the base class is initialized!
-			if base and base.init then
-				base.init(obj, ...)
-			end
-		end
-		return obj
-	end
-	c.init = init
-	c.is_a = function(self, klass)
-		local m = getmetatable(self)
-		while m do
-			if m == klass then return true end
-			m = m._base
-		end
-		return false
-	end
-	setmetatable(c, mt)
-	return c
-end
-
--- Define a class for our message types
-local Message = class(function(a, type, subType, length)
-	a.type = type			-- the packet type
-	a.subType = subType		-- the subtype
-	a.length = length		-- the length in bytes
-	a.key = string.format('%06X',(bitw.lshift((bitw.lshift(length,8) + type), 8)) + subType)
-	a.decodeFunction = nil	-- the function used to decode the command
-end)
-
--- A class method to print a message class object
---function Message:__tostring()
---	local part1 = "Message - length: " .. string.format("0x%02X", self.length) .. " type: " .. string.format("0x%02X", self.type)
---	local part2 = ' subType: ' .. self.subtype .. ' key: ' .. self.key or 'nil' .. ' decode function: ' .. self.decodeFunction or 'nil'
---	return (part1 .. part2)
---end
--- Create the message types in a table so we can work with them as a group
--- Each message is created with a type, subType and length
-local tableMsgTypes = {
-	MODE_COMMAND =				Message( 0x00, 0x00, 13 ),
-	RESPONSE_MODE_COMMAND =		Message( 0x01, 0x00, 20 ),
-	UNKNOWN_RTS_REMOTE =		Message( 0x01, 0x01, 13 ),
-	WRONG_COMMAND =				Message( 0x01, 0xFF, 13 ),
-	RECEIVER_LOCK_ERROR =		Message( 0x02, 0x00, 4 ),
-	TRANSMITTER_RESPONSE =		Message( 0x02, 0x01, 4 ),
-	LIGHTING_X10 =				Message( 0x10, 0x0, 7 ),
-	LIGHTING_ARC =				Message( 0x10, 0x1, 7 ),
-	LIGHTING_AB400D =			Message( 0x10, 0x2, 7 ),
-	LIGHTING_WAVEMAN =			Message( 0x10, 0x3, 7 ),
-	LIGHTING_EMW200 =			Message( 0x10, 0x4, 7 ),
-	LIGHTING_IMPULS =			Message( 0x10, 0x5, 7 ),
-	LIGHTING_RISINGSUN =		Message( 0x10, 0x6, 7 ),
-	LIGHTING_PHILIPS =			Message( 0x10, 0x7, 7 ),
-	LIGHTING_ENERGENIE_ENER010 =Message( 0x10, 0x8, 7 ),
-	LIGHTING_ENERGENIE_5GANG =	Message( 0x10, 0x9, 7 ),
-	LIGHTING_COCO =				Message( 0x10, 0xa, 7 ),
-	LIGHTING_AC =				Message( 0x11, 0x0, 11 ),
-	LIGHTING_HEU =				Message( 0x11, 0x1, 11 ),
-	LIGHTING_ANSLUT =			Message( 0x11, 0x2, 11 ),
-	LIGHTING_KOPPLA =			Message( 0x12, 0x0, 8 ),
-	SECURITY_DOOR =				Message( 0x13, 0x0, 9 ),
-	LIGHTING_LIGHTWARERF =		Message( 0x14, 0x0, 10 ),
-	LIGHTING_EMW100 =			Message( 0x14, 0x1, 10 ),
-	LIGHTING_BBSB =				Message( 0x14, 0x2, 10 ),
-	LIGHTING_RSL2 =				Message( 0x14, 0x4, 10 ),
-	LIGHTING_LIVOLO =			Message( 0x14, 0x5, 10 ),
-	LIGHTING_KANGTAI =			Message( 0x14, 0x11, 10 ),
-	LIGHTING_BLYSS =			Message( 0x15, 0x0, 11 ),
-	CURTAIN_HARRISON =			Message( 0x18, 0x0, 7 ),
-	BLIND_T0 =					Message( 0x19, 0x0, 9 ),
-	BLIND_T1 =					Message( 0x19, 0x1, 9 ),
-	BLIND_T2 =					Message( 0x19, 0x2, 9 ),
-	BLIND_T3 =					Message( 0x19, 0x3, 9 ),
-	BLIND_T4 =					Message( 0x19, 0x4, 9 ),
-	BLIND_T5 =					Message( 0x19, 0x5, 9 ),
-	BLIND_T6 =					Message( 0x19, 0x6, 9 ),
-	BLIND_T7 =					Message( 0x19, 0x7, 9 ),
-	RFY0 =						Message( 0x1A, 0x0, 12 ),
-	SECURITY_X10DS =			Message( 0x20, 0x0, 8 ),
-	SECURITY_X10MS =			Message( 0x20, 0x1, 8 ),
-	SECURITY_X10SR =			Message( 0x20, 0x2, 8 ),
-	KD101 =						Message( 0x20, 0x3, 8 ),
-	POWERCODE_PRIMDS =			Message( 0x20, 0x4, 8 ),
-	POWERCODE_MS =				Message( 0x20, 0x5, 8 ),
-	POWERCODE_AUXDS =			Message( 0x20, 0x7, 8 ),
-	SECURITY_MEISR =			Message( 0x20, 0x8, 8 ),
-	SA30 =						Message( 0x20, 0x9, 8 ),
-	ATI_REMOTE_WONDER =			Message( 0x30, 0x0, 6 ),
-	ATI_REMOTE_WONDER_PLUS =	Message( 0x30, 0x1, 6 ),
-	MEDION_REMOTE =				Message( 0x30, 0x2, 6 ),
-	X10_PC_REMOTE =				Message( 0x30, 0x3, 6 ),
-	ATI_REMOTE_WONDER_II =		Message( 0x30, 0x4, 6 ),
-	HEATER3_MERTIK1 =			Message( 0x42, 0x0, 8 ),
-	HEATER3_MERTIK2 =			Message( 0x42, 0x1, 8 ),
-	TR1 =						Message( 0x4F, 0x1, 10 ),
-	TEMP1 =						Message( 0x50, 0x1, 8 ),
-	TEMP2 =						Message( 0x50, 0x2, 8 ),
-	TEMP3 =						Message( 0x50, 0x3, 8 ),
-	TEMP4 =						Message( 0x50, 0x4, 8 ),
-	TEMP5 =						Message( 0x50, 0x5, 8 ),
-	TEMP6 =						Message( 0x50, 0x6, 8 ),
-	TEMP7 =						Message( 0x50, 0x7, 8 ),
-	TEMP8 =						Message( 0x50, 0x8, 8 ),
-	TEMP9 =						Message( 0x50, 0x9, 8 ),
-	TEMP10 =					Message( 0x50, 0xA, 8 ),
-	TEMP11 =					Message( 0x50, 0xB, 8 ),
-	HUM1 =						Message( 0x51, 0x1, 8 ),
-	HUM2 =						Message( 0x51, 0x2, 8 ),
-	TEMP_HUM1 =					Message( 0x52, 0x1, 10 ),
-	TEMP_HUM2 =					Message( 0x52, 0x2, 10 ),
-	TEMP_HUM3 =					Message( 0x52, 0x3, 10 ),
-	TEMP_HUM4 =					Message( 0x52, 0x4, 10 ),
-	TEMP_HUM5 =					Message( 0x52, 0x5, 10 ),
-	TEMP_HUM6 =					Message( 0x52, 0x6, 10 ),
-	TEMP_HUM7 =					Message( 0x52, 0x7, 10 ),
-	TEMP_HUM8 =					Message( 0x52, 0x8, 10 ),
-	TEMP_HUM9 =					Message( 0x52, 0x9, 10 ),
-	TEMP_HUM10 =				Message( 0x52, 0xa, 10 ),
-	TEMP_HUM11 =				Message( 0x52, 0xb, 10 ),
-	TEMP_HUM12 =				Message( 0x52, 0xc, 10 ),
-	TEMP_HUM13 =				Message( 0x52, 0xd, 10 ),
-	TEMP_HUM14 =				Message( 0x52, 0xe, 10 ),
-	BARO1 =						Message( 0x53, 0x1, 9 ),
-	TEMP_HUM_BARO1 =			Message( 0x54, 0x1, 13 ),
-	TEMP_HUM_BARO2 =			Message( 0x54, 0x2, 13 ),
-	RAIN1 =						Message( 0x55, 0x1, 11 ),
-	RAIN2 =						Message( 0x55, 0x2, 11 ),
-	RAIN3 =						Message( 0x55, 0x3, 11 ),
-	RAIN4 =						Message( 0x55, 0x4, 11 ),
-	RAIN5 =						Message( 0x55, 0x5, 11 ),
-	RAIN6 =						Message( 0x55, 0x6, 11 ),
-	RAIN7 =						Message( 0x55, 0x7, 11 ),
-	WIND1 =						Message( 0x56, 0x1, 16 ),
-	WIND2 =						Message( 0x56, 0x2, 16 ),
-	WIND3 =						Message( 0x56, 0x3, 16 ),
-	WIND4 =						Message( 0x56, 0x4, 16 ),
-	WIND5 =						Message( 0x56, 0x5, 16 ),
-	WIND6 =						Message( 0x56, 0x6, 16 ),
-	WIND7 =						Message( 0x56, 0x7, 16 ),
-	UV1 =						Message( 0x57, 0x1, 9 ),
-	UV2 =						Message( 0x57, 0x2, 9 ),
-	UV3 =						Message( 0x57, 0x3, 9 ),
-	ELEC1 =						Message( 0x59, 0x1, 13 ),
-	ELEC2 =						Message( 0x5A, 0x1, 17 ),
-	ELEC3 =						Message( 0x5A, 0x2, 17 ),
-	ELEC4 =						Message( 0x5B, 0x1, 19 ),
-	WEIGHT1 =					Message( 0x5D, 0x1, 8 ),
-	WEIGHT2 =					Message( 0x5D, 0x2, 8 ),
-	RFXSENSOR_T =				Message( 0x70, 0x0, 7 ),
-	RFXMETER =					Message( 0x71, 0x0, 10 )
-}
-
--- Define a class for commands to be processed
-local DeviceCmd = class(function(a, altid, cmd, value, delay)
-	a.altid = altid		-- the altid of the device to act on
-	a.cmd = cmd			-- the Command object defining what to do. Most often this is a variable name
-	a.value = value		-- the value data used by the command
-	a.delay = delay		-- the delay amount for delayed message actions
-end)
-
--- This table is initialized in deferredStartup
--- It is used to select a message type based on the length, type, and subtype
---  found in the received message.
-local tableMsgSelect = {}
-
 local DATA_MSG_RESET = string.char(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 local DATA_MSG_GET_STATUS = string.char(2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 local DATA_MSG_SAVE = string.char(6, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
--- This table keeps trace of messages sent by the plugin to the RFXtrx
+-- Forward definitions
+local findChild
+local getVariable
+local tableMsgTypes
+
+local function log(text, level)
+	luup.log("RFXtrx: "..text, (level or 50))
+end
+
+local function warning(stuff)
+	log("warning: "..stuff, 2)
+end
+
+local function error(stuff)
+	log("error: "..stuff, 1)
+end
+
+local function debug(stuff)
+	if (DEBUG_MODE) then
+		log("dbg: "..stuff)
+	end
+end
+
+local CmdCodeCmd = class(function(a, cmdCode, cmd)
+	a.cmdCode = cmdCode	-- the command to be sent to the device
+	a.cmd = cmd			-- the command to be acted on for the UI - translates to a variable
+end)
+
+-- Function called when an unhandled input message is received from the RFXtrx
+local function decodeUnkMsg()
+	warning("Unhandled message received.")
+	return {}
+end
+
+-- Function called when an attempt is made to create a message to be transmitted
+-- from an unrecognized UI input.
+local function createUnkMsg()
+	warning("Attempt to create untransmitted message.")
+	return nil
+end
+
+-----------------------------------------------------------------------------------------
+-- LUA is all about tables. Since this plugin's main purpose is to translate UI commands into
+--  device command codes or device command codes into UI updates, it uses lots of tables.
+--
+-- This table keeps track of messages sent by the plugin to the RFXtrx
 -- Each entry is a table of 2 elements:
 -- 1) sequence number of the message
 -- 2) table of commands
 local tableMsgSent = {}
-
--- A table to speed up searching for a command
--- Used by searchCommandsTable(cmd)
---local tableCommandByCmd = {}
-
+--
 -- A class for commands
 local Command = class(function(a, name, deviceType, variable)
 	a.name = name				-- Name of the command
@@ -258,9 +137,9 @@ local Command = class(function(a, name, deviceType, variable)
 end)
 
 -- A class method to print a command class object
---function Command:__tostring()
---	return("Command - name: " .. self.name .. " deviceType: " .. self.deviceType .. ' variable: ' .. self.variable or 'nil')
---end
+function Command:__tostring()
+	return("Command.name: "..self.name.." .deviceType: "..self.deviceType..' .variable: '..self.variable or 'nil')
+end
 
 -- The table defines all commands used by the plugin
 -- Each command object (defined above)
@@ -270,11 +149,16 @@ end)
 local tableCommandTypes = {
 	CMD_ON = Command("On", "LIGHT", "VAR_LIGHT"),
 	CMD_OFF = Command("Off", "LIGHT", "VAR_LIGHT"),
+	CMD_LIGHT = Command("Light", "LIGHT", "VAR_LIGHT"),
 	CMD_OPEN = Command("Open", "COVER", nil),
 	CMD_CLOSE = Command("Close", "COVER", nil),
 	CMD_STOP = Command("Stop", "COVER", nil),
 	CMD_DIM = Command("Dim", "DIMMER", "VAR_DIMMER"),
+	CMD_DIMLAST = Command("DimLast", "DIMMER", "VAR_DIMMERLAST"),
 	CMD_PROGRAM = Command("Program", nil, nil),
+	CMD_FANLIGHT = Command("Light", "FAN", "VAR_STATE"),
+	CMD_REVERSE = Command("Reverse", "FAN", "VAR_REVERSE"),
+	CMD_SPEED = Command("Speed", "FAN", "VAR_SPEED"),
 	CMD_TEMP = Command("Temperature", "TEMP", "VAR_TEMP"),
 	CMD_TEMPTABLE = Command("Temptable", "TEMP", "VAR_TEMPMAXMIN"),
 	CMD_TEMPMAX24HR = Command("Tempmax24hr", "TEMP", "VAR_TEMPMAX24HR"),
@@ -333,6 +217,325 @@ local tableCommandTypes = {
 	CMD_HEATER_UP = Command("HeaterUp", "HEATER", nil),
 	CMD_HEATER_DOWN = Command("HeaterDown", "HEATER", nil)
 }
+-- These tables are used to translate an action initiated in the UI
+--  into a device command code
+local tableActions2CmdCodes = {
+	-- Lighting devices
+	L1Action2CmdCode = {
+		['Off'] = 0x00,
+		['On'] = 0x01,
+		['Dim'] = 0x02,
+		['Bright'] = 0x03,
+		['Program'] = 0x04,
+		['GroupOff'] = 0x05,
+		['GroupOn'] = 0x06,
+		['Chime'] = 0x07
+	},
+	L2Action2CmdCode = {
+		['Off'] = 0x00,
+		['On'] = 0x01,
+		['SetLevel'] = 0x02,
+		['Dim'] = 0x02,	-- The command resulting from the JSON file
+		['GroupOff'] = 0x03,
+		['GroupOn'] = 0x04,
+		['SetGroupLevel'] = 0x05
+	},
+	L5aAction2CmdCode = {
+		['Off'] = 0x00,
+		['Toggle'] = 0x00,
+		['On'] = 0x01,
+		['GroupOff'] = 0x02,
+		['Learn'] = 0x02,
+		['GroupOn'] = 0x03,
+		['Mood1'] = 0x03,
+		['Mood2'] = 0x04,
+		['Mood3'] = 0x05,
+		['Mood4'] = 0x06,
+		['Mood5'] = 0x07,
+		['reserved1'] = 0x08,
+		['reserved2'] = 0x09,
+		['Unlock'] = 0x0A,
+		['Lock'] = 0x0B,
+		['AllLock'] = 0x0C,
+		['Close'] = 0x0D,
+		['Stop'] = 0x0E,
+		['Open'] = 0x0F,
+		['SetLevel'] = 0x10,
+		['ColourPalette'] = 0x11,
+		['ColourTone'] = 0x12,
+		['ColourCycle'] = 0x13,
+		['Power'] = 0x00,
+		['Light'] = 0x01,
+		['Bright'] = 0x02,
+		['Dim'] = 0x03,
+		['100%'] = 0x04,
+		['50%'] = 0x05,
+		['25%'] = 0x06,
+		['Mode+'] = 0x07,
+		['Speed-'] = 0x08,
+		['Speed+'] = 0x09,
+		['Mode-'] = 0x0A,
+		['Color+'] = 0x04,
+		['Color-'] = 0x05,
+		['SelectColor'] = 0xFF
+	},
+	L5bAction2CmdCode = {
+		['Off'] = 0x03,
+		['On'] = 0x02,
+		['GroupOff'] = 0x00,
+		['ToggleGang1'] = 0x01,
+		['ToggleGang2'] = 0x02,
+		['ToggleGang3'] = 0x03,
+		['Bright'] = 0x02,
+		['Dim'] = 0x03,
+		['Toggle1'] = 0x01,
+		['Toggle2'] = 0x02,
+		['Toggle3'] = 0x03,
+		['Toggle4'] = 0x04,
+		['Toggle5'] = 0x05,
+		['Toggle6'] = 0x06,
+		['Toggle7'] = 0x07,
+		['Bright7'] = 0x08,
+		['Dim7'] = 0x09,
+		['Toggle8'] = 0x0A,
+		['Toggle9'] = 0x0B,
+		['Bright9'] = 0x0C,
+		['Dim9'] = 0x0D,
+		['Toggle10'] = 0x0E,
+		['Scene1'] = 0x0F,
+		['Scene2'] = 0x10,
+		['Scene3'] = 0x11,
+		['Scene4'] = 0x12,
+		['OK_Set'] = 0x13
+	},
+	L5cAction2CmdCode = {
+		['Power'] = 0x00,
+		['Bright'] = 0x01,
+		['Dim'] = 0x02,
+		['100%'] = 0x03,
+		['80%'] = 0x04,
+		['60%'] = 0x05,
+		['40%'] = 0x06,
+		['20%'] = 0x07,
+		['10%'] = 0x08,
+	},
+	L6Action2CmdCode = {
+		['Off'] = 0x01,
+		['On'] = 0x00,
+		['GroupOn'] = 0x02,
+		['GroupOff'] = 0x03
+	},
+	-- Blinds, window covers
+	BaAction2CmdCode = {
+		['Open'] = 0x00,
+		['Close'] = 0x01,
+		['Stop'] = 0x02,
+		['Confirm_Pair'] = 0x03,
+		['SetLimit'] = 0x04,
+		['SetLowerLimit'] = 0x05,
+		['DeleteLimits'] = 0x06,
+		['ChangeDir'] = 0x07,
+		['Left'] = 0x08,
+		['Right'] = 0x09,
+		['IntPosA'] = 0x04,
+		['ChangeAngle+'] = 0x04,
+		['ChangeAngle-'] = 0x05
+	},
+	BbAction2CmdCode = {
+		['Open'] = 0x00,
+		['Close'] = 0x01,
+		['Stop'] = 0x02,
+		['Confirm_Pair'] = 0x03,
+		['SetLimit'] = 0x04,
+		['SetLowerLimit'] = 0x05,
+		['ChangeDir'] = 0x06,
+		['IntPosA'] = 0x07,
+		['IntPosCntr'] = 0x08,
+		['IntPosB'] = 0x09,
+		['EraseChannel'] = 0x0A,
+		['EraseChannels'] = 0x0B
+	},
+	BcAction2CmdCode = {
+		['Open'] = 0x00,
+		['Close'] = 0x01,
+		['Stop'] = 0x02,
+		['Confirm_Pair'] = 0x03,
+		['ChangeDir'] = 0x06,
+		['EraseChannel'] = 0x05,
+		['LearnMaster'] = 0x04
+	},
+	BdAction2CmdCode = {
+		['Open'] = 0x00,
+		['Close'] = 0x01,
+		['Stop'] = 0x02,
+		['Confirm_Pair'] = 0x03,
+		['ChangeDir'] = 0x05,
+		['EraseChannel'] = 0x04
+	},
+	-- Both Up and Open and Down and Close are defined for each RFY type
+	--  even though a particular device will only really respond to Up or Open
+	--  and Down or close. Doing this avoids a lot of if-then-else code
+	MotorAction2CmdCode = {
+		['Up'] = 0x01,
+		['Open'] = 0x01,
+		['Down'] = 0x03,
+		['Close'] = 0x03,
+		['Stop'] = 0x00,
+		['Program'] = 0x07
+	},
+	CentralisAction2CmdCode = {
+		['Up'] = 0x11,
+		['Open'] = 0x11,
+		['Down'] = 0x12,
+		['UpperLimit'] = 0x02,
+		['LowerLimit'] = 0x04,
+		['Close'] = 0x12,
+		['Stop'] = 0x00
+	},
+	VenetianUSAction2CmdCode = {
+		['Open'] = 0x0F,
+		['Up'] = 0x0F,
+		['Close'] = 0x10,
+		['Down'] = 0x10,
+		['Stop'] = 0x00,
+		['Angle+'] = 0x11,
+		['Angle-'] = 0x12,
+		['Program'] = 0x07
+	},
+	VenetianEUAction2CmdCode = {
+		['Open'] = 0x11,
+		['Up'] = 0x11,
+		['Close'] = 0x12,
+		['Down'] = 0x12,
+		['Stop'] = 0x00,
+		['Angle+'] = 0x0F,
+		['Angle-'] = 0x10,
+	},
+	AwningAction2CmdCode = {
+		['Up'] = 0x01,
+		['Open'] = 0x01,
+		['Down'] = 0x03,
+		['Close'] = 0x03,
+		['Stop'] = 0x00,
+		['UpperLimit'] = 0x02,
+		['LowerLimit'] = 0x04,
+		['Program'] = 0x07,
+		['Disable'] = 0x14,
+		['Enable'] = 0x13
+	},
+	CAction2CmdCode = {
+		['Open'] = 0x00,
+		['Close'] = 0x01,
+		['Stop'] = 0x02,
+		['Program'] = 0x03
+	},
+	SAction2CmdCode = {
+		['Off1'] = 0x10,
+		['Off2'] = 0x12,
+		['On1'] = 0x11,
+		['On2'] = 0x13
+	},
+	-- Fans
+	FaAction2CmdCode = { -- Siemens -> Fan0.json
+		['Timer']	= CmdCodeCmd(0x01, nil),
+		['SpeedDown']= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['Learn']	= CmdCodeCmd(0x03, nil),
+		['SpeedUp']	= CmdCodeCmd(0x04, tableCommandTypes.CMD_SPEED),
+		['Confirm']	= CmdCodeCmd(0x05, nil),
+		['Light']	= CmdCodeCmd(0x06, tableCommandTypes.CMD_FANLIGHT)
+		},
+	FbAction2CmdCode = { -- Lucci Air, Westinghouse, Casafan -> Fan2.json
+		['Hi']		= CmdCodeCmd(0x01, tableCommandTypes.CMD_SPEED),
+		['Med']		= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['Low']		= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Off']		= CmdCodeCmd(0x04, tableCommandTypes.CMD_SPEED),
+		['Light']	= CmdCodeCmd(0x05, tableCommandTypes.CMD_FANLIGHT)
+		},
+	FcAction2CmdCode = { -- Lucci Air DC -> Fan5.json
+		['Power']	= CmdCodeCmd(0x01, tableCommandTypes.CMD_DIM),
+		['SpeedUp']	= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['SpeedDown']= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Light']	= CmdCodeCmd(0x04, tableCommandTypes.CMD_FANLIGHT),
+		['Reverse']	= CmdCodeCmd(0x05, tableCommandTypes.CMD_REVERSE),
+		['Flow']	= CmdCodeCmd(0x06, tableCommandTypes.CMD_SPEED),
+		['Pair']	= CmdCodeCmd(0x07, nil)
+		},
+	FdAction2CmdCode = { -- Falmec -> Fan8.json
+		['PowerOff']= CmdCodeCmd(0x01, tableCommandTypes.CMD_SPEED),
+		['Speed1']	= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['Speed2']	= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Speed3']	= CmdCodeCmd(0x04, tableCommandTypes.CMD_SPEED),
+		['Speed4']	= CmdCodeCmd(0x05, tableCommandTypes.CMD_SPEED),
+		['Timer1']	= CmdCodeCmd(0x06, nil),
+		['Timer2']	= CmdCodeCmd(0x07, nil),
+		['Timer3']	= CmdCodeCmd(0x08, nil),
+		['Timer4']	= CmdCodeCmd(0x09, nil),
+		['LightOn']	= CmdCodeCmd(0x0A, tableCommandTypes.CMD_FANLIGHT),
+		['LightOff']= CmdCodeCmd(0x0B, tableCommandTypes.CMD_FANLIGHT)
+		},
+	FeAction2CmdCode = { -- Seav 
+		['T1']		= CmdCodeCmd(0x04, nil),
+		['T2']		= CmdCodeCmd(0x05, nil),
+		['T3']		= CmdCodeCmd(0x06, nil),
+		['T4']		= CmdCodeCmd(0x07, nil)
+	},
+	FfAction2CmdCode = { -- FT1211R -> Fan7.json
+		['Power']	= CmdCodeCmd(0x01, tableCommandTypes.CMD_SPEED),
+		['Light']	= CmdCodeCmd(0x02, tableCommandTypes.CMD_FANLIGHT),
+		['One']		= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Two']		= CmdCodeCmd(0x04, tableCommandTypes.CMD_SPEED),
+		['Three']	= CmdCodeCmd(0x05, tableCommandTypes.CMD_SPEED),
+		['Four']	= CmdCodeCmd(0x06, tableCommandTypes.CMD_SPEED),
+		['Five']	= CmdCodeCmd(0x07, tableCommandTypes.CMD_SPEED),
+		['Reverse']	= CmdCodeCmd(0x08, tableCommandTypes.CMD_REVERSE),
+		['1H']		= CmdCodeCmd(0x09, nil),
+		['4H']		= CmdCodeCmd(0x0A, nil),
+		['8H']		= CmdCodeCmd(0x0B, nil)
+	},
+	FgAction2CmdCode = { -- Lucci Air DC II -> Fan9.json
+		['Off']		= CmdCodeCmd(0x01, tableCommandTypes.CMD_SPEED),
+		['One']		= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['Two']		= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Three']	= CmdCodeCmd(0x04, tableCommandTypes.CMD_SPEED),
+		['Four']	= CmdCodeCmd(0x05, tableCommandTypes.CMD_SPEED),
+		['Five']	= CmdCodeCmd(0x06, tableCommandTypes.CMD_SPEED),
+		['Six']		= CmdCodeCmd(0x07, tableCommandTypes.CMD_SPEED),
+		['Light']	= CmdCodeCmd(0x08, tableCommandTypes.CMD_FANLIGHT),
+		['Reverse']	= CmdCodeCmd(0x09, tableCommandTypes.CMD_REVERSE)
+	},
+	FhAction2CmdCode = { -- For Itho Fans - not implemented 868Mhz
+		['One']		= CmdCodeCmd(0x01, tableCommandTypes.CMD_SPEED),
+		['Two']		= CmdCodeCmd(0x02, tableCommandTypes.CMD_SPEED),
+		['Three']	= CmdCodeCmd(0x03, tableCommandTypes.CMD_SPEED),
+		['Timer']	= CmdCodeCmd(0x04, nil),
+		['Away']	= CmdCodeCmd(0x05, nil),
+		['Learn']	= CmdCodeCmd(0x06, nil),
+		['Erase']	= CmdCodeCmd(0x07, nil)
+	}
+}
+-- A table of JSON filenames associated with device altid prefix.
+-- It is used to set the JSON file in cases where different files
+-- exist for similar devices. This avoids the need for many device
+-- files when only the JSON file is different. Entries are only needed
+-- when the required JSON file differs from the one in the device file (D_<device>.xml)
+-- Currently it is only used for fan devices.
+local tableDevice2Json = {
+	["F0"] = "D_Fan0.json",
+	["F2"] = "D_Fan2.json",
+	["F4"] = "D_Fan2.json",
+	["F5"] = "D_Fan5.json",
+	["F6"] = "D_Fan2.json",
+	["F7"] = "D_Fan7.json",
+	["F8"] = "D_Fan8.json",
+	["F9"] = "D_Fan9.json"
+	}
+-- Define a class for commands to be processed
+local DeviceCmd = class(function(a, altid, cmd, value, delay)
+	a.altid = altid		-- the altid of the device to act on
+	a.cmd = cmd			-- the Command object defining what to do. Most often this is a variable name
+	a.value = value		-- the value data used by the command
+	a.delay = delay		-- the delay amount for delayed message actions
+end)
 
 -- Define a class for variables
 local Variable = class(function(a, serviceId, name, isBoolean, isAdjustable, onlySaveChanged)
@@ -365,6 +568,7 @@ local tabVars = {
 	VAR_HUMMIN = Variable( "urn:micasaverde-com:serviceId:HumiditySensor1", "MinHum", false, true, true ),
 	VAR_LIGHT = Variable( "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true ),
 	VAR_DIMMER = Variable( "urn:upnp-org:serviceId:Dimming1", "LoadLevelStatus", false, false, true ),
+	VAR_DIMMERLAST = Variable( "urn:upnp-org:serviceId:Dimming1", "LoadLevelLast", false, false, true ),
 	VAR_PRESSURE = Variable( "urn:upnp-org:serviceId:BarometerSensor1", "CurrentPressure", false, true, true ),
 	VAR_FORECAST = Variable( "urn:upnp-org:serviceId:BarometerSensor1", "Forecast", false, false, true ),
 	VAR_RAIN = Variable( "urn:upnp-org:serviceId:RainSensor1", "CurrentTRain", false, false, true ),
@@ -408,6 +612,8 @@ local tabVars = {
 	VAR_MULT = Variable( "urn:delanghe-com:serviceId:RFXMetering1", "Mult", false, false, true ),
 	VAR_LIGHT_LEVEL = Variable( "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, false, true ),
 	VAR_STATE = Variable( "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true ),
+	VAR_REVERSE = Variable( "urn:rfxcom-com:serviceId:Fan1", "Reversed", false, false, true ),
+	VAR_SPEED = Variable( "urn:rfxcom-com:serviceId:Fan1", "Speed", false, false, true ),
 	VAR_COMM_FAILURE = Variable( "urn:micasaverde-com:serviceId:HaDevice1", "CommFailure", false, false, true ),
 	VAR_COMM_STRENGTH = Variable( "urn:micasaverde-com:serviceId:HaDevice1", "CommStrength", false, false, true ),
 
@@ -462,9 +668,51 @@ local tabVars = {
 	VAR_DEBUG_LOGS = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "DebugLogs", true, false, true ),
 	VAR_RFY_MODE = Variable( "upnp-rfxcom-com:serviceId:rfxtrx1", "RFYMode", false, false, true )
 }
-
+-- A class for a device parameter and value to be used when creating a new device
+local Parameter = class(function(a, variable, value)
+	a.variable = variable
+	a.value = value
+end)
+-- These are parameters (variables and values) to be used when creating a new device
+local tableParams = {
+	ADJUSTMENTS = {
+		Parameter(tabVars.VAR_ADJUST_MULTIPLIER, "1.0"),
+		Parameter(tabVars.VAR_ADJUST_CONSTANT, "0.0"),
+		Parameter(tabVars.VAR_ADJUST_CONSTANT2, "0.0")
+	},
+	LIGHT = {
+		Parameter(tabVars.VAR_LIGHT, "0"),
+		Parameter(tabVars.VAR_REPEAT_EVENT, "0")
+	},
+	DIMMER = {
+		Parameter(tabVars.VAR_DIMMER, "0"),
+		Parameter(tabVars.VAR_LIGHT, "0")
+	},
+	DOOR = {
+		Parameter(tabVars.VAR_ARMEDTRIPPED, "0"),
+		Parameter(tabVars.VAR_REPEAT_EVENT, "1"),
+		Parameter(tabVars.VAR_TRIPPED, "0"),
+		Parameter(tabVars.VAR_ARMED, "0"),
+		Parameter(tabVars.VAR_AUTOUNTRIP, "0")
+	},
+	LIGHT_LEVEL = {
+		Parameter(tabVars.VAR_LIGHT_LEVEL, "0")
+	},
+	TOGGLE = {
+		Parameter(tabVars.VAR_STATE, "0"),
+		Parameter(tabVars.VAR_REPEAT_EVENT, "1")
+	},
+	FAN = {
+		Parameter(tabVars.VAR_STATE, "0"),
+		Parameter(tabVars.VAR_REVERSE, "0"),
+		Parameter(tabVars.VAR_SPEED, "Off")
+	},
+	ALARM = {
+		Parameter(tabVars.VAR_EXIT_DELAY, "0")
+	}
+}
 -- Define a class for devices
-local Device = class(function(a, deviceType, deviceFile, name, prefix, hasAssociation, hasMode, hasAdjustments, jsDeviceType)
+local Device = class(function(a, deviceType, deviceFile, name, prefix, hasAssociation, hasMode, hasAdjustments, jsDeviceType, parameters)
 	a.deviceType = deviceType			-- the upnp device type
 	a.deviceFile = deviceFile			-- the upnp device definition file D_<device>.xml
 	a.name = name						-- the device name
@@ -473,30 +721,33 @@ local Device = class(function(a, deviceType, deviceFile, name, prefix, hasAssoci
 	a.hasMode = hasMode					-- used to allow setting device modes
 	a.hasAdjustments = hasAdjustments	-- on device creation, creates offset and multiplier variables
 	a.jsDeviceType = jsDeviceType		-- the device type sent from the js file
+	a.parameters = parameters			-- the parameters (variables and values) to include when creating a device
 end)
 
--- This table defines all kinds of child that can be managed by the plugin
--- Each entry is a table of 7 elements:
--- 1) device type (URN)
--- 2) XML description file
--- 3) Prefix for the device name
--- 4) Prefix for the device id
--- 5) a boolean indicating if variable "Association" must be created for this device type
--- 6) a boolean indicating if variable "RFYMode" must be created for this device type
--- 7) a boolean indicating if variables "AdjustMultiplier" and "AdjustConstant" must be created for this device type
+-- This table defines all the device types that can be managed by the plugin
+-- Name = Device(
+-- 	device type (URN)
+-- 	XML description file
+-- 	Prefix for the device name - TODO: this parameter is never used?
+--	Prefix for the device id
+--	a boolean indicating if variable "Association" must be created for this device type
+--	a boolean indicating if variable "RFYMode" must be created for this device type
+--	a boolean indicating if variables "AdjustMultiplier" and "AdjustConstant" must be created for this device type
+--	the device type sent from the js file)
 local tableDeviceTypes = {
-	DOOR = Device("urn:schemas-micasaverde-com:device:DoorSensor:1", "D_DoorSensor1.xml", "RFX Door ", "DS/", false, false, false, "DOOR_SENSOR" ),
-	MOTION = Device("urn:schemas-micasaverde-com:device:MotionSensor:1", "D_MotionSensor1.xml", "RFX Motion ", "MS/", false, false, false, "MOTION_SENSOR" ),
-	SMOKE = Device("urn:schemas-micasaverde-com:device:SmokeSensor:1", "D_SmokeSensor1.xml", "RFX Smoke ", "SS/", false, false, false, nil ),
-	LIGHT = Device("urn:schemas-upnp-org:device:BinaryLight:1", "D_BinaryLight1.xml", "RFX Light ", "LS/", true, false, false, "SWITCH_LIGHT" ),
-	DIMMER = Device("urn:schemas-upnp-org:device:DimmableLight:1", "D_DimmableLight1.xml", "RFX dim Light ", "DL/", true, false, false, "DIMMABLE_LIGHT" ),
-	COVER = Device("urn:schemas-micasaverde-com:device:WindowCovering:1", "D_WindowCovering1.xml", "RFX Window ", "WC/", true, true, false, "WINDOW_COVERING" ),
-	TEMP = Device("urn:schemas-micasaverde-com:device:TemperatureSensor:1", "D_TemperatureSensor1.xml", "RFX Temp ", "TS/", false, false, true, nil ),
-	HUM = Device("urn:schemas-micasaverde-com:device:HumiditySensor:1", "D_HumiditySensor1.xml", "RFX Hum ", "HS/", false, false, true, nil ),
-	BARO = Device("urn:schemas-micasaverde-com:device:BarometerSensor:1", "D_BarometerSensor1.xml", "RFX Baro ", "BS/", false, false, true, nil ),
+	DOOR = Device("urn:schemas-micasaverde-com:device:DoorSensor:1", "D_DoorSensor1.xml", "RFX Door ", "DS/", false, false, false, "DOOR", tableParams.DOOR ),
+	MOTION = Device("urn:schemas-micasaverde-com:device:MotionSensor:1", "D_MotionSensor1.xml", "RFX Motion ", "MS/", false, false, false, "MOTION", tableParams.DOOR ),
+	SMOKE = Device("urn:schemas-micasaverde-com:device:SmokeSensor:1", "D_SmokeSensor1.xml", "RFX Smoke ", "SS/", false, false, false, nil, tableParams.DOOR ),
+	LIGHT = Device("urn:schemas-upnp-org:device:BinaryLight:1", "D_BinaryLight1.xml", "RFX Light ", "LS/", true, false, false, "LIGHT", tableParams.LIGHT ),
+	DIMMER = Device("urn:schemas-upnp-org:device:DimmableLight:1", "D_DimmableLight1.xml", "RFX dim Light ", "DL/", true, false, false, "DIMMER", tableParams.DIMMER ),
+	COVER = Device("urn:schemas-micasaverde-com:device:WindowCovering:1", "D_WindowCovering1.xml", "RFX Window ", "WC/", true, true, false, "COVER", tableParams.DIMMER  ),
+	FAN = Device("urn:rfxcom-com:device:Fan:1", "D_Fan1.xml", "RFX Fan ", "FN/", false, false, false, "FAN", tableParams.FAN ),
+	TEMP = Device("urn:schemas-micasaverde-com:device:TemperatureSensor:1", "D_TemperatureSensor1.xml", "RFX Temp ", "TS/", false, false, true, nil, tableParams.ADJUSTMENTS ),
+	HUM = Device("urn:schemas-micasaverde-com:device:HumiditySensor:1", "D_HumiditySensor1.xml", "RFX Hum ", "HS/", false, false, true, nil, tableParams.ADJUSTMENTS ),
+	BARO = Device("urn:schemas-micasaverde-com:device:BarometerSensor:1", "D_BarometerSensor1.xml", "RFX Baro ", "BS/", false, false, true, nil, tableParams.ADJUSTMENTS ),
 	WIND = Device("urn:schemas-micasaverde-com:device:WindSensor:1", "D_WindSensor1.xml", "RFX Wind ", "WS/", false, false, false, nil ),
 	RAIN = Device("urn:schemas-micasaverde-com:device:RainSensor:1", "D_RainSensor1.xml", "RFX Rain ", "RS/", false, false, false, nil ),
-	UV = Device("urn:schemas-micasaverde-com:device:UvSensor:1", "D_UvSensor1.xml", "RFX UV ", "UV/", false, false, true, nil ),
+	UV = Device("urn:schemas-micasaverde-com:device:UvSensor:1", "D_UvSensor1.xml", "RFX UV ", "UV/", false, false, true, nil, tableParams.ADJUSTMENTS ),
 	WEIGHT = Device("urn:schemas-micasaverde-com:device:ScaleSensor:1", "D_ScaleSensor1.xml", "RFX Weight ", "WT/", false, false, false, nil ),
 	POWER = Device("urn:schemas-micasaverde-com:device:PowerMeter:1", "D_PowerMeter1.xml", "RFX Power ", "PM/", false, false, false, nil ),
 	RFXMETER = Device("urn:casa-delanghe-com:device:RFXMeter:1", "D_RFXMeter1.xml", "RFX Meter ", "RM/", false, false, false, nil ),
@@ -505,9 +756,962 @@ local tableDeviceTypes = {
 	LWRF_REMOTE = Device("urn:rfxcom-com:device:LWRFRemote:1", "D_LWRFRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil ),
 	ATI_REMOTE = Device("urn:rfxcom-com:device:ATIRemote:1", "D_ATIRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil ),
 	HEATER = Device("urn:schemas-upnp-org:device:Heater:1", "D_Heater1.xml", "RFX Heater ", "HT/", false, false, false, nil ),
-	LIGHT_LEVEL = Device("urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_SENSOR" ),
-	SWITCH_TOGGLE = Device("urn:rfxcom-com:device:SwitchToggle:1", "D_SwitchToggle1.xml", "RFX Toggle Switch ", "L4/", false, false, false, "SWITCH_TOGGLE" )
+	LIGHT_LEVEL = Device("urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_LEVEL", tableParams.LIGHT_LEVEL ),
+	SWITCH_TOGGLE = Device("urn:rfxcom-com:device:SwitchToggle:1", "D_SwitchToggle1.xml", "RFX Toggle Switch ", "LS/", false, false, false, "SWITCH_TOGGLE", tableParams.TOGGLE )
 }
+
+-- Define a class for parameter limits
+local Limit = class(function(a, minimum, maximum)
+	a.minimum = minimum			-- the minimum value for the parameter
+	a.maximum = maximum			-- the maximum value for the parameter
+end)
+
+-- Define a class for a device category
+-- A category is a specific subtype of one of the device types shown above
+local Category = class(function(a, displayName, isaLIGHT, isaDIMMER, isaMOTION, isaDOOR, isaLIGHT_LEVEL, isaCOVER, isaFAN,
+						idLimits, houseCodeLimits, groupCodeLimits, unitCodeLimits, systemCodeLimits, channelLimits,
+						subAltid, altidFmt, type2, altid2Fmt, type3, altid3Fmt)
+	a.displayName = displayName
+	a.isaLIGHT = isaLIGHT
+	a.isaDIMMER = isaDIMMER
+	a.isaMOTION = isaMOTION
+	a.isaDOOR = isaDOOR
+	a.isaLIGHT_LEVEL = isaLIGHT_LEVEL
+	a.isaCOVER = isaCOVER
+	a.isaFAN = isaFAN
+	a.isCreatable = isaLIGHT or isaDIMMER or isaMOTION or isaDOOR or isaLIGHT_LEVEL or isaCOVER or isaFAN
+	a.idLimits = idLimits
+	a.houseCodeLimits = houseCodeLimits
+	a.groupCodeLimits = groupCodeLimits
+	a.unitCodeLimits = unitCodeLimits
+	a.systemCodeLimits = systemCodeLimits
+	a.channelLimits = channelLimits
+	a.subAltid = subAltid
+	a.altidFmt = altidFmt
+	a.type2 = type2
+	a.altid2Fmt = altid2Fmt
+	a.type3 = type3
+	a.altid3Fmt = altid3Fmt
+end)
+
+local tableCategories = {
+	A_OK_AC114 = Category(	"A-OK AC114", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B3/", "%s%06X/00", nil, nil, nil, nil	),
+	A_OK_RF01 = Category(	"A-OK RF01", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B2/", "%s%06X/00", nil, nil, nil, nil	),
+	AC = Category(	"AC", true, true, true, true, true, true, false,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	ANSLUT = Category(	"ANSLUT", true, true, false, false, false, false, false,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	ARC = Category(	"ARC", true, false, true, true, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	ASA = Category(	"ASA", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFF),
+		nil,
+		nil,
+		Limit(1, 5),
+		nil,
+		nil,
+	"RFY.3/", "%s%05X/%02d", nil, nil, nil, nil	),
+	BBSB = Category(	"Bye Bye Standby (new)", true, false, false, false, false, false, false,
+		Limit(1, 0x7FFFF),
+		nil,
+		nil,
+		Limit(1, 6),
+		nil,
+		nil,
+	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	BLYSS = Category(	"Blyss", true, false, true, true, false, false, false,
+		Limit(0, 0xFFFF),
+		nil,
+		Limit(0x41, 0x50),
+		Limit(1, 5),
+		nil,
+		nil,
+	"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	),
+	CASAFAN = Category(	"Casafan", false, false, false, false, false, false, true,
+		Limit(0, 0x00000F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F6/", "%s%06X", nil, nil, nil, nil	),
+	COCO = Category(	"COCO GDR2-2000R", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x44),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.A/", "%s%s%02d", nil, nil, nil, nil	),
+	DC_RMF_YOODA = Category(	"DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B6/", "%s%07X/%02d", nil, nil, nil, nil	),
+	ELRO_AB400D = Category(	"ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 64),
+		nil,
+		nil,
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
+	EMW100 = Category(	"GAO/Everflourish EMW100", true, false, false, false, false, false, false,
+		Limit(1, 0x3FFF),
+		nil,
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	),
+	EMW200 = Category(	"Chacon EMW200", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x43),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.4/", "%s%s%02d", nil, nil, nil, nil	),
+	ENERGENIE_5GANG = Category(	"Energenie 5 gang", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 10),
+		nil,
+		nil,
+	"L1.9/", "%s%s%02d", nil, nil, nil, nil	),
+	ENERGENIE_ENER010 = Category(	"Energenie ENER010", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	FALMEC_FAN = Category(	"Falmec Fan", false, false, false, false, false, false, true,
+		Limit(0, 0x00000F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F8/", "%s%06X", nil, nil, nil, nil	),
+	FOREST = Category(	"Forest", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B7/", "%s%07X/%02d", nil, nil, nil, nil	),
+	FT1211R_FAN = Category(	"FT1211R Fan", false, false, false, false, false, false, true,
+		Limit(1, 0x00FFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F7/", "%s%06X", nil, nil, nil, nil	),
+	HARRISON_CURTAIN = Category(	"Harrison Curtain", false, false, false, false, false, true, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"C0/", "%s%s%02d", nil, nil, nil, nil	),
+	HASTA_NEW = Category(	"Hasta (new)", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
+	HASTA_OLD = Category(	"Hasta (old)", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B1/", "%s%06X/%02d", nil, nil, nil, nil	),
+	HOMEEASY_EU = Category(	"HomeEasy EU", true, true, false, false, false, false, false,
+		Limit(1, 0x3FFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
+	IKEA_KOPPLA = Category(	"Ikea Koppla", true, false, false, false, false, false, false,
+		nil,
+		nil,
+		nil,
+		nil,
+		Limit(1, 16),
+		Limit(1, 10),
+	"L3.0/", "%s%X%02d", nil, nil, nil, nil	),
+	IMPULS = Category(	"Impuls", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 64),
+		nil,
+		nil,
+	"L1.5/", "%s%s%02d", nil, nil, nil, nil	),
+	KANGTAI = Category(	"Kangtai", true, false, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(1,30),
+		nil,
+		nil,
+	"L5.11/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	LIGHTWAVERF_SIEMENS = Category(	"LightwaveRF, Siemens", true, true, true, true, false, true, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	),
+	LIVOLO_1GANG = Category(	"Livolo (1 gang)", true, true, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", nil, nil, nil, nil	),
+	LIVOLO_2GANG = Category(	"Livolo (2 gang)", true, false, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	),
+	LIVOLO_3GANG = Category(	"Livolo (3 gang)", true, false, false, false, false, false, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	),
+	LUCCI_AIR_DC = Category(	"Lucci Air DC", false, false, false, false, false, false, true,
+		Limit(0, 0x0F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F5/", "%s%06X", nil, nil, nil, nil	),
+	LUCCI_AIR_DCII = Category(	"Lucci Air DCII", false, false, false, false, false, false, true,
+		Limit(0, 0x0F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F9/", "%s%06X", nil, nil, nil, nil	),
+	LUCCI_AIR_FAN = Category(	"Lucci Air Fan", false, false, false, false, false, false, true,
+		Limit(0, 0x0F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F2/", "%s%06X", nil, nil, nil, nil	),
+	MEDIA_MOUNT = Category(	"Media Mount projector screen", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B5/", "%s%06X/00", nil, nil, nil, nil	),
+	PHENIX = Category(	"Phenix", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1,32),
+		nil,
+		nil,
+	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
+	PHILIPS_SBC = Category(	"Philips SBC", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 8),
+		nil,
+		nil,
+	"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
+	RAEX = Category(	"Raex YR1326 T16 motor", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"B4/", "%s%06X/00", nil, nil, nil, nil	),
+	RFY0 = Category(	"Somfy RTS", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFF),
+		nil,
+		nil,
+		Limit(0, 4),
+		nil,
+		nil,
+	"RFY.0/", "%s%05X/%02d", nil, nil, nil, nil	),
+	RFY1 = Category(	"Somfy RTS", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFF),
+		nil,
+		nil,
+		Limit(0, 4),
+		nil,
+		nil,
+	"RFY.1/", "%s%05X/%02d", nil, nil, nil, nil	),
+	RISINGSUN = Category(	"RisingSun", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x44),
+		nil,
+		Limit(1, 4),
+		nil,
+		nil,
+	"L1.6/", "%s%s%02d", nil, nil, nil, nil	),
+	ROLLERTROL = Category(	"RollerTrol", false, false, false, false, false, true, false,
+		Limit(1, 0xFFFF),
+		nil,
+		nil,
+		Limit(0, 15),
+		nil,
+		nil,
+	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
+	RSL2 = Category(	"Conrad RSL2", true, false, false, false, false, false, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
+	SEAV = Category(	"SEAV TXS4 Fan", false, false, false, false, false, true, false,
+		Limit(1, 0x0FFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F3/", "%s%06X", nil, nil, nil, nil	),
+	SIEMENS_WAVE = Category(	"Siemens/Wave Design Fan", false, false, false, false, false, false, true,
+		Limit(1, 0x00FFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F0/", "%s%06X", nil, nil, nil, nil	),
+	SONOFF = Category(	"Sonoff Smart Switch", true, false, false, false, false, false, false,
+		Limit(1, 0xFFFFFF),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"L4.0/", "%s%06X/00", nil, nil, nil, nil	),
+	WAVEMAN = Category(	"Waveman", true, false, false, false, false, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.3/", "%s%s%02d", nil, nil, nil, nil	),
+	WESTINGHOUSE_FAN = Category(	"Westinghouse Fan", false, false, false, false, false, false, true,
+		Limit(0, 0x0F),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	"F4/", "%s%06X", nil, nil, nil, nil	),
+	X10 = Category(	"X10 lighting", true, false, true, false, true, false, false,
+		nil,
+		Limit(0x41, 0x50),
+		nil,
+		Limit(1, 16),
+		nil,
+		nil,
+	"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	)
+}
+
+-- This table is initialized in deferredStartup and is used to select a category
+-- from the above table
+-- tableCategoryBySubAltid is used to selected a category by its subAltid
+local tableCategoryBySubAltid = {}
+
+-- J_RFXtrx.js depends on the text of these table items
+local tableHardwareType = {
+	[0x50] = "RFXtrx315 at 310 MHz",
+	[0x51] = "RFXtrx315 at 315 MHz",
+	[0x52] = "RFXrec433 at 433.92 MHz",
+	[0x53] = "RFXtrx433 at 433.92 MHz",
+	[0x54] = "RFXtrx433 at 433.42 MHz",
+	[0x55] = "RFXtrx868X operating at 868 MHz",
+	[0x56] = "RFXtrx868X operating at 868.00 MHz FSK",
+	[0x57] = "RFXtrx868X operating at 868.30 MHz",
+	[0x58] = "RFXtrx868X operating at 868.30 MHz FSK",
+	[0x59] = "RFXtrx868X operating at 868.35 MHz",
+	[0x5A] = "RFXtrx868X operating at 868.35 MHz FSK",
+	[0x5B] = "RFXtrx868X operating at 868.95 MHz",
+	[0x5C] = "RFXtrx433IOT at 433.92 MHz",
+	[0x5D] = "RFXtrx433IOT at 868 MHz",
+	[0x5E] = "RFXtrx433IOT at 868 MHz",
+	[0x5F] = "RFXtrx433 at 434.50 MHz"
+	}
+
+local tableFirmwareType = {
+	"Type1 receive only",
+	"Type1",
+	"Type2",
+	"Ext",
+	"Ext2",
+	"Pro1",
+	"Pro2",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"unknown",
+	"ProXL1"
+	}
+
+-- The following functions are used to create a string of bytes to be transmitted
+-- to a device. The functions are given a character string representing the device altid
+-- and a command action. The altid contains the ID of the device which may include an
+-- ordinary id number or any of a housecode, a groupcode, a unitcode, a systemcode
+-- or a channel. Each function is particular to the device type intended to receive
+-- the message. It should work properly for all subtypes of that device type.  These
+-- functions are designed to handle all possible actions for a device type and
+-- subtype - even if the user interface does not yet provide a way of triggering all actions.
+local function createL1MsgData(altid, action)
+	local cmdCode, subType, data, housecode, unitCode
+	cmdCode = tableActions2CmdCodes.L1Action2CmdCode[action]
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	debug("L1Msg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil'))
+	if not (cmdCode) then
+		warning("createL1MsgData - no cmdCode for given action "..action)
+		return
+	end
+	housecode = string.sub(altid, 9, 9)
+	unitCode = tonumber(string.sub(altid, 10, 11))
+	-- If this command is from an RC device the unitCode will be nil
+	if not (unitCode) then unitCode = 1 end
+	data = housecode..string.char(unitCode, cmdCode, 0)
+	return data, 1
+end
+
+local function createL2MsgData(altid, action, level)
+	local cmdCode, subType, data, remoteId, unitCode
+	cmdCode = tableActions2CmdCodes.L2Action2CmdCode[action]
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	debug("L2Msg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil').." level: "..(level or 'nil'))
+	if not (cmdCode) then
+		warning("createL2MsgData - no cmdCode for given action "..action)
+		return
+	end
+	-- Level may need to be converted to the proper range
+	if ((action == 'SetLevel') or (action == 'Dim') and level) then
+		level = math.floor(level * 0x0F / 100 + 0.5)
+	else
+		level = 0
+	end
+	remoteId = string.sub(altid, 9, 18)
+	unitCode = tonumber(string.sub(remoteId, 9, 10))
+	-- If this command is from an RC device the unitCode will be nil
+	if not (unitCode) then unitCode = 1 end
+	data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		tonumber(string.sub(remoteId, 6, 7), 16),
+		unitCode, cmdCode, level, 0)
+	return data, 1
+end
+
+local function createL3MsgData(altid, action, level)
+	local cmdCode, subType, data, remoteId, unitcode, channel1, channel2
+	cmdCode = tableActions2CmdCodes.L3Action2CmdCode[action]
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	debug("L3Msg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil').." level: "..(level or 'nil'))
+	if not (cmdCode) then
+		warning("createL3MsgData - no cmdCode for given action "..action)
+		return
+	end
+	level = tonumber(level)
+	if (level) then
+		if (level == 0) then cmdCode = tableActions2CmdCodes.L3Action2CmdCode['Off']
+		elseif (level == 100) then cmdCode = tableActions2CmdCodes.L3Action2CmdCode['On']
+		else -- level must be >= 1 and <= 9
+			level = math.min(math.max(math.floor(level / 10 + 0.5),1),9)
+			cmdCode = level + 0x10
+		end
+	end
+	remoteId = tonumber(string.sub(altid, 9, 9), 16)
+	unitcode = tonumber(string.sub(altid, 10, 11))
+	channel1 = 0
+	channel2 = 0
+	if (unitcode >= 1 and unitcode <= 8)
+		then
+		channel1 = 1
+		if (unitcode > 1)
+			then
+			channel1 = bitw.lshift(channel1, unitcode-1)
+		end
+	elseif (unitcode >= 9 and unitcode <= 10)
+		then
+		channel2 = 1
+		if (unitcode > 9)
+			then
+			channel2 = bitw.lshift(channel2, unitcode-9)
+		end
+	end
+	data = string.char(remoteId, channel1, channel2, cmdCode, 0)
+	return data, 1
+end
+
+local function createL4MsgData(altid)
+	local data, remoteId
+	debug("L4Msg-> altid: "..altid)
+	remoteId = string.sub(altid, 9, 14)
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		tonumber("01", 16),
+		tonumber("76", 16),
+		0)
+	return data, 1
+end
+
+local function createL5MsgData(altid, action, level)
+	local subTypeTblSelect = {
+		tableActions2CmdCodes.L5aAction2CmdCode,	-- subtype 0
+		tableActions2CmdCodes.L5aAction2CmdCode,	-- subtype 1
+		tableActions2CmdCodes.L5aAction2CmdCode,	--   .
+		tableActions2CmdCodes.L5aAction2CmdCode,	--   .
+		tableActions2CmdCodes.L5aAction2CmdCode,	--   .
+		tableActions2CmdCodes.L5bAction2CmdCode,	-- subtype 5
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5bAction2CmdCode,	-- subtype 0x0A
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5cAction2CmdCode,	-- subtype 0x0C
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode,
+		tableActions2CmdCodes.L5aAction2CmdCode
+	}
+	local subType, cmdCode, remoteId, unitCode, data
+	local nbTimes = 1
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	remoteId = string.match(altid, '/[^/]+/(.+)')
+	unitCode = tonumber(string.sub(remoteId, 8, 9))
+	-- If this command is from an RC device the unitCode will be nil
+	if not (unitCode) then unitCode = 1 end
+	cmdCode = subTypeTblSelect[subType+1][action]
+	-- ?? cmdCode = tonumber(string.sub(remoteId, 8, 8))
+	debug("L5Msg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil').." level: "..(level or 'nil'))
+	if not (cmdCode) then
+		warning("createL5MsgData - no cmdCode for given action "..action)
+		return
+	end
+	-- Level may need to be converted to the proper range
+	if ((action == 'SetLevel') or (action == 'Dim') and level) then
+		if (subType == 0) then
+			level = math.max(math.floor(level * 0x1F / 100 + 0.5), 1)
+		elseif (subType == 0x0F) then
+			level = math.max(math.floor(level * 0x0F / 100 + 0.5), 1)
+		end
+	else
+		level = 0
+	end
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		unitCode,
+		cmdCode,
+		level, 0)
+	-- Special case to allow Livolo dimmer to respond to On and Off commands
+	if ((subType == tableMsgTypes.LIGHTING_LIVOLO.subType) and (string.sub(altid, 1,2) == "DL")
+		and ((action == 'On') or (action == 'Off'))) then nbTimes = 6 end
+	return data, nbTimes
+end
+
+-- TODO L6 is for Blyss devices. We'll need global cmd seq numbers that are
+-- incremented when we send commands AND when we see commands from a remote
+local function createL6MsgData(altid, action)
+	local cmdCode, subType, data, remoteId, unitCode, groupCode, cmdSeqNmbr
+	cmdCode = tableActions2CmdCodes.L6Action2CmdCode[action]
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	debug("L6Msg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil'))
+	if not (cmdCode) then
+		warning("createL6MsgData - no cmdCode for given action "..action)
+		return
+	end
+	remoteId = string.sub(altid, 9, 12)
+	groupCode = string.sub(altid, 14, 14)
+	unitCode = tonumber(string.sub(altid, 15, 15))
+	-- If this command is from an RC device the unitCode will be nil
+	if not (unitCode) then unitCode = 1 end
+	cmdSeqNmbr = 1	-- May need to fix this
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+		tonumber(string.sub(remoteId, 3, 4), 16))
+		..groupCode
+		..string.char(unitCode, cmdCode, cmdSeqNmbr, 0, 0)
+	return data, 1
+end
+
+local function createBMsgData(altid, action, level)
+	local subTypeTblSelect = {
+		tableActions2CmdCodes.BaAction2CmdCode,	-- subtype 0
+		tableActions2CmdCodes.BaAction2CmdCode,	-- subtype 1
+		tableActions2CmdCodes.BaAction2CmdCode,	--   .
+		tableActions2CmdCodes.BaAction2CmdCode,	--   .
+		tableActions2CmdCodes.BaAction2CmdCode,	--   .
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BbAction2CmdCode,	-- subtype 9
+		tableActions2CmdCodes.BcAction2CmdCode,	-- subtype 0x0A
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BdAction2CmdCode,	-- subtype 0x0C
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode,
+		tableActions2CmdCodes.BaAction2CmdCode
+	}
+	local subType, cmdCode, remoteId, unitCode, id4, data
+	subType = tonumber(string.match(altid, 'WC/B([^/]+)/'), 16)
+	cmdCode = subTypeTblSelect[subType+1][action]
+	debug("BMsg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil').." level: "..(level or 'nil'))
+	if not (cmdCode) then
+		warning("createBMsgData - no cmdCode for given action "..action)
+		return
+	end
+	remoteId = string.sub(altid, 7, 12)
+	if (subType == 6 or subType == 7)
+		then
+		id4 = tonumber(string.sub(altid, 13, 13), 16)
+		unitCode = tonumber(string.sub(altid, 15, 16)) % 16
+	else
+		id4 = 0
+		unitCode = tonumber(string.sub(altid, 14, 15)) % 16
+	end
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+	tonumber(string.sub(remoteId, 3, 4), 16),
+	tonumber(string.sub(remoteId, 5, 6), 16),
+	id4 * 16 + unitCode, cmdCode, 0)
+	return data
+end
+
+local function createCMsgData(altid, action)
+	local cmdCode, subType, houseCode, unitCode, data
+	cmdCode = tableActions2CmdCodes.CAction2CmdCode[action]
+	subType = tonumber(string.match(altid, 'WC/C([^/]+)/'), 16)
+	debug("CMsg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil').." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil'))
+	if not (cmdCode) then
+		warning("createCMsgData - no cmdCode for given action "..action)
+		return
+	end
+	houseCode = string.sub(altid, 7, 7)
+	unitCode = tonumber(string.sub(altid, 8, 9))
+	data = houseCode..string.char(unitCode, cmdCode, 0)
+	return data
+end
+
+function createSMsgData(altid, action)
+	local cmdCode, remoteId, light_num
+	local data = ""
+	light_num = string.sub(altid, 9, 9)
+	cmdCode = tableActions2CmdCodes.SAction2CmdCode[action..light_num]
+	debug("SMsg-> altid: "..altid.." action: "..action.." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil'))
+	if not (cmdCode) then
+		warning("createSMsgData - no cmdCode for given action "..action)
+		return
+	end
+	remoteId = string.sub(altid, 11, 16)
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		cmdCode, 0)
+	return data, 1
+end
+
+local function createRFYMsgData(altid, action)
+	local deviceNum, cmdCode, subType, RFYType, remoteId, unitCode, data
+	local subTypeTblSelect = {
+		['STANDARD'] = tableActions2CmdCodes.VenetianUSAction2CmdCode,
+		['EUROPEAN'] = tableActions2CmdCodes.VenetianEUAction2CmdCode,
+		['CENTRALIS'] = tableActions2CmdCodes.CentralisAction2CmdCode,
+		['MOTOR'] = tableActions2CmdCodes.MotorAction2CmdCode,
+		['AWNING'] = tableActions2CmdCodes.AwningAction2CmdCode
+	}
+	subType = tonumber(string.match(altid, '[^%.]+%.([^/]+)/'), 16)
+	-- Find the device so we can determine exactly what kind of RFY device this is
+	deviceNum = findChild(THIS_DEVICE, string.sub(altid,4), tableDeviceTypes.COVER.deviceType)
+	RFYType = getVariable(deviceNum, tabVars.VAR_RFY_MODE)
+	cmdCode = subTypeTblSelect[RFYType][action]
+	debug("RFYMsg-> altid: "..altid.." subType: "..(string.format("0x%02X", subType) or 'nil').." deviceNum: "..(deviceNum or 'nil').." RFYType: "..(RFYType or 'nil').." action: "..action.." cmdCode: "..(string.format("0x%02X", cmdCode) or 'nil'))
+	if not (cmdCode) then
+		warning("createRFYMsgData - no cmdCode for given action "..action)
+		return
+	end
+	remoteId = string.match(altid, '/[^/]+/(.+)')
+	unitCode = tonumber(string.sub(remoteId, 7, 8))
+	data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
+		tonumber(string.sub(remoteId, 2, 3), 16),
+		tonumber(string.sub(remoteId, 4, 5), 16),
+		unitCode, cmdCode, 0, 0, 0, 0)
+	return data
+end
+
+local function createFMsgData(altid, action)
+	local subTypeTblSelect = {
+		tableActions2CmdCodes.FaAction2CmdCode,	-- subtype 0
+		tableActions2CmdCodes.FhAction2CmdCode,	-- subtype 1
+		tableActions2CmdCodes.FbAction2CmdCode,	--   .
+		tableActions2CmdCodes.FeAction2CmdCode,	--   .
+		tableActions2CmdCodes.FbAction2CmdCode,	--   .
+		tableActions2CmdCodes.FcAction2CmdCode,	-- subtype 5
+		tableActions2CmdCodes.FbAction2CmdCode,
+		tableActions2CmdCodes.FfAction2CmdCode,
+		tableActions2CmdCodes.FdAction2CmdCode,
+		tableActions2CmdCodes.FgAction2CmdCode
+	}
+	local subType, thisCmdData, remoteId, data
+	local cmdName = "nil cmd"
+	subType = tonumber(string.match(altid, '/F([0-9])/'), 16)
+	remoteId = string.match(altid, '/F[0-9]/(.+)')
+	thisCmdData = subTypeTblSelect[subType+1][action]
+	debug("FMsg-> altid: "..altid.." action: "..action.." subType: "..(string.format("0x%02X", subType) or 'nil'))
+	if not (thisCmdData) then
+		warning("createFMsgData - no thisCmdData for given action "..action)
+		return
+	end
+	if (thisCmdData.cmd) then cmdName = thisCmdData.cmd.name end
+	debug("FMsg-> cmd: "..cmdName.." cmdCode: "..(string.format("0x%02X", thisCmdData.cmdCode) or 'nil'))
+	data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
+		tonumber(string.sub(remoteId, 3, 4), 16),
+		tonumber(string.sub(remoteId, 5, 6), 16),
+		thisCmdData.cmdCode,
+		0)
+	return data, thisCmdData.cmd
+end
+
+-- Define a class for our message types
+-- The subaltid is used to look up the message type to send in response to a UI input
+--  since not all message types are transmitted the subAltID will not be used
+-- The key is used to look up a message decode function in response to a received message
+--  since some messages are transmit only, there is no need for a decode function
+local Message = class(function(a, pktType, subType, length, subAltID, createMsgDataFunction)
+	a.pktType = pktType					-- the packet type
+	a.subType = subType					-- the subtype
+	a.length = length					-- the length in bytes
+	a.subAltID = subAltID				-- the second part of the device altid e.g. "L1.0" in LS/L1.0/B02
+	a.key = string.format('%06X',(bitw.lshift((bitw.lshift(length,8) + pktType), 8)) + subType)
+	a.decodeMsgFunction = decodeUnkMsg	-- the function used to decode a received message of this type
+	a.createMsgDataFunction = createMsgDataFunction -- create data for a msg of this type to be transmitted
+end)
+
+-- A class method to print a message class object
+function Message:__tostring()
+	local part1 = "Message length: "..string.format("0x%02X", self.length).." pktType: "..string.format("0x%02X", self.pktType)
+	local part2 = ' subType: '..self.subtype..' key: '..self.key or 'nil' --..' decode function: '..self.decodeMsgFunction or 'nil'
+	return (part1..part2)
+end
+
+tableMsgTypes = {
+	MODE_COMMAND =				Message( 0x00, 0x00, 13, 'M0.0/', createUnkMsg ),
+	RESPONSE_MODE_COMMAND =		Message( 0x01, 0x00, 20, 'R1.0/', createUnkMsg ),
+	UNKNOWN_RTS_REMOTE =		Message( 0x01, 0x01, 20, 'R1.1/', createUnkMsg ),
+	INVALID_COMMAND =			Message( 0x01, 0xFF, 20, 'R1.FF/', createUnkMsg ),
+	RECEIVER_LOCK_ERROR =		Message( 0x02, 0x00, 4, 'R2.0/', createUnkMsg ),
+	TRANSMITTER_RESPONSE =		Message( 0x02, 0x01, 4, 'R2.1/', createUnkMsg ),
+	UNDECODED =					Message( 0x03, 0x00, 36, 'U0.0/', createUnkMsg ),
+	LIGHTING_X10 =				Message( 0x10, 0x0, 7, 'L1.0/', createL1MsgData ),
+	LIGHTING_ARC =				Message( 0x10, 0x1, 7, 'L1.1/', createL1MsgData ),
+	LIGHTING_AB400D =			Message( 0x10, 0x2, 7, 'L1.2/', createL1MsgData ),
+	LIGHTING_WAVEMAN =			Message( 0x10, 0x3, 7, 'L1.3/', createL1MsgData ),
+	LIGHTING_EMW200 =			Message( 0x10, 0x4, 7, 'L1.4/', createL1MsgData ),
+	LIGHTING_IMPULS =			Message( 0x10, 0x5, 7, 'L1.5/', createL1MsgData ),
+	LIGHTING_RISINGSUN =		Message( 0x10, 0x6, 7, 'L1.6/', createL1MsgData ),
+	LIGHTING_PHILIPS =			Message( 0x10, 0x7, 7, 'L1.7/', createL1MsgData ),
+	LIGHTING_ENERGENIE_ENER010 =Message( 0x10, 0x8, 7, 'L1.8/', createL1MsgData ),
+	LIGHTING_ENERGENIE_5GANG =	Message( 0x10, 0x9, 7, 'L1.9/', createL1MsgData ),
+	LIGHTING_COCO =				Message( 0x10, 0xa, 7, 'L1.A/', createL1MsgData ),
+	LIGHTING_AC =				Message( 0x11, 0x0, 11, 'L2.0/', createL2MsgData ),
+	LIGHTING_HEU =				Message( 0x11, 0x1, 11, 'L2.1/', createL2MsgData ),
+	LIGHTING_ANSLUT =			Message( 0x11, 0x2, 11, 'L2.2/', createL2MsgData ),
+	LIGHTING_KOPPLA =			Message( 0x12, 0x0, 8, 'L3.0/', createL3MsgData ),
+	SECURITY_DOOR =				Message( 0x13, 0x0, 9, 'L4.0/', createL4MsgData ),
+	LIGHTING_LIGHTWARERF =		Message( 0x14, 0x0, 10, 'L5.0/', createL5MsgData ),
+	LIGHTING_EMW100 =			Message( 0x14, 0x1, 10, 'L5.1/', createL5MsgData ),
+	LIGHTING_BBSB =				Message( 0x14, 0x2, 10, 'L5.2/', createL5MsgData ),
+	LIGHTING_RSL2 =				Message( 0x14, 0x4, 10, 'L5.4/', createL5MsgData ),
+	LIGHTING_LIVOLO =			Message( 0x14, 0x5, 10, 'L5.5/', createL5MsgData ),
+	LIGHTING_KANGTAI =			Message( 0x14, 0x11, 10, 'L5.11/', createL5MsgData ),
+	LIGHTING_BLYSS =			Message( 0x15, 0x0, 11, 'L6.0/', createL6MsgData ),
+	FAN_T0 =					Message( 0x17, 0x0, 8, 'F0/', createFMsgData ),
+	FAN_T1 =					Message( 0x17, 0x1, 8, 'F1/', createFMsgData ),
+	FAN_T2 =					Message( 0x17, 0x2, 8, 'F2/', createFMsgData ),
+	FAN_T3 =					Message( 0x17, 0x3, 8, 'F3/', createFMsgData ),
+	FAN_T4 =					Message( 0x17, 0x4, 8, 'F4/', createFMsgData ),
+	FAN_T5 =					Message( 0x17, 0x5, 8, 'F5/', createFMsgData ),
+	FAN_T6 =					Message( 0x17, 0x6, 8, 'F6/', createFMsgData ),
+	FAN_T7 =					Message( 0x17, 0x7, 8, 'F7/', createFMsgData ),
+	FAN_T8 =					Message( 0x17, 0x8, 8, 'F8/', createFMsgData ),
+	FAN_T9 =					Message( 0x17, 0x9, 8, 'F9/', createFMsgData ),
+	CURTAIN_HARRISON =			Message( 0x18, 0x0, 7, 'C0/', createCMsgData ),
+	BLIND_T0 =					Message( 0x19, 0x0, 9, 'B0/', createBMsgData ),
+	BLIND_T1 =					Message( 0x19, 0x1, 9, 'B1/', createBMsgData ),
+	BLIND_T2 =					Message( 0x19, 0x2, 9, 'B2/', createBMsgData ),
+	BLIND_T3 =					Message( 0x19, 0x3, 9, 'B3/', createBMsgData ),
+	BLIND_T4 =					Message( 0x19, 0x4, 9, 'B4/', createBMsgData ),
+	BLIND_T5 =					Message( 0x19, 0x5, 9, 'B5/', createBMsgData ),
+	BLIND_T6 =					Message( 0x19, 0x6, 9, 'B6/', createBMsgData ),
+	BLIND_T7 =					Message( 0x19, 0x7, 9, 'B7/', createBMsgData ),
+	RFY0 =						Message( 0x1A, 0x0, 12, 'RFY.0/', createRFYMsgData ),
+	RFY1 =						Message( 0x1A, 0x1, 12, 'RFY.1/', createRFYMsgData ),
+	ASA =						Message( 0x1A, 0x3, 12, 'RFY.3/', createRFYMsgData ),
+	SECURITY_X10DS =			Message( 0x20, 0x0, 8, 'S1.0/', createUnkMsg ),
+	SECURITY_X10MS =			Message( 0x20, 0x1, 8, 'S1.1/', createUnkMsg ),
+	SECURITY_X10SR =			Message( 0x20, 0x2, 8, 'S1.2/', createUnkMsg ),
+	KD101 =						Message( 0x20, 0x3, 8, 'S1.3/', createUnkMsg ),
+	POWERCODE_PRIMDS =			Message( 0x20, 0x4, 8, 'S1.4/', createUnkMsg ),
+	POWERCODE_MS =				Message( 0x20, 0x5, 8, 'S1.5/', createUnkMsg ),
+	POWERCODE_AUXDS =			Message( 0x20, 0x7, 8, 'S1.7/', createUnkMsg ),
+	SECURITY_MEISR =			Message( 0x20, 0x8, 8, 'S1.8/', createUnkMsg ),
+	SA30 =						Message( 0x20, 0x9, 8, 'S1.9/', createUnkMsg ),
+	ATI_REMOTE_WONDER =			Message( 0x30, 0x0, 6, 'RC.0/', createUnkMsg ),
+	ATI_REMOTE_WONDER_PLUS =	Message( 0x30, 0x1, 6, 'RC.1/', createUnkMsg ),
+	MEDION_REMOTE =				Message( 0x30, 0x2, 6, 'RC.2/', createUnkMsg ),
+	X10_PC_REMOTE =				Message( 0x30, 0x3, 6, 'RC.3/', createUnkMsg ),
+	ATI_REMOTE_WONDER_II =		Message( 0x30, 0x4, 6, 'RC.4/', createUnkMsg ),
+	HEATER3_MERTIK1 =			Message( 0x42, 0x0, 8, 'HT3.0/', createUnkMsg ),
+	HEATER3_MERTIK2 =			Message( 0x42, 0x1, 8, 'HT3.1/', createUnkMsg ),
+	TR1 =						Message( 0x4F, 0x1, 10, 'TR.0/', createUnkMsg ),
+	TEMP1 =						Message( 0x50, 0x1, 8, 'TS.1/', createUnkMsg ),
+	TEMP2 =						Message( 0x50, 0x2, 8, 'TS.2/', createUnkMsg ),
+	TEMP3 =						Message( 0x50, 0x3, 8, 'TS.3/', createUnkMsg ),
+	TEMP4 =						Message( 0x50, 0x4, 8, 'TS.4/', createUnkMsg ),
+	TEMP5 =						Message( 0x50, 0x5, 8, 'TS.5/', createUnkMsg ),
+	TEMP6 =						Message( 0x50, 0x6, 8, 'TS.6/', createUnkMsg ),
+	TEMP7 =						Message( 0x50, 0x7, 8, 'TS.7/', createUnkMsg ),
+	TEMP8 =						Message( 0x50, 0x8, 8, 'TS.8/', createUnkMsg ),
+	TEMP9 =						Message( 0x50, 0x9, 8, 'TS.9/', createUnkMsg ),
+	TEMP10 =					Message( 0x50, 0xA, 8, 'TS.A/', createUnkMsg ),
+	TEMP11 =					Message( 0x50, 0xB, 8, 'TS.B/', createUnkMsg ),
+	HUM1 =						Message( 0x51, 0x1, 8, 'HS.1/', createUnkMsg ),
+	HUM2 =						Message( 0x51, 0x2, 8, 'HS.2/', createUnkMsg ),
+	TEMP_HUM1 =					Message( 0x52, 0x1, 10, 'TH.1/', createUnkMsg ),
+	TEMP_HUM2 =					Message( 0x52, 0x2, 10, 'TH.2/', createUnkMsg ),
+	TEMP_HUM3 =					Message( 0x52, 0x3, 10, 'TH.3/', createUnkMsg ),
+	TEMP_HUM4 =					Message( 0x52, 0x4, 10, 'TH.4/', createUnkMsg ),
+	TEMP_HUM5 =					Message( 0x52, 0x5, 10, 'TH.5/', createUnkMsg ),
+	TEMP_HUM6 =					Message( 0x52, 0x6, 10, 'TH.6/', createUnkMsg ),
+	TEMP_HUM7 =					Message( 0x52, 0x7, 10, 'TH.7/', createUnkMsg ),
+	TEMP_HUM8 =					Message( 0x52, 0x8, 10, 'TH.8/', createUnkMsg ),
+	TEMP_HUM9 =					Message( 0x52, 0x9, 10, 'TH.9/', createUnkMsg ),
+	TEMP_HUM10 =				Message( 0x52, 0xa, 10, 'TH.A/', createUnkMsg ),
+	TEMP_HUM11 =				Message( 0x52, 0xb, 10, 'TH.B/', createUnkMsg ),
+	TEMP_HUM12 =				Message( 0x52, 0xc, 10, 'TH.C/', createUnkMsg ),
+	TEMP_HUM13 =				Message( 0x52, 0xd, 10, 'TH.D/', createUnkMsg ),
+	TEMP_HUM14 =				Message( 0x52, 0xe, 10, 'TH.E/', createUnkMsg ),
+	BARO1 =						Message( 0x53, 0x1, 9, 'PS.1/', createUnkMsg ),
+	TEMP_HUM_BARO1 =			Message( 0x54, 0x1, 13, 'THP.1/', createUnkMsg ),
+	TEMP_HUM_BARO2 =			Message( 0x54, 0x2, 13, 'THP.2/', createUnkMsg ),
+	RAIN1 =						Message( 0x55, 0x1, 11, 'RS.1/', createUnkMsg ),
+	RAIN2 =						Message( 0x55, 0x2, 11, 'RS.2/', createUnkMsg ),
+	RAIN3 =						Message( 0x55, 0x3, 11, 'RS.3/', createUnkMsg ),
+	RAIN4 =						Message( 0x55, 0x4, 11, 'RS.4/', createUnkMsg ),
+	RAIN5 =						Message( 0x55, 0x5, 11, 'RS.5/', createUnkMsg ),
+	RAIN6 =						Message( 0x55, 0x6, 11, 'RS.6/', createUnkMsg ),
+	RAIN7 =						Message( 0x55, 0x7, 11, 'RS.7/', createUnkMsg ),
+	WIND1 =						Message( 0x56, 0x1, 16, 'WS.1/', createUnkMsg ),
+	WIND2 =						Message( 0x56, 0x2, 16, 'WS.2/', createUnkMsg ),
+	WIND3 =						Message( 0x56, 0x3, 16, 'WS.3/', createUnkMsg ),
+	WIND4 =						Message( 0x56, 0x4, 16, 'WS.4/', createUnkMsg ),
+	WIND5 =						Message( 0x56, 0x5, 16, 'WS.5/', createUnkMsg ),
+	WIND6 =						Message( 0x56, 0x6, 16, 'WS.6/', createUnkMsg ),
+	WIND7 =						Message( 0x56, 0x7, 16, 'WS.7/', createUnkMsg ),
+	UV1 =						Message( 0x57, 0x1, 9, 'US.1/', createUnkMsg ),
+	UV2 =						Message( 0x57, 0x2, 9, 'US.2/', createUnkMsg ),
+	UV3 =						Message( 0x57, 0x3, 9, 'US.3/', createUnkMsg ),
+	ELEC1 =						Message( 0x59, 0x1, 13, 'E1.1/', createUnkMsg ),
+	ELEC2 =						Message( 0x5A, 0x1, 17, 'E2.1/', createUnkMsg ),
+	ELEC3 =						Message( 0x5A, 0x2, 17, 'E3.2/', createUnkMsg ),
+	ELEC4 =						Message( 0x5B, 0x1, 19, 'E4.1/', createUnkMsg ),
+	WEIGHT1 =					Message( 0x5D, 0x1, 8, 'SS.1/', createUnkMsg ),
+	WEIGHT2 =					Message( 0x5D, 0x2, 8, 'SS.2/', createUnkMsg ),
+	RFXSENSOR_T =				Message( 0x70, 0x0, 7, 'RFX.0/', createUnkMsg ),
+	RFXMETER =					Message( 0x71, 0x0, 10, 'RFXM.0/', createUnkMsg )
+}
+
+-- These two tables are initialized in deferredStartup and are used to select a message
+-- type from the above table
+-- tableMsgByKey is used decode a received message. The type to decode is selected
+-- based on the length, type, and subtype found in the received message.
+local tableMsgByKey = {}
+-- tableMsgBySubID is used to select the message type to be created and sent in response to
+-- input from the Vera user interface.
+local tableMsgBySubID = {}
+
+-- A table to speed up searching for a command
+-- Used by searchCommandsTable(cmd)
+--local tableCommandByCmd = {}
 
 -- Scene controller - scene number
 -- ON/OFF (activated/deactivated): 1-16
@@ -533,387 +1737,15 @@ local tableDeviceTypes = {
 -- PAIR (KD101/SA30) (activated only): 124
 -- CHIME (activated only): 131-146
 
---   1-7) Category name = {Displayed name, is a SWITCH_LIGHT, is a DIMMIBLE_LIGHT, is a MOTION_SENSOR, is a DOOR_SENSOR, is a LIGHT_SENSOR, is a WINDOW_COVERING
---  8-10) has an ID, ID min, ID max
--- 11-13) has a HouseCode, HouseCode min, HouseCode max
--- 14-16) has a GroupCode, GroupCode min, GroupCode max
--- 17-19) has a UnitCode, UnitCode min, UnitCode, max
--- 20-22) has a SystemCode, SystemCode min, SystemCode max
--- 23-25) has a Channel, Channel min, Channel max
--- 26-31) start of altid string, default altid string format, 2nd type, 2nd altid string format, third device type, third altid string format }
+-- Category name = {Displayed name, is a LIGHT, is a DIMMIBLE_LIGHT, is a MOTION, is a DOOR, is a LIGHT_LEVEL, is a COVER
+-- ID limits (nil if this doesn't apply), ID min, ID max
+-- HouseCode limits
+-- GroupCode limits
+-- UnitCode limits
+-- SystemCode limits
+-- Channel limits
+-- start of altid string, default altid string format, 2nd type, 2nd altid string format, third device type, third altid string format }
 
--- Define a class for parameter limits
-local Limit = class(function(a, minimum, maximum)
-	a.minimum = minimum			-- the minimum value for the parameter
-	a.maximum = maximum			-- the maximum value for the parameter
-end)
-
--- Define a class for a device category
--- A category is a specific subtype of one of the device types shown above
-local Category = class(function(a, displayName, isaLIGHT, isaDIMMER, isaMOTION_SENSOR, isaDOOR_SENSOR, isaLIGHT_SENSOR, isaWINDOW_COVERING,
-						idLimits, houseCodeLimits, groupCodeLimits, unitCodeLimits, systemCodeLimits, channelLimits,
-						subID, altidFmt, type2, altid2Fmt, type3, altid3Fmt)
-	a.displayName = displayName
-	a.isaLIGHT = isaLIGHT
-	a.isaDIMMER = isaDIMMER
-	a.isaMOTION_SENSOR = isaMOTION_SENSOR
-	a.isaDOOR_SENSOR = isaDOOR_SENSOR
-	a.isaLIGHT_SENSOR = isaLIGHT_SENSOR
-	a.isaWINDOW_COVERING = isaWINDOW_COVERING
-	a.idLimits = idLimits
-	a.houseCodeLimits = houseCodeLimits
-	a.groupCodeLimits = groupCodeLimits
-	a.unitCodeLimits = unitCodeLimits
-	a.systemCodeLimits = systemCodeLimits
-	a.channelLimits = channelLimits
-	a.subID = subID
-	a.altidFmt = altidFmt
-	a.type2 = type2
-	a.altid2Fmt = altid2Fmt
-	a.type3 = type3
-	a.altid3Fmt = altid3Fmt
-end)
-
-local tableCategories = {
-	A_OK_AC114 = Category(	"A-OK AC114", false, false, false, false, false, true,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"B3/", "%s%06X/00", nil, nil, nil, nil	),
-	A_OK_RF01 = Category(	"A-OK RF01", false, false, false, false, false, true,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"B2/", "%s%06X/00", nil, nil, nil, nil	),
-	AC = Category(	"AC", true, true, true, true, true, true,
-		Limit(1, 0x3FFFFFF),
-		nil,
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L2.0/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
-	ANSLUT = Category(	"ANSLUT", true, true, false, false, false, false,
-		Limit(1, 0x3FFFFFF),
-		nil,
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L2.2/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
-	ARC = Category(	"ARC", true, false, true, true, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L1.1/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
-	BBSB = Category(	"Bye Bye Standby (new)", true, false, false, false, false, false,
-		Limit(1, 0x7FFFF),
-		nil,
-		nil,
-		Limit(1, 6),
-		nil,
-		nil,
-	"L5.2/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
-	BLYSS = Category(	"Blyss", true, false, true, true, false, false,
-		Limit(0, 0xFFFF),
-		nil,
-		Limit(0x41, 0x50),
-		Limit(1, 5),
-		nil,
-		nil,
-	"L6.0/", "%s%04X/%s%d", "REMOTE", "%s%04X/%s", nil, nil	),
-	COCO = Category(	"COCO GDR2-2000R", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x44),
-		nil,
-		Limit(1, 4),
-		nil,
-		nil,
-	"L1.A/", "%s%s%02d", nil, nil, nil, nil	),
-	DC_RMF_YOODA = Category(	"DC106, YOODA, Rohrmotor24 RMF", false, false, false, false, false, true,
-		Limit(1, 0x0FFFFFFF),
-		nil,
-		nil,
-		Limit(0, 15),
-		nil,
-		nil,
-	"B6/", "%s%07X/%02d", nil, nil, nil, nil	),
-	ELRO_AB400D = Category(	"ELRO AB400D, Flamingo, Sartano", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 64),
-		nil,
-		nil,
-	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
-	EMW100 = Category(	"GAO/Everflourish EMW100", true, false, false, false, false, false,
-		Limit(1, 0x3FFF),
-		nil,
-		nil,
-		Limit(1, 4),
-		nil,
-		nil,
-	"L5.1/", "%s%06X/%02d", nil, nil, nil, nil	),
-	EMW200 = Category(	"Chacon EMW200", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x43),
-		nil,
-		Limit(1, 4),
-		nil,
-		nil,
-	"L1.4/", "%s%s%02d", nil, nil, nil, nil	),
-	ENERGENIE_5GANG = Category(	"Energenie 5 gang", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 10),
-		nil,
-		nil,
-	"L1.9/", "%s%s%02d", nil, nil, nil, nil	),
-	ENERGENIE_ENER010 = Category(	"Energenie ENER010", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 4),
-		nil,
-		nil,
-	"L1.8/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
-	FOREST = Category(	"Forest", false, false, false, false, false, true,
-		Limit(1, 0x0FFFFFFF),
-		nil,
-		nil,
-		Limit(0, 15),
-		nil,
-		nil,
-	"B7/", "%s%07X/%02d", nil, nil, nil, nil	),
-	HARRISON_CURTAIN = Category(	"Harrison Curtain", false, false, false, false, false, true,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"C0/", "%s%s%02d", nil, nil, nil, nil	),
-	HASTA_NEW = Category(	"Hasta (new)", false, false, false, false, false, true,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		Limit(0, 15),
-		nil,
-		nil,
-	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
-	HASTA_OLD = Category(	"Hasta (old)", false, false, false, false, false, true,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		Limit(0, 15),
-		nil,
-		nil,
-	"B1/", "%s%06X/%02d", nil, nil, nil, nil	),
-	HOMEEASY_EU = Category(	"HomeEasy EU", true, true, false, false, false, false,
-		Limit(1, 0x3FFFFFF),
-		nil,
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L2.1/", "%s%07X/%02d", "REMOTE", "%s%07X", nil, nil	),
-	IKEA_KOPPLA = Category(	"Ikea Koppla", true, false, false, false, false, false,
-		nil,
-		nil,
-		nil,
-		nil,
-		Limit(1, 16),
-		Limit(1, 10),
-	"L3.0/", "%s%X%02d", nil, nil, nil, nil	),
-	IMPULS = Category(	"Impuls", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 64),
-		nil,
-		nil,
-	"L1.5/", "%s%s%02d", nil, nil, nil, nil	),
-	KANGTAI = Category(	"Kangtai", true, false, false, false, false, false,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		Limit(1,30),
-		nil,
-		nil,
-	"L5.B/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
-	LIGHTWAVERF_SIEMENS = Category(	"LightwaveRF, Siemens", true, true, true, true, false, true,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L5.0/", "%s%06X/%02d", "LWRF_REMOTE", "%s%06X", nil, nil	),
-	LIVOLO_1GANG = Category(	"Livolo (1 gang)", true, true, false, false, false, false,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"L5.5/", "%s%06X/1", nil, nil, nil, nil	),
-	LIVOLO_2GANG = Category(	"Livolo (2 gang)", true, false, false, false, false, false,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", nil, nil	),
-	LIVOLO_3GANG = Category(	"Livolo (3 gang)", true, false, false, false, false, false,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"L5.5/", "%s%06X/1", "LIGHT", "%s%06X/2", "LIGHT", "%s%06X/3"	),
-	MEDIA_MOUNT = Category(	"Media Mount projector screen", false, false, false, false, false, true,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"B5/", "%s%06X/00", nil, nil, nil, nil	),
-	PHENIX = Category(	"Phenix", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1,32),
-		nil,
-		nil,
-	"L1.2/", "%s%s%02d", nil, nil, nil, nil	),
-	PHILIPS_SBC = Category(	"Philips SBC", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 8),
-		nil,
-		nil,
-	"L1.7/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	),
-	RAEX = Category(	"Raex YR1326 T16 motor", false, false, false, false, false, true,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"B4/", "%s%06X/00", nil, nil, nil, nil	),
-	RFY = Category(	"RFY", false, false, false, false, false, true,
-		Limit(1, 0x0FFFFF),
-		nil,
-		nil,
-		Limit(0, 4),
-		nil,
-		nil,
-	"RFY0/", "%s%05X/%02d", nil, nil, nil, nil	),
-	RISINGSUN = Category(	"RisingSun", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x44),
-		nil,
-		Limit(1, 4),
-		nil,
-		nil,
-	"L1.6/", "%s%s%02d", nil, nil, nil, nil	),
-	ROLLERTROL = Category(	"RollerTrol", false, false, false, false, false, true,
-		Limit(1, 0xFFFF),
-		nil,
-		nil,
-		Limit(0, 15),
-		nil,
-		nil,
-	"B0/", "%s%06X/%02d", nil, nil, nil, nil	),
-	RSL2 = Category(	"Conrad RSL2", true, false, false, false, false, false,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L5.4/", "%s%06X/%02d", "REMOTE", "%s%06X", nil, nil	),
-	SONOFF = Category(	"Sonoff Smart Switch", true, false, false, false, false, false,
-		Limit(1, 0xFFFFFF),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	"L4/", "%s%06X/00", nil, nil, nil, nil	),
-	WAVEMAN = Category(	"Waveman", true, false, false, false, false, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L1.3/", "%s%s%02d", nil, nil, nil, nil	),
-	X10 = Category(	"X10 lighting", true, false, true, false, true, false,
-		nil,
-		Limit(0x41, 0x50),
-		nil,
-		Limit(1, 16),
-		nil,
-		nil,
-	"L1.0/", "%s%s%02d", "REMOTE", "%s%s", nil, nil	)
-}
-
-
--- J_RFXtrx.js depends on the text of these table items
-local tableHardwareType = {
-	[0x50] = "RFXtrx315 at 310 MHz",
-	[0x51] = "RFXtrx315 at 315 MHz",
-	[0x52] = "RFXrec433 at 433.92 MHz",
-	[0x53] = "RFXtrx433 at 433.92 MHz",
-	[0x54] = "RFXtrx433 at 433.42 MHz",
-	[0x55] = "RFXtrx868X operating at 868 MHz",
-	[0x56] = "RFXtrx868X operating at 868.00 MHz FSK",
-	[0x57] = "RFXtrx868X operating at 868.30 MHz",
-	[0x58] = "RFXtrx868X operating at 868.30 MHz FSK",
-	[0x59] = "RFXtrx868X operating at 868.35 MHz",
-	[0x5A] = "RFXtrx868X operating at 868.35 MHz FSK",
-	[0x5B] = "RFXtrx868X operating at 868.95 MHz",
-	[0x5C] = "RFXtrx433IOT at 433.92 MHz",
-	[0x5D] = "RFXtrx433IOT at 868 MHz",
-	[0x5E] = "RFXtrx433IOT at 868 MHz",
-	[0x5F] = "RFXtrx433 at 434.50 MHz"
-	}
-	
-local tableFirmwareType = {
-	"Type1 receive only",
-	"Type1",
-	"Type2",
-	"Ext",
-	"Ext2",
-	"Pro1",
-	"Pro2",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"unknown",
-	"ProXL1"
-	}
-	
 -- A table used to find the device ID number using the AltId
 -- This table is initialized in deferredStartup and after devices
 -- are added or deleted.
@@ -922,7 +1754,6 @@ local devicedIdNumByAltId = {}
 -- A table used to speed up searching for a child device
 -- Used by findChild(parentDevice, altid, deviceType)
 local tableDeviceNumByAltidAndType  = {}
-
 
 -- This table stores all children
 -- Each entry is a table of 4 elements:
@@ -973,7 +1804,7 @@ end
 local function getStringPart( psString, piStart, piLen )
 	local lsResult = ""
 
-	if ( psString ~= nil )
+	if ( psString  )
 		then
 		local liStringLength = 1 + #psString
 		for teller = piStart, (piStart + piLen - 1)
@@ -981,7 +1812,7 @@ local function getStringPart( psString, piStart, piLen )
 			-- if not beyond string length
 			if ( liStringLength > teller )
 				then
-				lsResult = lsResult .. string.sub(psString, teller, teller)
+				lsResult = lsResult..string.sub(psString, teller, teller)
 			end
 		end
 	end
@@ -992,11 +1823,11 @@ end
 local function formattohex(dataBuf)
 
 	local resultstr = ""
-	if (dataBuf ~= nil)
+	if (dataBuf )
 		then
 		for idx = 1, string.len(dataBuf)
 			do
-			resultstr = resultstr .. string.format("%02X ", string.byte(dataBuf, idx) )
+			resultstr = resultstr..string.format("%02X ", string.byte(dataBuf, idx) )
 		end
 	end
 	return resultstr
@@ -1063,9 +1894,9 @@ local function searchInKeyTable(table, value1, value2)
 
 end
 
-local function getVariable(deviceNum, variable)
+function getVariable(deviceNum, variable)
 	local value = nil
-	if (variable ~= nil)
+	if (variable)
 		then
 		value = luup.variable_get(variable.serviceId, variable.name, deviceNum)
 		if(variable.isBoolean)
@@ -1081,18 +1912,18 @@ local function getVariable(deviceNum, variable)
 end
 
 local function setDefaultValue(deviceNum, variable, value)
-	if (variable ~= nil and value ~= nil)
+	if (variable and value ~= nil)
 		then
 		local currentValue = luup.variable_get(variable.serviceId, variable.name, deviceNum)
 		if(currentValue == nil) then
-			debug("SET " .. variable.name .. " with default value " .. value)
+			debug("SET "..variable.name.." with default value "..value)
 			luup.variable_set(variable.serviceId, variable.name, value, deviceNum)
 		end
 	end
 end
 
 local function setVariable(deviceNum, variable, value)
-	if (variable ~= nil and value ~= nil)
+	if (variable and value ~= nil)
 		then
 		debug("setVariable - deviceNum: "..deviceNum.." variable: "..(variable.name or "nil").." value: "..tostring(value))
 		if (type(value) == "number") then
@@ -1164,37 +1995,16 @@ local function initStateVariables()
 	setDefaultValue(THIS_DEVICE, tabVars.VAR_VOLTAGE, "230")
 	setDefaultValue(THIS_DEVICE, tabVars.VAR_DISABLED_DEVICES, "")
 
-	-- Previous versions used one of four different static JSON files
-	-- to handle the different firmware versions. That is no longer needed
-	-- but we need to be sure the original JSON file is used.
-	local currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
-	debug("Current JSON file: " .. currentJsonFilename)
-	local properJsonFilename = "D_RFXtrx.json"
-	debug("Proper JSON file: " .. properJsonFilename)
-	if (currentJsonFilename ~= properJsonFilename)
-		then
-		debug("Setting device_json to " .. properJsonFilename)
-		luup.attr_set("device_json", properJsonFilename, THIS_DEVICE)
-		currentJsonFilename = luup.attr_get("device_json", THIS_DEVICE)
-		debug("Current JSON file: " .. currentJsonFilename)
-		if (currentJsonFilename ~= properJsonFilename)
-		then
-			error("Cannot set proper RFXtrx JSON file")
-		else
-			luup.reload()
-		end
-	end
-
 end
 
 local function encodeCommandsInString(tableCmds)
 
 	local str = ""
-	if ((tableCmds ~= nil) and (#tableCmds > 0))
+	if (tableCmds and (#tableCmds > 0))
 		then
 		for _, command in ipairs(tableCmds)
 			do
-			str = str .. command.altid .. "#" .. command.cmd .. "#" .. (command.value or "nil") .. "\n"
+			str = str..command.altid.."#"..command.cmd.."#"..(command.value or "nil").."\n"
 		end
 	end
 	return str
@@ -1213,14 +2023,14 @@ local function decodeCommandsFromString(data)
 			break
 		end
 		local cmdstr = string.sub(data, i+1, j-1)
-		--debug("cmd=" .. cmd)
+		--debug("cmd="..cmd)
 		for id, cmd, value in string.gmatch(cmdstr, "([%u%d/.]+)#([%a%d]+)#([%a%d/. ]+)")
 			do
 			if (value == "nil")
 				then
 				value = nil
 			end
-			--debug("id=" .. (id or "nil") .. " cmd=" .. (cmd or "nil") .. " value=" .. (value or "nil"))
+			--debug("id="..(id or "nil").." cmd="..(cmd or "nil").." value="..(value or "nil"))
 			table.insert(tableCmds, DeviceCmd( id, cmd, value, 0 ))
 		end
 		i = j
@@ -1236,6 +2046,7 @@ local function logDevices()
 	local countLS = 0
 	local countDL = 0
 	local countWC = 0
+	local countFN = 0
 	local countTS = 0
 	local countHS = 0
 	local countBS = 0
@@ -1269,6 +2080,9 @@ local function logDevices()
 		elseif (key == "COVER")
 			then
 			countWC = countWC + 1
+		elseif (key == "FAN")
+			then
+			countFN = countFN + 1
 		elseif (key == "TEMP")
 			then
 			countTS = countTS + 1
@@ -1313,46 +2127,47 @@ local function logDevices()
 			countST = countST + 1
 		end
 	end
-	log("Tree with number child devices: " .. #tableDevices)
-	log("       door sensors: " .. countDS)
-	log("     motion sensors: " .. countMS)
-	log("      light sensors: " .. countLL)
-	log("     light switches: " .. countLS)
-	log(" dim light switches: " .. countDL)
-	log("    window covering: " .. countWC)
-	log("temperature sensors: " .. countTS)
-	log("   humidity sensors: " .. countHS)
-	log(" barometric sensors: " .. countBS)
-	log("       wind sensors: " .. countWS)
-	log("       rain sensors: " .. countRS)
-	log("         UV sensors: " .. countUV)
-	log("     weight sensors: " .. countWT)
-	log("      power sensors: " .. countPM)
-	log("   security remotes: " .. countSR)
-	log("    remote controls: " .. countRC)
-	log("    heating devices: " .. countHT)
-	log("          RFXMeters: " .. countRM)
-	log("     smart switches: " .. countST)
+	log("Tree with number child devices: "..#tableDevices)
+	log("       door sensors: "..countDS)
+	log("     motion sensors: "..countMS)
+	log("      light sensors: "..countLL)
+	log("     light switches: "..countLS)
+	log(" dim light switches: "..countDL)
+	log("    window covering: "..countWC)
+	log("               fans: "..countFN)
+	log("temperature sensors: "..countTS)
+	log("   humidity sensors: "..countHS)
+	log(" barometric sensors: "..countBS)
+	log("       wind sensors: "..countWS)
+	log("       rain sensors: "..countRS)
+	log("         UV sensors: "..countUV)
+	log("     weight sensors: "..countWT)
+	log("      power sensors: "..countPM)
+	log("   security remotes: "..countSR)
+	log("    remote controls: "..countRC)
+	log("    heating devices: "..countHT)
+	log("          RFXMeters: "..countRM)
+	log("     smart switches: "..countST)
 
 end
 
 local function logCmds(title, tableCmds)
 
-	local str = title .. ": "
-	if (tableCmds ~= nil and #tableCmds > 0)
+	local str = title..": "
+	if (tableCmds and #tableCmds > 0)
 		then
 		for _, command in ipairs(tableCmds)
 			do
-			str = str .. (command.altid or "nil altid") .. " "
+			str = str..(command.altid or "nil altid").." "
 			if(command.cmd) then
-				str = str .. (command.cmd.name or "nil cmd.name")
+				str = str..(command.cmd.name or "nil cmd.name")
 			else
-				str = str .. "nil cmd"
+				str = str.."nil cmd"
 			end
-			str = str .. " " .. (command.value or "nil value") .. " "
+			str = str.." "..(command.value or "nil value").." "
 			if (command.delay and tonumber(command.delay) > 0)
 				then
-				str = str .. " delayed " .. command.delay .. "s"
+				str = str.." delayed "..command.delay.."s"
 			end
 		end
 	end
@@ -1362,11 +2177,11 @@ end
 
 local function findStrInStringList(list, str)
 
-	if (list ~= nil)
+	if (list)
 		then
 		for value in string.gmatch(list, "[%u%d/.]+")
 			do
-			--debug("value = " .. value)
+			--debug("value = "..value)
 			if (value == str)
 				then
 				return true
@@ -1385,36 +2200,42 @@ local function findAssociation(deviceNum, altid)
 
 end
 
-local function findChild(parentDevice, altid, deviceType)
-
-	local key = altid .. (deviceType or "")
-	local deviceNum = tableDeviceNumByAltidAndType[key]
-	if(deviceNum ~= nil) then
-		--debug("devicenum found in table - key: " .. key .. " devicenum: " .. deviceNum)
-		return deviceNum
+function findChild(parentDevice, altid, deviceType)
+	debug("findChild-> parentDevice: "..parentDevice.." altid: "..altid.." deviceType: "..(deviceType or 'nil'))
+	local key = altid..(deviceType or "")
+	local searchResult = tableDeviceNumByAltidAndType[key]
+	if(searchResult) then
+		if (searchResult[2]) then
+			debug("devicenum found in table - key: "..key.." devicenum: "..searchResult[1].." myDevice: true")
+			return searchResult[1]
+		else
+			debug("devicenum found in table - key: "..key.." devicenum: "..searchResult[1].." myDevice: false")
+			return
+		end
 	end
-	--debug("searching for devicenum " .. key)
-	local foundAssoc = nil
+	--debug("searching for devicenum "..key)
 	for k, veraDevice in pairs(luup.devices)
 		do
 		if ((deviceType == nil) or (veraDevice.device_type == deviceType))
 			then
-			if (veraDevice.device_num_parent == parentDevice and string.find(veraDevice.id, altid .. "$", 4) == 4)
+			--debug("veraDevice.id: "..veraDevice.id.." parent: "..veraDevice.device_num_parent.." stringfind: "..(string.find(veraDevice.id, altid.."$", 4)or 'nil'))
+--			if (veraDevice.device_num_parent == parentDevice and string.find(veraDevice.id, altid.."$", 4) == 4)
+			if (veraDevice.device_num_parent == parentDevice and string.find(veraDevice.id, altid, 4, true) == 4)
 				then
-				tableDeviceNumByAltidAndType[key]= k
+				tableDeviceNumByAltidAndType[key] = {k, true}
+				debug("findChild succeeded->deviceNum: "..k)
 				return k
 			elseif (findAssociation(k, altid) == true)
 				then
-				foundAssoc = k
-				tableDeviceNumByAltidAndType[key]= k
+				tableDeviceNumByAltidAndType[key] = {k, true}
+				debug("findAssociation succeeded->deviceNum: "..k)
+				return k
 			end
 		end
 	end
-	if(foundAssoc == nil)
-		then debug("findChild failed for altid: " .. altid)
-	end
-	return foundAssoc
-
+	debug("findChild failed for altid: "..altid)
+	tableDeviceNumByAltidAndType[key] = {0, false}
+	return nil
 end
 
 local function findChildren(parentDevice, deviceType)
@@ -1435,14 +2256,14 @@ end
 -- Function to send a message to RFXtrx
 local function sendCommand(packetType, packetSubType, packetData, tableCmds)
 
-	if (tableCmds ~= nil and #tableCmds > 0)
+	if (tableCmds and #tableCmds > 0)
 		then
 		table.insert(tableMsgSent, { sequenceNum, tableCmds })
 	end
 
-	local cmd = string.char(string.len(packetData) + 3, packetType, packetSubType, sequenceNum) .. packetData
+	local cmd = string.char(string.len(packetData) + 3, packetType, packetSubType, sequenceNum)..packetData
 
-	debug("Sending command: " .. formattohex(cmd))
+	debug("Sending command: "..formattohex(cmd))
 
 	if (luup.io.write(cmd) == false)
 		then
@@ -1487,7 +2308,7 @@ local function disableDevice(id)
 			then
 			disabledDevices = id
 		else
-			disabledDevices = disabledDevices .. "," .. id
+			disabledDevices = disabledDevices..","..id
 		end
 		setVariable(THIS_DEVICE, tabVars.VAR_DISABLED_DEVICES, disabledDevices)
 	end
@@ -1574,11 +2395,11 @@ local function decodeTemperature( altid, dataString, byte1 )
 		temp = -temp
 		if (temp < -28.89)
 			then
-			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
+			debug("Dubious temperature reading: "..temp.."C".." altid="..altid)
 		end
 		else if (temp > 65.56)
 			then
-			debug("Dubious temperature reading: " .. temp .. "C" .. " altid=" .. altid)
+			debug("Dubious temperature reading: "..temp.."C".." altid="..altid)
 		end
 	end
 	if (not getVariable(THIS_DEVICE, tabVars.VAR_TEMP_UNIT))
@@ -1595,7 +2416,7 @@ local function resetRainData(first, last, rainTable)
 		warning("Invalid type passed to resetRainData")
 		return
 	end
-	debug("Resetting rain data from " .. first .. " to " .. last .. " in " .. #rainTable)
+	debug("Resetting rain data from "..first.." to "..last.." in "..#rainTable)
 	local i = first
 	if (first <= last) then
 		while i <= last do
@@ -1623,7 +2444,7 @@ local function resetRainTable(rainTable, size)
 		warning("Invalid type passed to resetRainTable")
 		return
 	end
-	debug("Resetting rain table " .. #rainTable)
+	debug("Resetting rain table "..#rainTable)
 	resetRainData(1, size, rainTable)
 end
 
@@ -1713,7 +2534,7 @@ local function checkMaxMinTemp( altid, tableCmds, temp )
 	local minval
 	-- Determine the device number of the temperature sensor
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.TEMP.deviceType)
-	if (deviceNum ~= nil)
+	if (deviceNum)
 		then
 		-- Update the maximum temperature if necessary
 		maxval = tonumber(getVariable(deviceNum, tabVars.VAR_TEMPMAX))
@@ -1790,7 +2611,7 @@ local function checkMaxMinHum( altid, tableCmds, hum )
 	local minval
 	-- Determine the device number of the temperature sensor
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.HUM.deviceType)
-	if (deviceNum ~= nil)
+	if (deviceNum)
 		then
 		-- Update the maximum temperature if necessary
 		maxval = tonumber(getVariable(deviceNum, tabVars.VAR_HUMMAX))
@@ -1860,19 +2681,21 @@ end
 local function checkExistingDevices(lul_device)
 
 	local nbr = 0
+	local restartNeeded = false
 
-	-- Check all devices if they are childeren. If so, register in
+	-- Check all devices if they are children. If so, register in
 	-- the correct array based on the device type
 	for k, v in pairs(luup.devices)
 		do
+		local altIdPrefix = string.match(v.id, '/([^/]+)/')
 		-- Look for devices with this device as parent
 		if (v.device_num_parent == lul_device)
 			then
-			debug( "Found child device id " .. tostring(v.id) .. " of type " .. tostring(v.device_type))
+			debug( "Found child device id "..tostring(v.id).." of type "..tostring(v.device_type))
 			nbr = nbr + 1
 
 			local key = searchInKeyTable(tableDeviceTypes, tostring(v.device_type), string.sub(v.id, 1, 3))
-			if (key ~= nil)
+			if (key)
 				then
 				local associations = getVariable(k, tabVars.VAR_ASSOCIATION)
 				table.insert(tableDevices, { v.id, key, associations, v.description })
@@ -1895,19 +2718,58 @@ local function checkExistingDevices(lul_device)
 				end
 			end
 		end
+		if (altIdPrefix and tableDevice2Json[altIdPrefix]) then
+			local requiredJSONFile = tableDevice2Json[altIdPrefix]
+			local currentJSONFile = luup.attr_get("device_json", k)
+			if (currentJSONFile ~= requiredJSONFile) then
+				debug("Setting JSON file for device "..v.id.." to "..requiredJSONFile)
+				restartNeeded = true
+				luup.attr_set("device_json", requiredJSONFile, k)
+			end
+		end
 	end
-
+	if (restartNeeded) then
+		luup.reload()
+	end
 	setVariable(lul_device, tabVars.VAR_NBR_DEVICES, nbr)
 
 	logDevices()
 
 end
 
+local function addParameter(paramString, variable, value)
+	if not (paramString or variable or value) then
+		warning("a nil passed to addParameter")
+		return
+	end
+	if (paramString ~= "")
+		then
+		paramString = paramString.."\n"
+	end
+	paramString = paramString..variable.serviceId..","..variable.name.."="..(value or "")
+	return paramString
+end
+
+local function addParameters(paramString, paramTable)
+	if not (paramString or paramTable) then
+		warning("a nil passed to addParameters")
+		return
+	end
+	if (type(paramTable) ~= "table") then
+		warning("paramTable passed to addParameters is not a table")
+		return
+	end
+	for _, v in pairs(paramTable) do
+		paramString = addParameter(paramString, v.variable, v.value)
+	end
+	return paramString
+end
+
 local function updateManagedDevices(tableNewDevices, tableConversions, tableDeletedDevices)
 
-	if (( (tableNewDevices ~= nil) and (#tableNewDevices > 0) )
-		or ( (tableConversions ~= nil) and (#tableConversions > 0) )
-		or ( (tableDeletedDevices ~= nil) and (#tableDeletedDevices > 0) ))
+	if ((tableNewDevices and (#tableNewDevices > 0) )
+		or ( tableConversions and (#tableConversions > 0) )
+		or ( tableDeletedDevices and (#tableDeletedDevices > 0) ))
 		then
 		local child_devices = luup.chdev.start(THIS_DEVICE);
 
@@ -1924,7 +2786,7 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 
 			local toBeDeleted = false
 
-			if ((tableDeletedDevices ~= nil) and (#tableDeletedDevices > 0))
+			if (tableDeletedDevices and (#tableDeletedDevices > 0))
 				then
 				for _, v2 in ipairs(tableDeletedDevices)
 					do
@@ -1937,10 +2799,10 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 			end
 
 			local room
-			local deviceId = nil
+			local altId = nil
 			local devType = nil
 
-			if ((tableConversions ~= nil) and (#tableConversions > 0))
+			if (tableConversions and (#tableConversions > 0))
 				then
 				for _, v2 in ipairs(tableConversions)
 					do
@@ -1948,80 +2810,37 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 						then
 						name = v2[1]
 						room = v2[2]
-						deviceId = v2[3]
+						altId = v2[3]
 						devType = v2[4]
 						break
 					end
 				end
 			end
 
-			if (deviceId ~= nil and devType ~= nil)
+			if (altId and devType)
 				then
-				debug("Converting " .. name .. "...")
+				debug("Converting "..name.."...")
 
 				local newDeviceType = tableDeviceTypes[devType]
 
 				if (newDeviceType ~= existingDevice)
 					then
 					local parameters = ""
-					if (newDeviceType.hasAssociation)
-						then
-						if (parameters ~= "")
+					if (newDeviceType.hasAssociation) then
+						parameters = addParameter(parameters, tabVars.VAR_ASSOCIATION, "")
+						if (associations)
 							then
-							parameters = parameters .. "\n"
-						end
-						parameters = parameters .. tabVars.VAR_ASSOCIATION.serviceId .. "," .. tabVars.VAR_ASSOCIATION.name .. "="
-						if (associations ~= nil)
-							then
-							parameters = parameters .. associations
+							parameters = parameters..associations
 							else
-							parameters = parameters .. ""
+							parameters = parameters..""
 						end
 					end
-					if (newDeviceType == tableDeviceTypes.LIGHT)
-						then
-						if (parameters ~= "")
-							then
-							parameters = parameters .. "\n"
-						end
-						parameters = parameters .. tabVars.VAR_LIGHT.serviceId .. "," .. tabVars.VAR_LIGHT.name .. "=0"
-						parameters = parameters .. "\n"
-						parameters = parameters .. tabVars.VAR_REPEAT_EVENT.serviceId .. "," .. tabVars.VAR_REPEAT_EVENT.name .. "=0"
-					elseif (newDeviceType == tableDeviceTypes.DIMMER
-						or newDeviceType == tableDeviceTypes.COVER)
-						then
-						if (parameters ~= "")
-							then
-							parameters = parameters .. "\n"
-						end
-						parameters = parameters .. tabVars.VAR_DIMMER.serviceId .. "," .. tabVars.VAR_DIMMER.name .. "=0"
-						parameters = parameters .. "\n"
-						parameters = parameters .. tabVars.VAR_LIGHT.serviceId .. "," .. tabVars.VAR_LIGHT.name .. "=0"
-					elseif (newDeviceType == tableDeviceTypes.MOTION
-						or newDeviceType == tableDeviceTypes.DOOR)
-						then
-						if (parameters ~= "")
-							then
-							parameters = parameters .. "\n"
-						end
-						parameters = parameters .. tabVars.VAR_ARMEDTRIPPED.serviceId .. "," .. tabVars.VAR_ARMEDTRIPPED.name .. "=0"
-						--						parameters = parameters .. "\n"
-						--						parameters = parameters .. tabVars.VAR_TRIPPED.serviceId .. "," .. tabVars.VAR_TRIPPED.name .. "=0"
-						parameters = parameters .. "\n"
-						parameters = parameters .. tabVars.VAR_REPEAT_EVENT.serviceId .. "," .. tabVars.VAR_REPEAT_EVENT.name .. "=1"
-						--						parameters = parameters .. "\n"
-						--						parameters = parameters .. tabVars.VAR_TAMPERED.serviceId .. "," .. tabVars.VAR_TAMPERED.name .. "=0"
-					elseif (newDeviceType == tableDeviceTypes.LIGHT_LEVEL)
-						then
-						if (parameters ~= "")
-							then
-							parameters = parameters .. "\n"
-						end
-						parameters = parameters .. tabVars.VAR_LIGHT_LEVEL.serviceId .. "," .. tabVars.VAR_LIGHT_LEVEL.name .. "=0"
+					if (newDeviceType.parameters) then
+						parameters = addParameters(parameters, newDeviceType.parameters)
 					end
-					luup.chdev.append(THIS_DEVICE, child_devices, newDeviceType.prefix .. subId, name,
+					luup.chdev.append(THIS_DEVICE, child_devices, newDeviceType.prefix..subId, name,
 					newDeviceType.deviceType, newDeviceType.deviceFile, "", parameters, false)
-					tableDevices[i] = { newDeviceType.prefix .. subId, devType, associations, name }
+					tableDevices[i] = { newDeviceType.prefix..subId, devType, associations, name }
 				else
 					luup.chdev.append(THIS_DEVICE, child_devices, id, name,
 					existingDevice.deviceType, existingDevice.deviceFile, "", "", false)
@@ -2032,120 +2851,56 @@ local function updateManagedDevices(tableNewDevices, tableConversions, tableDele
 				existingDevice.deviceType, existingDevice.deviceFile, "", "", false)
 			end
 		end
+		-- Synch the new tree with the old tree
+		debug("Start sync")
+		luup.chdev.sync(THIS_DEVICE, child_devices)
+		debug("End sync")
 
 		------------------------------------------------------------------------------------
 		-- Now add the new device(s) to the tree
 		------------------------------------------------------------------------------------
 
-		if ((tableNewDevices ~= nil) and (#tableNewDevices > 0))
+		if (tableNewDevices and (#tableNewDevices > 0))
 			then
 			for _, device in ipairs(tableNewDevices)
 				do
 				local name = device[1]
 				local room = device[2]
-				local deviceId = device[3]
+				local altId = device[3]
 				local devType = device[4]
 				local newDevice = tableDeviceTypes[devType]
-				name = name or (newDevice.name .. deviceId)
-				debug("Creating child device id " .. newDevice.prefix .. deviceId .. " of type " .. newDevice.deviceType)
-				local parameters = ""
-				if (newDevice.hasAssociation)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
+				local newDevId
+				debug("new device->name: "..(name or 'nil').." room: "..(room or 'nil').." altId: "..(altId or 'nil').." device type: "..(devType or 'nil'))
+				if not(newDevice) then
+					warning("updateManagedDevices: no device found for device type "..(devType or 'nil'))
+				else
+					name = name or (newDevice.name..altId)
+					debug("Creating child device id "..newDevice.prefix..altId.." of type "..newDevice.deviceType)
+					local parameters = ""
+					if (newDevice.hasAssociation) then
+						parameters = addParameter(parameters, tabVars.VAR_ASSOCIATION, "")
 					end
-					parameters = parameters .. tabVars.VAR_ASSOCIATION.serviceId .. "," .. tabVars.VAR_ASSOCIATION.name .. "="
+					if (newDevice.hasMode) then
+						parameters = addParameter(parameters, tabVars.VAR_RFY_MODE, "STANDARD")
+					end
+					if (newDevice.parameters) then
+						parameters = addParameters(parameters, newDevice.parameters)
+					end
+					newDevId = luup.create_device("", newDevice.prefix..altId, name, newDevice.deviceFile, "", "", "",
+						false, false, THIS_DEVICE, 0, 0, parameters, 0, "", "", true, false)
+					debug("New device ID: "..(newDevId or 'nil'))
+--					luup.chdev.append(THIS_DEVICE, child_devices, newDevice.prefix..altId, name,
+--						newDevice.deviceType, newDevice.deviceFile, "", parameters, false)
+					table.insert(tableDevices, { newDevice.prefix..altId, devType, nil, name })
 				end
-				if (newDevice.hasMode)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_RFY_MODE.serviceId .. "," .. tabVars.VAR_RFY_MODE.name .. "=STANDARD"
-				end
-				if (newDevice.hasAdjustments)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_ADJUST_MULTIPLIER.serviceId .. "," .. tabVars.VAR_ADJUST_MULTIPLIER.name .. "=1.0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_ADJUST_CONSTANT.serviceId .. "," .. tabVars.VAR_ADJUST_CONSTANT.name .. "=0.0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_ADJUST_CONSTANT2.serviceId .. "," .. tabVars.VAR_ADJUST_CONSTANT2.name .. "=0.0"
-				end
-				if (newDevice == tableDeviceTypes.LIGHT)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_LIGHT.serviceId .. "," .. tabVars.VAR_LIGHT.name .. "=0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_REPEAT_EVENT.serviceId .. "," .. tabVars.VAR_REPEAT_EVENT.name .. "=0"
-				elseif (newDevice == tableDeviceTypes.SWITCH_TOGGLE)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_STATE.serviceId .. "," .. tabVars.VAR_STATE.name .. "=0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_REPEAT_EVENT.serviceId .. "," .. tabVars.VAR_REPEAT_EVENT.name .. "=1"
-				elseif (newDevice == tableDeviceTypes.DIMMER
-					or newDevice == tableDeviceTypes.COVER)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_DIMMER.serviceId .. "," .. tabVars.VAR_DIMMER.name .. "=0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_LIGHT.serviceId .. "," .. tabVars.VAR_LIGHT.name .. "=0"
-				elseif (newDevice == tableDeviceTypes.MOTION
-					or newDevice == tableDeviceTypes.DOOR
-					or newDevice == tableDeviceTypes.SMOKE)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_TRIPPED.serviceId .. "," .. tabVars.VAR_TRIPPED.name .. "=0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_REPEAT_EVENT.serviceId .. "," .. tabVars.VAR_REPEAT_EVENT.name .. "=1"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_ARMED.serviceId .. "," .. tabVars.VAR_ARMED.name .. "=0"
-					parameters = parameters .. "\n"
-					parameters = parameters .. tabVars.VAR_AUTOUNTRIP.serviceId .. "," .. tabVars.VAR_AUTOUNTRIP.name .. "=0"
-				elseif (newDevice == tableDeviceTypes.ALARM)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_EXIT_DELAY.serviceId .. "," .. tabVars.VAR_EXIT_DELAY.name .. "=0"
-				elseif (newDevice == tableDeviceTypes.LIGHT_LEVEL)
-					then
-					if (parameters ~= "")
-						then
-						parameters = parameters .. "\n"
-					end
-					parameters = parameters .. tabVars.VAR_LIGHT_LEVEL.serviceId .. "," .. tabVars.VAR_LIGHT_LEVEL.name .. "=0"
-				end
-				luup.chdev.append(THIS_DEVICE, child_devices, newDevice.prefix .. deviceId, name,
-					newDevice.deviceType, newDevice.deviceFile, "", parameters, false)
-				table.insert(tableDevices, { newDevice.prefix .. deviceId, devType, nil, name })
 			end
 		end
 
 		logDevices()
-		-- Synch the new tree with the old three
-		debug("Start sync")
-		luup.chdev.sync(THIS_DEVICE, child_devices)
-		debug("End sync")
+		-- Synch the new tree with the old tree
+--		debug("Start sync")
+--		luup.chdev.sync(THIS_DEVICE, child_devices)
+--		debug("End sync")
 
 		initIDLookup()
 	end
@@ -2185,7 +2940,7 @@ local function actOnCommands(tableCmds)
 			cmdDeviceType = nil
 		end
 		if ((altID and #altID > 0)
-			and (cmdDeviceType ~= nil)
+			and (cmdDeviceType)
 			and (searchInTable2(tableNewDevices, 3, altID, 4, cmdDeviceType) == 0)
 			and (searchInTable(tableConversions, 3, altID) == 0))
 			then
@@ -2200,7 +2955,7 @@ local function actOnCommands(tableCmds)
 				or cmd == tableCommandTypes.CMD_DIM)
 				then
 				dev = findChild(THIS_DEVICE, altID, nil)
-				if (dev ~= nil)
+				if (dev)
 					then
 					if ((cmd == tableCommandTypes.CMD_OPEN
 						or cmd == tableCommandTypes.CMD_CLOSE
@@ -2221,10 +2976,10 @@ local function actOnCommands(tableCmds)
 			if ((dev == nil)
 				and (autoCreate)
 				and (findChild(THIS_DEVICE, altID, tableDeviceTypes[cmdDeviceType].deviceType) == nil)
-				and (isDisabledDevice(tableDeviceTypes[cmdDeviceType].prefix .. altID) == false))
+				and (isDisabledDevice(tableDeviceTypes[cmdDeviceType].prefix..altID) == false))
 				then
 				table.insert(tableNewDevices, { nil, nil, altID, cmdDeviceType })
-				debug("New device: altID: " .. altID .. " deviceType: " .. cmdDeviceType)
+				debug("New device: altID: "..altID.." deviceType: "..cmdDeviceType)
 			end
 		end
 	end
@@ -2259,7 +3014,7 @@ local function actOnCommands(tableCmds)
 				table.insert(tableDelayedCmds, command )
 			end
 		end
-		--logCmds("delayed cmds " .. delay .. "s", tableDelayedCmds)
+		--logCmds("delayed cmds "..delay.."s", tableDelayedCmds)
 		luup.call_delay("handleDelayedCmds", delay, encodeCommandsInString(tableDelayedCmds))
 	end
 
@@ -2270,16 +3025,18 @@ local function actOnCommands(tableCmds)
 	end
 
 	------------------------------------------------------------------------------
-	-- Deliver commands to devices
+	-- Deliver commands to devices - actually just set a device variable
+	--  TODO: This whole section needs review. The variable and value should be
+	--  determined by the code processing the message or UI command.
 	------------------------------------------------------------------------------
 	for deviceNum, luupDevice in pairs(luup.devices) do
 		-- Check if we have a device with the correct parent (THIS_DEVICE)
 		if (luupDevice.device_num_parent == THIS_DEVICE)
 			then
---			debug("Device Number: " .. deviceNum ..
---					 " luupDevice.device_type: " .. tostring(luupDevice.device_type) ..
---					 " luupDevice.device_num_parent: " .. tostring(luupDevice.device_num_parent) ..
---					 " luupDevice.id: " .. tostring(luupDevice.id)
+--			debug("Device Number: "..deviceNum..
+--					 " luupDevice.device_type: "..tostring(luupDevice.device_type)..
+--					 " luupDevice.device_num_parent: "..tostring(luupDevice.device_num_parent)..
+--					 " luupDevice.id: "..tostring(luupDevice.id)
 --			)
 			for _, v2 in ipairs(tableImmediateCmds)
 				do
@@ -2287,7 +3044,7 @@ local function actOnCommands(tableCmds)
 				cmd = v2.cmd
 				value = v2.value
 				if ((#altID > 0)
-					and ((string.find(luupDevice.id, altID .. "$", 4) == 4)
+					and ((string.find(luupDevice.id, altID.."$", 4) == 4)
 					or (findAssociation(deviceNum, altID) == true)))
 					then
 					if (cmd == tableCommandTypes.CMD_OFF)
@@ -2299,31 +3056,31 @@ local function actOnCommands(tableCmds)
 					end
 					cmdDeviceType = nil
 					variable = nil
-					if (cmd.deviceType ~= nil)
+					if (cmd.deviceType)
 						then
 						cmdDeviceType = tableDeviceTypes[cmd.deviceType]
 					end
-					if (cmd.variable ~= nil)
+					if (cmd.variable)
 						then
 						variable = tabVars[cmd.variable]
 					end
-					if ((cmdDeviceType == nil or luupDevice.device_type == cmdDeviceType.deviceType) and variable ~= nil and value ~= nil)
+					if ((cmdDeviceType == nil or luupDevice.device_type == cmdDeviceType.deviceType) and variable and value ~= nil)
 						then
-						if (cmdDeviceType ~= nil and cmdDeviceType.hasAdjustments and variable.isAdjustable)
+						if (cmdDeviceType and cmdDeviceType.hasAdjustments and variable.isAdjustable)
 							then
 							value = tonumber(value)
 							local adjust = getVariable(deviceNum, tabVars.VAR_ADJUST_CONSTANT2)
-							if (adjust ~= nil and adjust ~= "")
+							if (adjust and adjust ~= "")
 								then
 								value = value + tonumber(adjust)
 							end
 							adjust = getVariable(deviceNum, tabVars.VAR_ADJUST_MULTIPLIER)
-							if (adjust ~= nil and adjust ~= "")
+							if (adjust and adjust ~= "")
 								then
 								value = value * tonumber(adjust)
 							end
 							adjust = getVariable(deviceNum, tabVars.VAR_ADJUST_CONSTANT)
-							if (adjust ~= nil and adjust ~= "")
+							if (adjust and adjust ~= "")
 								then
 								value = value + tonumber(adjust)
 							end
@@ -2392,7 +3149,7 @@ local function actOnCommands(tableCmds)
 							then
 							local last = getVariable(deviceNum, tabVars.VAR_LAST_TRIP)
 							if (getVariable(deviceNum, tabVars.VAR_TRIPPED)
-								and last ~= nil and (os.time() - last) >= 25)
+								and last and (os.time() - last) >= 25)
 								then
 								value = false
 							end
@@ -2419,20 +3176,21 @@ local function decodeMessage(message)
 
 	local tableCmds = {}
 	local key = string.format('%06X',(bitw.lshift((bitw.lshift(string.byte(message, 1),8) + string.byte(message, 2)), 8)) + string.byte(message, 3))
-	--debug("Msg select key: " .. key)
+	--debug("Msg select key: "..key)
 	local seqNum = string.byte(message, 4)
 	local data = getStringPart(message, 5, #message)
-	local decodeFunction = tableMsgSelect[key].decodeFunction
-
-	-- If there is a method to decode this message
-	if(decodeFunction ~= nil) then
---		debug("Msg decoded: "..tableMsgTypes[tableMsgSelect[key]].key)
-		tableCmds = decodeFunction(tableMsgSelect[key].subType, data, seqNum)
-		actOnCommands(tableCmds)
-	else
-		warning("No decode method for message: " .. formattohex(message))
-		return
+	local msgType = tableMsgByKey[key]
+	if (msgType) then
+		local decodeMsgFunction = msgType.decodeMsgFunction
+		-- If there is a method to decode this message
+		if(decodeMsgFunction) then
+	--		debug("Msg decoded: "..tableMsgTypes[tableMsgByKey[key]].key)
+			tableCmds = decodeMsgFunction(tableMsgByKey[key].subType, data, seqNum)
+			actOnCommands(tableCmds)
+			return
+		end
 	end
+	warning("No decode method for message: "..formattohex(message))
 end
 
 local function decodeResponse(subType, data, seqNum)
@@ -2445,20 +3203,20 @@ local function decodeResponse(subType, data, seqNum)
 		local idx = searchInTable(tableMsgSent, 1, seqNum)
 		if (idx > 0)
 			then
-			debug("Found sent command " .. seqNum .. " at index " .. idx)
+			debug("Found sent command "..seqNum.." at index "..idx)
 			local msg = string.byte(data, 1)
 			if (msg == 0x0 or msg == 0x1)
 				then
-				debug("Transmitter response " .. msg .. " ACK")
+				debug("Transmitter response "..msg.." ACK")
 				tableCmds = tableMsgSent[idx][2]
 			elseif (msg == 0x2 or msg == 0x3) then
-				error("Transmitter response " .. msg .. " NAK for message number " .. seqNum)
+				error("Transmitter response "..msg.." NAK for message number "..seqNum)
 			else
-				error("Transmitter response " .. msg .. " ??? for message number " .. seqNum)
+				error("Transmitter response "..msg.." ??? for message number "..seqNum)
 			end
 			table.remove(tableMsgSent, idx)
 		else
-			error("Transmitter response for an unexpected message number " .. seqNum)
+			error("Transmitter response for an unexpected message number "..seqNum)
 		end
 	end
 
@@ -2471,7 +3229,7 @@ local function decodeResponseMode(subType, data)
 
 	if (subType == tableMsgTypes.RESPONSE_MODE_COMMAND.subType)
 		then
-		log("Plugin version: " .. PLUGIN_VERSION)
+		log("Plugin version: "..PLUGIN_VERSION)
 		setVariable(THIS_DEVICE, tabVars.VAR_PLUGIN_VERSION, PLUGIN_VERSION)
 		local cmd = string.byte(data, 1)
 		-- if result of Get Status or Set Mode commands
@@ -2483,13 +3241,13 @@ local function decodeResponseMode(subType, data)
 			if(hdwType == nil) then
 				hdwType = "Unknown"
 			end
-			log("Hardware type: " .. hdwType)
+			log("Hardware type: "..hdwType)
 			luup.attr_set("model", hdwType, THIS_DEVICE, 0)
 
 			-- Add 1000 to the byte indicating the firmware version
 			--  so that the displayed version matches that of the firmware version
 			firmware = 1000 + string.byte(data, 3)
-			log("Firmware version: " .. firmware)
+			log("Firmware version: "..firmware)
 			setVariable(THIS_DEVICE, tabVars.VAR_FIRMWARE_VERSION, firmware)
 
 			-- Get the firmware type
@@ -2498,18 +3256,18 @@ local function decodeResponseMode(subType, data)
 			if(firmtype == nil) then
 				firmtype = "Unknown"
 			end
-			log("Firmware type: " .. firmtype)
+			log("Firmware type: "..firmtype)
 			setVariable(THIS_DEVICE, tabVars.VAR_FIRMWARE_TYPE, firmtype)
 			-- Get the hardware version ;
 			--  the major and minor versions
-			hardware = string.byte(data, 8) .. "." .. string.byte(data, 9)
-			log("Hardware version: " .. hardware)
+			hardware = string.byte(data, 8).."."..string.byte(data, 9)
+			log("Hardware version: "..hardware)
 			setVariable(THIS_DEVICE, tabVars.VAR_HARDWARE_VERSION, hardware)
 
-			log("Output power: " .. string.byte(data, 10))
-			
-			noise = string.byte(data, 12)
-			log("Receiver noise level: " .. noise)
+			log("Output power: "..string.byte(data, 10))
+
+			local noise = string.byte(data, 12)
+			log("Receiver noise level: "..noise)
 			setVariable(THIS_DEVICE, tabVars.VAR_NOISE, noise)
 
 			log("RFXtrx setup to receive protocols:")
@@ -2693,18 +3451,18 @@ local function decodeResponseMode(subType, data)
 			log("Receiving modes saved in non-volatile memory")
 			--tableCmds = { { "", "", nil, 0 } }
 		else
-			error("Response to an unexpected mode command: " .. cmd)
+			error("Response to an unexpected mode command: "..cmd)
 		end
 	elseif (subType == tableMsgTypes.UNKNOWN_RTS_REMOTE.subType)
 		then
 		warning("Unknown RTS remote")
 		--tableCmds = { { "", "", nil, 0 } }
-	elseif (subType == tableMsgTypes.WRONG_COMMAND.subType)
+	elseif (subType == tableMsgTypes.INVALID_COMMAND.subType)
 		then
-		warning("Wrong command received")
+		warning("Invalid command received")
 		--tableCmds = { { "", "", nil, 0 } }
 	else
-		error("Unexpected subtype for response on a command: " .. subType)
+		error("Unexpected subtype for response on a command: "..subType)
 	end
 
 	return tableCmds
@@ -2714,7 +3472,7 @@ end
 local function decodeLighting1(subType, data)
 
 	local altid2 = string.format("L1.%X/%s", subType, string.sub(data, 1, 1))
-	local altid = altid2 .. string.format("%02d", string.byte(data, 2))
+	local altid = altid2..string.format("%02d", string.byte(data, 2))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 3)
@@ -2755,7 +3513,7 @@ local function decodeLighting1(subType, data)
 		-- CHIME => scene number from 131 to 146
 		table.insert(tableCmds, DeviceCmd( altid2, tableCommandTypes.CMD_SCENE_ON, string.byte(data, 2) + 130, 0 ) )
 	else
-		warning("Lighting1 unexpected command: " .. cmdCode)
+		warning("Lighting1 unexpected command: "..cmdCode)
 	end
 
 	return tableCmds
@@ -2764,12 +3522,12 @@ end
 
 local function decodeLighting2(subType, data)
 
-	local altid2 = "L2." .. subType .. "/"
-	.. string.format("%X", bitw.band(string.byte(data, 1), 0x03))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
-	.. string.format("%02X", string.byte(data, 4))
-	local altid = altid2 .. "/" .. string.format("%02d", string.byte(data, 5))
+	local altid2 = "L2."..subType.."/"
+	..string.format("%X", bitw.band(string.byte(data, 1), 0x03))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
+	..string.format("%02X", string.byte(data, 4))
+	local altid = altid2.."/"..string.format("%02d", string.byte(data, 5))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 6)
@@ -2801,7 +3559,7 @@ local function decodeLighting2(subType, data)
 		-- GROUP LEVEL => scene number 101
 		table.insert(tableCmds, DeviceCmd( altid2, tableCommandTypes.CMD_SCENE_ON, 101, 0 ) )
 	else
-		warning("Lighting2 unexpected command: " .. cmdCode)
+		warning("Lighting2 unexpected command: "..cmdCode)
 	end
 
 	return tableCmds
@@ -2811,8 +3569,8 @@ end
 local function decodeLighting3(subType, data)
 
 	local ids = {}
-	local altid = "L3." .. subType .. "/"
-	.. string.format("%X", bitw.band(string.byte(data, 1), 0x0F))
+	local altid = "L3."..subType.."/"
+	..string.format("%X", bitw.band(string.byte(data, 1), 0x0F))
 	if (bitw.band(string.byte(data, 2), 0x01) ~= 0)
 		then
 		table.insert(ids, 1)
@@ -2858,7 +3616,7 @@ local function decodeLighting3(subType, data)
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = string.byte(data, 4)
-	--debug("Koppla message received with command code: " .. cmdCode)
+	--debug("Koppla message received with command code: "..cmdCode)
 	if (cmdCode == 0x1A)
 		then
 		cmd = tableCommandTypes.CMD_OFF
@@ -2870,16 +3628,16 @@ local function decodeLighting3(subType, data)
 		cmd = tableCommandTypes.CMD_DIM
 		cmdValue = (cmdCode - 0x10) * 10
 	else
-		warning("Lighting3 command not yet implemented: " .. cmdCode)
+		warning("Lighting3 command not yet implemented: "..cmdCode)
 	end
 
-	if (ids ~= nil and #ids > 0)
+	if (ids and #ids > 0)
 		then
 		for _, id in ipairs(ids)
 			do
-			if (cmd ~= nil)
+			if (cmd)
 				then
-				table.insert(tableCmds, DeviceCmd( altid .. string.format("%02d", id), cmd, cmdValue, 0 ) )
+				table.insert(tableCmds, DeviceCmd( altid..string.format("%02d", id), cmd, cmdValue, 0 ) )
 			end
 		end
 	end
@@ -2890,11 +3648,11 @@ end
 
 local function decodeLighting5(subType, data)
 
-	local altid2 = "L5." .. subType .. "/"
-	.. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
-	local altid = altid2 .. "/" .. string.format("%02d", string.byte(data, 4))
+	local altid2 = "L5."..subType.."/"
+	..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
+	local altid = altid2.."/"..string.format("%02d", string.byte(data, 4))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 5)
@@ -2990,7 +3748,7 @@ local function decodeLighting5(subType, data)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_DIM, math.floor((string.byte(data, 6) + 1) * 100 / 0x20 + 0.5), 0 ) )
 		table.insert(tableCmds, DeviceCmd( altid2, tableCommandTypes.CMD_LWRF_SCENE_ON, string.byte(data, 4) + 16, 0 ) )
 	else
-		warning("Lighting5 unexpected command: " .. cmdCode)
+		warning("Lighting5 unexpected command: "..cmdCode)
 	end
 
 	return tableCmds
@@ -2999,11 +3757,11 @@ end
 
 local function decodeLighting6(subType, data)
 
-	local altid2 = "L6." .. subType .. "/"
-	.. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. "/" .. string.sub(data, 3, 3)
-	local altid = altid2 .. string.byte(data, 4)
+	local altid2 = "L6."..subType.."/"
+	..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	.."/"..string.sub(data, 3, 3)
+	local altid = altid2..string.byte(data, 4)
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 5)
@@ -3026,7 +3784,7 @@ local function decodeLighting6(subType, data)
 		-- GROUP OFF => scene number 100
 		table.insert(tableCmds, DeviceCmd( altid2, tableCommandTypes.CMD_SCENE_OFF, 100, 0 ) )
 	else
-		warning("Lighting6 unexpected command: " .. cmdCode)
+		warning("Lighting6 unexpected command: "..cmdCode)
 	end
 
 	return tableCmds
@@ -3035,7 +3793,7 @@ end
 
 local function decodeCurtain(subType, data)
 
-	local altid = "C" .. subType .. "/"	.. string.sub(data, 1, 1) .. string.format("%02d", string.byte(data, 2))
+	local altid = "C"..subType.."/"	..string.sub(data, 1, 1)..string.format("%02d", string.byte(data, 2))
 	local tableCmds = {}
 	local cmd = nil
 	local cmdCode = string.byte(data, 3)
@@ -3049,9 +3807,9 @@ local function decodeCurtain(subType, data)
 		then
 		cmd = tableCommandTypes.CMD_STOP
 	else
-		warning("Curtain command not yet implemented: " .. cmdCode)
+		warning("Curtain command not yet implemented: "..cmdCode)
 	end
-	if (cmd ~= nil)
+	if (cmd)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, cmd, nil, 0 ) )
 	end
@@ -3062,15 +3820,15 @@ end
 
 local function decodeBlind(subType, data)
 
-	local altid = "B" .. subType .. "/"
-	.. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
+	local altid = "B"..subType.."/"
+	..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
 	if (subType == tableMsgTypes.BLIND_T6.subType or subType == tableMsgTypes.BLIND_T7.subType)
 		then
-		altid = altid .. string.format("%X", bitw.rshift(string.byte(data, 4), 4))
+		altid = altid..string.format("%X", bitw.rshift(string.byte(data, 4), 4))
 	end
-	altid = altid .. "/" .. string.format("%02d", bitw.band(string.byte(data, 4), 0x0F))
+	altid = altid.."/"..string.format("%02d", bitw.band(string.byte(data, 4), 0x0F))
 
 	local tableCmds = {}
 	local cmd = nil
@@ -3085,9 +3843,9 @@ local function decodeBlind(subType, data)
 		then
 		cmd = tableCommandTypes.CMD_STOP
 	else
-		warning("Blind command not yet implemented: " .. cmdCode)
+		warning("Blind command not yet implemented: "..cmdCode)
 	end
-	if (cmd ~= nil)
+	if (cmd)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, cmd, nil, 0 ) )
 	end
@@ -3098,10 +3856,10 @@ end
 
 local function decodeThermostat3(subType, data)
 
-	local altid = "HT3." .. subType .. "/"
-	.. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
+	local altid = "HT3."..subType.."/"
+	..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
 
 	local tableCmds = {}
 	local cmdCode = string.byte(data, 4)
@@ -3141,7 +3899,7 @@ local function decodeThermostat3(subType, data)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_HEATER, "Off", 0 ) )
 	else
-		warning("Thermostat3 command not yet implemented: " .. cmdCode)
+		warning("Thermostat3 command not yet implemented: "..cmdCode)
 	end
 
 	return tableCmds
@@ -3151,7 +3909,7 @@ end
 local function decodeTemp(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "T" .. subType .. "/" .. id
+	local altid = "T"..subType.."/"..id
 
 	local tableCmds = {}
 	local temp = decodeTemperature( altid, data, 3 )
@@ -3173,7 +3931,7 @@ end
 local function decodeHum(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "H" .. subType .. "/" .. id
+	local altid = "H"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3186,7 +3944,7 @@ local function decodeHum(subType, data)
 		-- Update if necessary the max and min humidity detected by this device
 		checkMaxMinHum( altid, tableCmds, hum )
 	else
-		debug("Dubious humidity reading: " .. hum .. "%" .. " altid=" .. altid .. " status=")
+		debug("Dubious humidity reading: "..hum.."%".." altid="..altid.." status=")
 	end
 
 	local strength = decodeSignalStrength(data, 5)
@@ -3202,7 +3960,7 @@ end
 local function decodeTempHum(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "TH" .. subType .. "/" .. id
+	local altid = "TH"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3222,7 +3980,7 @@ local function decodeTempHum(subType, data)
 		-- Update if necessary the max and min humidity detected by this device
 		checkMaxMinHum( altid, tableCmds, hum )
 	else
-		debug("Dubious humidity reading: " .. hum .. " altid=" .. altid .. " status=")
+		debug("Dubious humidity reading: "..hum.." altid="..altid.." status=")
 	end
 
 	local strength = decodeSignalStrength(data, 7)
@@ -3238,7 +3996,7 @@ end
 local function decodeBaro(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "B" .. subType .. "/" .. id
+	local altid = "B"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3260,7 +4018,7 @@ local function decodeBaro(subType, data)
 		then
 		strForecast = "rain"
 	end
-	if (strForecast ~= nil)
+	if (strForecast)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_FORECAST, strForecast, 0 ) )
 	end
@@ -3278,7 +4036,7 @@ end
 local function decodeTempHumBaro(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "THB" .. subType .. "/" .. id
+	local altid = "THB"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3297,7 +4055,7 @@ local function decodeTempHumBaro(subType, data)
 		-- Update if necessary the max and min humidity detected by this device
 		checkMaxMinHum( altid, tableCmds, hum )
 	else
-		debug("Dubious humidity reading: " .. hum .. " altid=" .. altid .. " status=")
+		debug("Dubious humidity reading: "..hum.." altid="..altid.." status=")
 	end
 	local baro = string.byte(data, 7) * 256 + string.byte(data, 8)
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_PRESSURE, baro, 0 ) )
@@ -3317,7 +4075,7 @@ local function decodeTempHumBaro(subType, data)
 		then
 		strForecast = "rain"
 	end
-	if (strForecast ~= nil)
+	if (strForecast)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_FORECAST, strForecast, 0 ) )
 	end
@@ -3334,7 +4092,7 @@ end
 
 local function decodeRain(subType, data)
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "R" .. subType .. "/" .. id
+	local altid = "R"..subType.."/"..id
 
 	local tableCmds = {}
 	local rainReading = 0
@@ -3356,7 +4114,7 @@ local function decodeRain(subType, data)
 	else
 		rainReading = string.byte(data, 7)
 	end
-	debug("rainReading: " .. rainReading)
+	debug("rainReading: "..rainReading)
 	-- Determine the device number of the rain sensor
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.RAIN.deviceType)
 	-- If the device doesn't exist just save the rain amount so it will be created
@@ -3367,7 +4125,7 @@ local function decodeRain(subType, data)
 		-- Get the last reading
 		local previousRain = getVariable(deviceNum, tabVars.VAR_RAIN)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
-		if(previousRain ~= nil) then
+		if(previousRain) then
 			--Get the old battery time
 			local previousSeconds = getVariable(deviceNum, tabVars.VAR_BATTERY_DATE)
 			local previousTime  = {}
@@ -3389,7 +4147,7 @@ local function decodeRain(subType, data)
 					rainDiff = 0.0
 					rainReading = 0
 					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAIN, rainReading, 0 ) )
-				end				
+				end
 			end
 			rainDiff = rainDiff * readingConversionFactor
 			-- Get the saved rain data into tables
@@ -3469,18 +4227,18 @@ local function decodeRain(subType, data)
 
 			--			if(DEBUG_MODE) then
 			--				debug("               year yday wk m d hr mm ss wday")
-			--				debug("previous time: " .. previousTime["year"] .. " " .. previousTime["yday"] .. " " .. previousWeek .. " " .. previousTime["month"] .. " " .. previousTime["day"] .. " " .. previousTime["hour"] .. " " .. previousTime["min"] .. " " .. previousTime["sec"] .. " " .. previousTime["wday"])
-			--				debug("current time:  " .. currentTime["year"] .. " " .. currentTime["yday"] .. " " .. currentWeek .. " " .. currentTime["month"] .. " " .. currentTime["day"] .. " " .. currentTime["hour"] .. " " .. currentTime["min"] .. " " .. currentTime["sec"] .. " " .. currentTime["wday"])
-			--				debug("Rain this minute: " .. currentTime["min"] .. " " .. rainByMinute[currentTime["min"]+1])
-			--				debug("Rain by Minute: " .. recursiveConcat(rainByMinute))
-			--				debug("Rain this hour: " .. currentTime["hour"] .. " " .. rainByHour[currentTime["hour"]+1])
-			--				debug("Rain by Hour: " .. recursiveConcat(rainByHour))
-			--				debug("Rain this day: " .. currentTime["wday"] .. " " .. rainByWkDay[currentTime["wday"]])
-			--				debug("Rain by Day: " .. recursiveConcat(rainByWkDay))
-			--				debug("Rain this week: " .. currentWeek .. " " .. rainByWeek[currentWeek])
-			--				debug("Rain by Week: " .. recursiveConcat(rainByWeek))
-			--				debug("Rain this month: " .. currentTime["month"] .. " " .. rainByMonth[currentTime["month"]])
-			--				debug("Rain by Month: " .. recursiveConcat(rainByMonth))
+			--				debug("previous time: "..previousTime["year"].." "..previousTime["yday"].." "..previousWeek.." "..previousTime["month"].." "..previousTime["day"].." "..previousTime["hour"].." "..previousTime["min"].." "..previousTime["sec"].." "..previousTime["wday"])
+			--				debug("current time:  "..currentTime["year"].." "..currentTime["yday"].." "..currentWeek.." "..currentTime["month"].." "..currentTime["day"].." "..currentTime["hour"].." "..currentTime["min"].." "..currentTime["sec"].." "..currentTime["wday"])
+			--				debug("Rain this minute: "..currentTime["min"].." "..rainByMinute[currentTime["min"]+1])
+			--				debug("Rain by Minute: "..recursiveConcat(rainByMinute))
+			--				debug("Rain this hour: "..currentTime["hour"].." "..rainByHour[currentTime["hour"]+1])
+			--				debug("Rain by Hour: "..recursiveConcat(rainByHour))
+			--				debug("Rain this day: "..currentTime["wday"].." "..rainByWkDay[currentTime["wday"]])
+			--				debug("Rain by Day: "..recursiveConcat(rainByWkDay))
+			--				debug("Rain this week: "..currentWeek.." "..rainByWeek[currentWeek])
+			--				debug("Rain by Week: "..recursiveConcat(rainByWeek))
+			--				debug("Rain this month: "..currentTime["month"].." "..rainByMonth[currentTime["month"]])
+			--				debug("Rain by Month: "..recursiveConcat(rainByMonth))
 			--			end
 
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINBYMONTH, recursiveConcat(rainByMonth), 0 ) )
@@ -3496,7 +4254,7 @@ local function decodeRain(subType, data)
 				then
 				local periodsPerHour = 3600 / elapsedSeconds
 				calculatedRate = periodsPerHour * rainDiff
-				debug("Calculated rain rate: " .. calculatedRate .. " mm/hr")
+				debug("Calculated rain rate: "..calculatedRate.." mm/hr")
 			end
 			if (subType == tableMsgTypes.RAIN1.subType)
 				then
@@ -3505,9 +4263,9 @@ local function decodeRain(subType, data)
 				then
 				rate = (string.byte(data, 3) * 256 + string.byte(data, 4)) / 100
 			end
-			if (rate ~= nil)
+			if (rate)
 				then
-				debug("rain rate from the sensor: " .. rate .. " mm/hr")
+				debug("rain rate from the sensor: "..rate.." mm/hr")
 				table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_RAINRATE, rate, 0 ) )
 			else
 				-- use the calculated rate
@@ -3529,7 +4287,7 @@ end
 local function decodeTempRain(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "TR" .. subType .. "/" .. id
+	local altid = "TR"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3557,7 +4315,7 @@ local function decodeWind(subType, data)
 	local unitKmh = (getVariable(THIS_DEVICE, tabVars.VAR_SPEED_UNIT))
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "W" .. subType .. "/" .. id
+	local altid = "W"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3608,7 +4366,7 @@ end
 local function decodeUV(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "U" .. subType .. "/" .. id
+	local altid = "U"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3636,7 +4394,7 @@ end
 local function decodeWeight(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
-	local altid = "WT" .. subType .. "/" .. id
+	local altid = "WT"..subType.."/"..id
 
 	local tableCmds = {}
 
@@ -3667,10 +4425,10 @@ local function decodeSecurity(subType, data)
 
 	-- For a PT2262 type device the first 20 bits are fixed
 	-- the last 4 bits could be a status
-	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%1X", bitw.rshift(string.byte(data, 3), 4))
-	--	.. string.format("%02X", string.byte(data, 3))
+	local altid = "D/"..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%1X", bitw.rshift(string.byte(data, 3), 4))
+	--	..string.format("%02X", string.byte(data, 3))
 
 	local tableCmds = {}
 	-- Since many devices only transmit 'door opened', default the command value to 1
@@ -3678,7 +4436,7 @@ local function decodeSecurity(subType, data)
 	local cmd = tableCommandTypes.CMD_DOOR
 	local cmdCode = bitw.band(string.byte(data, 3), 0x0F)
 
-	debug("decodeSecurity: " .. subType .. " altid=" .. altid .. " status=" .. string.format("%02X", cmdCode))
+	debug("decodeSecurity: "..subType.." altid="..altid.." status="..string.format("%02X", cmdCode))
 
 	table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
 
@@ -3698,12 +4456,12 @@ end
 local function handleTamperSwitch(altid, deviceType, tampered, tableCmds)
 	-- Get the device number
 	local deviceNum = findChild(THIS_DEVICE, altid, deviceType)
-	if((deviceNum ~= nil) and (tampered ~= nil)) then
+	if(deviceNum and (tampered ~= nil)) then
 		-- Get current state of tampered
 		local wasTampered = getVariable(deviceNum, tabVars.VAR_TAMPERED)
 		-- Get current state of armed
 		local armed = getVariable(deviceNum, tabVars.VAR_ARMED)
-		debug("handleTamper - armed: " .. (armed or 'nil') .. " wasTampered: ".. (wasTampered or 'nil') .. " tamperedNow: " .. (tampered or 'nil'))
+		debug("handleTamper - armed: "..(armed or 'nil').." wasTampered: "..(wasTampered or 'nil').." tamperedNow: "..(tampered or 'nil'))
 		if(wasTampered ~= nil) then
 			if(tonumber(wasTampered)>0) then wasTampered = 1 else wasTampered = 0 end
 		end
@@ -3715,7 +4473,7 @@ local function handleTamperSwitch(altid, deviceType, tampered, tableCmds)
 					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_TAMPERED, 1, 0 ))
 				end
 			end
-		elseif((wasTampered ~= nil) and (wasTampered == 1) and (tampered == 0)) then
+		elseif(wasTampered and (wasTampered == 1) and (tampered == 0)) then
 			debug("resetting tampered")
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_TAMPERED, 0, 0 ))
 		end
@@ -3731,11 +4489,11 @@ end
 
 local function decodeSecurityMS(subType, data)
 
-	local altid = "M/" .. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
+	local altid = "M/"..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
 
-	debug("decodeSecurityMS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
+	debug("decodeSecurityMS: "..subType.." altid="..altid.." status="..string.byte(data, 4))
 
 	local tableCmds = {}
 	local cmd = nil
@@ -3752,14 +4510,14 @@ local function decodeSecurityMS(subType, data)
 		cmd = tableCommandTypes.CMD_MOTION
 		cmdValue = "0"
 	else
-		if (cmdCode ~= nil)
+		if (cmdCode)
 			then
-			warning("decodeSecurityMS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
+			warning("decodeSecurityMS command not yet implemented: "..cmdCode.."hex="..formattohex(cmdCode))
 		else
 			warning("decodeSecurityMS command not yet implemented")
 		end
 	end
-	if (cmd ~= nil)
+	if (cmd)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
 		--		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION.deviceType, tampered, tableCmds)
@@ -3776,11 +4534,11 @@ end
 
 local function decodeSecurityDS(subType, data)
 
-	local altid = "D/" .. string.format("%02X", string.byte(data, 1))
-	.. string.format("%02X", string.byte(data, 2))
-	.. string.format("%02X", string.byte(data, 3))
+	local altid = "D/"..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
 
-	debug("decodeSecurityDS: " .. subType .. " altid=" .. altid .. " status=" .. string.byte(data, 4))
+	debug("decodeSecurityDS: "..subType.." altid="..altid.." status="..string.byte(data, 4))
 
 	local tableCmds = {}
 	local cmd = nil
@@ -3800,14 +4558,14 @@ local function decodeSecurityDS(subType, data)
 			cmd = tableCommandTypes.CMD_DOOR
 			cmdValue = "1"
 		else
-			if (cmdCode ~= nil)
+			if (cmdCode)
 				then
-				warning("decodeSecurityDS command not yet implemented: " .. cmdCode .. "hex=" .. formattohex(cmdCode))
+				warning("decodeSecurityDS command not yet implemented: "..cmdCode.." hex: "..formattohex(cmdCode))
 			else
 				warning("decodeSecurityDS command not yet implemented")
 			end
 		end
-		if (cmd ~= nil)
+		if (cmd)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
 			--			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR.deviceType, tampered, tableCmds)
@@ -3835,32 +4593,32 @@ local function decodeSecurityRemote(subType, data)
 
 	if (subType == tableMsgTypes.SECURITY_X10SR.subType)
 		then
-		altid = "X10/SR/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "X10/SR/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 
 		local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.ALARM.deviceType)
-		if (deviceNum ~= nil)
+		if (deviceNum)
 			then
 			exitDelay = tonumber(getVariable(deviceNum, tabVars.VAR_EXIT_DELAY) or "0")
 		end
 	elseif (subType == tableMsgTypes.SECURITY_MEISR.subType)
 		then
-		altid = "MEI/SR/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "MEI/SR/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 	elseif (subType == tableMsgTypes.KD101.subType)
 		then
-		altid = "KD1/SR/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "KD1/SR/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 
 		battery = -1
 	elseif (subType == tableMsgTypes.SA30.subType)
 		then
-		altid = "S30/SR/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "S30/SR/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 
 		battery = -1
 	end
@@ -3928,13 +4686,13 @@ local function decodeSecurityRemote(subType, data)
 			then
 			if (subType == tableMsgTypes.KD101.subType)
 				then
-				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "KD1/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			else
-				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "S30/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_SMOKE, "1", 0 ) )
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_SMOKE_OFF, nil, 30 ) )
@@ -3954,13 +4712,13 @@ local function decodeSecurityRemote(subType, data)
 			then
 			if (subType == tableMsgTypes.KD101.subType)
 				then
-				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "KD1/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			else
-				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "S30/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_SMOKE, "0", 0 ) )
 			if (battery >= 0 and battery <= 100)
@@ -3975,9 +4733,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 		end
-		altid = "X10/L1/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "X10/L1/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_OFF, nil, 0 ) )
 	elseif (cmd == 0x11)
 		then
@@ -3986,9 +4744,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 		end
-		altid = "X10/L1/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "X10/L1/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_ON, nil, 0 ) )
 	elseif (cmd == 0x12)
 		then
@@ -3997,9 +4755,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 		end
-		altid = "X10/L2/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "X10/L2/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_OFF, nil, 0 ) )
 	elseif (cmd == 0x13)
 		then
@@ -4008,9 +4766,9 @@ local function decodeSecurityRemote(subType, data)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_BATTERY, battery, 0 ) )
 		end
-		altid = "X10/L2/" .. string.format("%02X", string.byte(data, 1))
-		.. string.format("%02X", string.byte(data, 2))
-		.. string.format("%02X", string.byte(data, 3))
+		altid = "X10/L2/"..string.format("%02X", string.byte(data, 1))
+		..string.format("%02X", string.byte(data, 2))
+		..string.format("%02X", string.byte(data, 3))
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_ON, nil, 0 ) )
 	elseif (cmd == 0x16)
 		then
@@ -4022,18 +4780,18 @@ local function decodeSecurityRemote(subType, data)
 			then
 			if (subType == tableMsgTypes.KD101.subType)
 				then
-				altid = "KD1/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "KD1/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			else
-				altid = "S30/SS/" .. string.format("%02X", string.byte(data, 1))
-				.. string.format("%02X", string.byte(data, 2))
-				.. string.format("%02X", string.byte(data, 3))
+				altid = "S30/SS/"..string.format("%02X", string.byte(data, 1))
+				..string.format("%02X", string.byte(data, 2))
+				..string.format("%02X", string.byte(data, 3))
 			end
 			table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_SMOKE, "0", 0 ) )
 		end
 	else
-		warning("x10securityRemote command not yet implemented: " .. cmd .. "hex=" .. formattohex(cmd))
+		warning("x10securityRemote command not yet implemented: "..cmd.."hex="..formattohex(cmd))
 	end
 
 	return tableCmds
@@ -4058,7 +4816,7 @@ end
 
 local function decodeRemote(subType, data)
 
-	local altid = "RC" .. subType .. "/" .. string.format("%02X", string.byte(data, 1))
+	local altid = "RC"..subType.."/"..string.format("%02X", string.byte(data, 1))
 	local cmd = string.byte(data, 2)
 	local tableCmds = {}
 	table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_ATI_SCENE_ON, cmd, 0 ) )
@@ -4071,10 +4829,10 @@ local function decodeElec1(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
 	local num = tonumber(subType)
-	local altid = "ELEC" .. num .. "/" .. id
-	local altid1 = "ELEC" .. num .. "/" .. id .. "/1"
-	local altid2 = "ELEC" .. num .. "/" .. id .. "/2"
-	local altid3 = "ELEC" .. num .. "/" .. id .. "/3"
+	local altid = "ELEC"..num.."/"..id
+	local altid1 = "ELEC"..num.."/"..id.."/1"
+	local altid2 = "ELEC"..num.."/"..id.."/2"
+	local altid3 = "ELEC"..num.."/"..id.."/3"
 	local tableCmds = {}
 
 	local voltage = tonumber(getVariable(THIS_DEVICE, tabVars.VAR_VOLTAGE) or "230") or 230
@@ -4104,7 +4862,7 @@ local function decodeElec2Elec3(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
 	local num = tonumber(subType) + 1
-	local altid = "ELEC" .. num .. "/" .. id
+	local altid = "ELEC"..num.."/"..id
 
 	local tableCmds = {}
 
@@ -4133,10 +4891,10 @@ local function decodeElec4(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
 	local num = tonumber(subType) + 3
-	local altid = "ELEC" .. num .. "/" .. id
-	local altid1 = "ELEC" .. num .. "/" .. id .. "/1"
-	local altid2 = "ELEC" .. num .. "/" .. id .. "/2"
-	local altid3 = "ELEC" .. num .. "/" .. id .. "/3"
+	local altid = "ELEC"..num.."/"..id
+	local altid1 = "ELEC"..num.."/"..id.."/1"
+	local altid2 = "ELEC"..num.."/"..id.."/2"
+	local altid3 = "ELEC"..num.."/"..id.."/3"
 	local tableCmds = {}
 
 	local voltage = tonumber(getVariable(THIS_DEVICE, tabVars.VAR_VOLTAGE) or "230") or 230
@@ -4173,7 +4931,7 @@ end
 local function decodeRFXSensor(subType, data)
 
 	local id = string.byte(data, 1)
-	local altid = "RFXSENSOR" .. subType .. "/" .. id
+	local altid = "RFXSENSOR"..subType.."/"..id
 	local tableCmds = {}
 
 	if (subType == tableMsgTypes.RFXSENSOR_T.subType)
@@ -4185,7 +4943,7 @@ local function decodeRFXSensor(subType, data)
 		local strength = decodeSignalStrength(data, 4)
 		table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_STRENGTH, strength, 0 ) )
 	else
-		warning("RFXSensor subtype not yet implemented: " .. subType)
+		warning("RFXSensor subtype not yet implemented: "..subType)
 	end
 
 	return tableCmds
@@ -4196,14 +4954,14 @@ local function decodeRFXMeter(subType, data)
 
 	local id = string.byte(data, 1) * 256 + string.byte(data, 2)
 	local num = tonumber(subType) + 1
-	local altid = "RFXMETER" .. num .. "/" .. id
+	local altid = "RFXMETER"..num.."/"..id
 	local instant = 0.1
 	local waarde = 0
 	local multiplier = 1
 	local tableCmds = {}
 
 	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.RFXMETER.deviceType)
-	if (deviceNum ~= nil)
+	if (deviceNum)
 		then
 		waarde = getVariable(deviceNum, tabVars.VAR_OFFSET)
 		if (waarde == nil)
@@ -4231,115 +4989,114 @@ end
 
 local function initDecodingFunctions()
 
-	tableMsgTypes.RESPONSE_MODE_COMMAND.decodeFunction = decodeResponseMode
-	tableMsgTypes.UNKNOWN_RTS_REMOTE.decodeFunction = decodeResponseMode
-	tableMsgTypes.WRONG_COMMAND.decodeFunction = decodeResponseMode
-	tableMsgTypes.RECEIVER_LOCK_ERROR.decodeFunction = decodeResponse
-	tableMsgTypes.TRANSMITTER_RESPONSE.decodeFunction = decodeResponse
-	tableMsgTypes.LIGHTING_X10.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_ARC.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_AB400D.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_WAVEMAN.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_EMW200.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_IMPULS.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_RISINGSUN.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_PHILIPS.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_ENERGENIE_ENER010.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_ENERGENIE_5GANG.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_COCO.decodeFunction = decodeLighting1
-	tableMsgTypes.LIGHTING_AC.decodeFunction = decodeLighting2
-	tableMsgTypes.LIGHTING_HEU.decodeFunction = decodeLighting2
-	tableMsgTypes.LIGHTING_ANSLUT.decodeFunction = decodeLighting2
-	tableMsgTypes.LIGHTING_KOPPLA.decodeFunction = decodeLighting3
-	tableMsgTypes.SECURITY_DOOR.decodeFunction = decodeSecurity
-	tableMsgTypes.LIGHTING_LIGHTWARERF.decodeFunction = decodeLighting5
-	tableMsgTypes.LIGHTING_EMW100.decodeFunction = decodeLighting5
-	tableMsgTypes.LIGHTING_BBSB.decodeFunction = decodeLighting5
-	tableMsgTypes.LIGHTING_RSL2.decodeFunction = decodeLighting5
-	tableMsgTypes.LIGHTING_KANGTAI.decodeFunction = decodeLighting5
-	tableMsgTypes.LIGHTING_BLYSS.decodeFunction = decodeLighting6
-	tableMsgTypes.CURTAIN_HARRISON.decodeFunction = decodeCurtain
-	tableMsgTypes.BLIND_T0.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T1.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T2.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T3.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T4.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T5.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T6.decodeFunction = decodeBlind
-	tableMsgTypes.BLIND_T7.decodeFunction = decodeBlind
-	tableMsgTypes.SECURITY_X10DS.decodeFunction = decodeSecurityDS
-	tableMsgTypes.SECURITY_X10MS.decodeFunction = decodeSecurityMS
-	tableMsgTypes.SECURITY_X10SR.decodeFunction = decodeSecurityRemote
-	tableMsgTypes.SECURITY_MEISR.decodeFunction = decodeSecurityMeiantech
-	tableMsgTypes.KD101.decodeFunction = decodeSecurityRemote
-	tableMsgTypes.POWERCODE_PRIMDS.decodeFunction = decodeSecurityDS
-	tableMsgTypes.POWERCODE_AUXDS.decodeFunction = decodeSecurityDS
-	tableMsgTypes.POWERCODE_MS.decodeFunction = decodeSecurityMS
-	tableMsgTypes.SA30.decodeFunction = decodeSecurityRemote
-	tableMsgTypes.ATI_REMOTE_WONDER.decodeFunction = decodeRemote
-	tableMsgTypes.ATI_REMOTE_WONDER_PLUS.decodeFunction = decodeRemote
-	tableMsgTypes.MEDION_REMOTE.decodeFunction = decodeRemote
-	tableMsgTypes.X10_PC_REMOTE.decodeFunction = decodeRemote
-	tableMsgTypes.ATI_REMOTE_WONDER_II.decodeFunction = decodeRemote
-	tableMsgTypes.HEATER3_MERTIK1.decodeFunction = decodeThermostat3
-	tableMsgTypes.HEATER3_MERTIK2.decodeFunction = decodeThermostat3
-	tableMsgTypes.TR1.decodeFunction = decodeTempRain
-	tableMsgTypes.TEMP1.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP2.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP3.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP4.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP5.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP6.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP7.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP8.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP9.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP10.decodeFunction = decodeTemp
-	tableMsgTypes.TEMP11.decodeFunction = decodeTemp
-	tableMsgTypes.HUM1.decodeFunction = decodeHum
-	tableMsgTypes.HUM2.decodeFunction = decodeHum
-	tableMsgTypes.TEMP_HUM1.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM2.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM3.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM4.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM5.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM6.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM7.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM8.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM9.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM10.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM11.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM12.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM13.decodeFunction = decodeTempHum
-	tableMsgTypes.TEMP_HUM14.decodeFunction = decodeTempHum
-	tableMsgTypes.BARO1.decodeFunction = decodeBaro
-	tableMsgTypes.TEMP_HUM_BARO1.decodeFunction = decodeTempHumBaro
-	tableMsgTypes.TEMP_HUM_BARO2.decodeFunction = decodeTempHumBaro
-	tableMsgTypes.RAIN1.decodeFunction = decodeRain
-	tableMsgTypes.RAIN2.decodeFunction = decodeRain
-	tableMsgTypes.RAIN3.decodeFunction = decodeRain
-	tableMsgTypes.RAIN4.decodeFunction = decodeRain
-	tableMsgTypes.RAIN5.decodeFunction = decodeRain
-	tableMsgTypes.RAIN6.decodeFunction = decodeRain
-	tableMsgTypes.RAIN7.decodeFunction = decodeRain
-	tableMsgTypes.WIND1.decodeFunction = decodeWind
-	tableMsgTypes.WIND2.decodeFunction = decodeWind
-	tableMsgTypes.WIND3.decodeFunction = decodeWind
-	tableMsgTypes.WIND4.decodeFunction = decodeWind
-	tableMsgTypes.WIND5.decodeFunction = decodeWind
-	tableMsgTypes.WIND6.decodeFunction = decodeWind
-	tableMsgTypes.WIND7.decodeFunction = decodeWind
-	tableMsgTypes.UV1.decodeFunction = decodeUV
-	tableMsgTypes.UV2.decodeFunction = decodeUV
-	tableMsgTypes.UV3.decodeFunction = decodeUV
-	tableMsgTypes.ELEC1.decodeFunction = decodeElec1
-	tableMsgTypes.ELEC2.decodeFunction = decodeElec2Elec3
-	tableMsgTypes.ELEC3.decodeFunction = decodeElec2Elec3
-	tableMsgTypes.ELEC4.decodeFunction = decodeElec4
-	tableMsgTypes.WEIGHT1.decodeFunction = decodeWeight
-	tableMsgTypes.WEIGHT2.decodeFunction = decodeWeight
-	tableMsgTypes.RFXSENSOR_T.decodeFunction = decodeRFXSensor
-	tableMsgTypes.RFXMETER.decodeFunction = decodeRFXMeter
-
+	tableMsgTypes.RESPONSE_MODE_COMMAND.decodeMsgFunction = decodeResponseMode
+	tableMsgTypes.UNKNOWN_RTS_REMOTE.decodeMsgFunction = decodeResponseMode
+	tableMsgTypes.INVALID_COMMAND.decodeMsgFunction = decodeResponseMode
+	tableMsgTypes.RECEIVER_LOCK_ERROR.decodeMsgFunction = decodeResponse
+	tableMsgTypes.TRANSMITTER_RESPONSE.decodeMsgFunction = decodeResponse
+	tableMsgTypes.LIGHTING_X10.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ARC.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_AB400D.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_WAVEMAN.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_EMW200.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_IMPULS.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_RISINGSUN.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_PHILIPS.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ENERGENIE_ENER010.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_ENERGENIE_5GANG.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_COCO.decodeMsgFunction = decodeLighting1
+	tableMsgTypes.LIGHTING_AC.decodeMsgFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_HEU.decodeMsgFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_ANSLUT.decodeMsgFunction = decodeLighting2
+	tableMsgTypes.LIGHTING_KOPPLA.decodeMsgFunction = decodeLighting3
+	tableMsgTypes.SECURITY_DOOR.decodeMsgFunction = decodeSecurity
+	tableMsgTypes.LIGHTING_LIGHTWARERF.decodeMsgFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_EMW100.decodeMsgFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_BBSB.decodeMsgFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_RSL2.decodeMsgFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_KANGTAI.decodeMsgFunction = decodeLighting5
+	tableMsgTypes.LIGHTING_BLYSS.decodeMsgFunction = decodeLighting6
+	tableMsgTypes.CURTAIN_HARRISON.decodeMsgFunction = decodeCurtain
+	tableMsgTypes.BLIND_T0.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T1.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T2.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T3.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T4.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T5.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T6.decodeMsgFunction = decodeBlind
+	tableMsgTypes.BLIND_T7.decodeMsgFunction = decodeBlind
+	tableMsgTypes.SECURITY_X10DS.decodeMsgFunction = decodeSecurityDS
+	tableMsgTypes.SECURITY_X10MS.decodeMsgFunction = decodeSecurityMS
+	tableMsgTypes.SECURITY_X10SR.decodeMsgFunction = decodeSecurityRemote
+	tableMsgTypes.SECURITY_MEISR.decodeMsgFunction = decodeSecurityMeiantech
+	tableMsgTypes.KD101.decodeMsgFunction = decodeSecurityRemote
+	tableMsgTypes.POWERCODE_PRIMDS.decodeMsgFunction = decodeSecurityDS
+	tableMsgTypes.POWERCODE_AUXDS.decodeMsgFunction = decodeSecurityDS
+	tableMsgTypes.POWERCODE_MS.decodeMsgFunction = decodeSecurityMS
+	tableMsgTypes.SA30.decodeMsgFunction = decodeSecurityRemote
+	tableMsgTypes.ATI_REMOTE_WONDER.decodeMsgFunction = decodeRemote
+	tableMsgTypes.ATI_REMOTE_WONDER_PLUS.decodeMsgFunction = decodeRemote
+	tableMsgTypes.MEDION_REMOTE.decodeMsgFunction = decodeRemote
+	tableMsgTypes.X10_PC_REMOTE.decodeMsgFunction = decodeRemote
+	tableMsgTypes.ATI_REMOTE_WONDER_II.decodeMsgFunction = decodeRemote
+	tableMsgTypes.HEATER3_MERTIK1.decodeMsgFunction = decodeThermostat3
+	tableMsgTypes.HEATER3_MERTIK2.decodeMsgFunction = decodeThermostat3
+	tableMsgTypes.TR1.decodeMsgFunction = decodeTempRain
+	tableMsgTypes.TEMP1.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP2.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP3.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP4.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP5.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP6.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP7.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP8.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP9.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP10.decodeMsgFunction = decodeTemp
+	tableMsgTypes.TEMP11.decodeMsgFunction = decodeTemp
+	tableMsgTypes.HUM1.decodeMsgFunction = decodeHum
+	tableMsgTypes.HUM2.decodeMsgFunction = decodeHum
+	tableMsgTypes.TEMP_HUM1.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM2.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM3.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM4.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM5.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM6.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM7.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM8.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM9.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM10.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM11.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM12.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM13.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.TEMP_HUM14.decodeMsgFunction = decodeTempHum
+	tableMsgTypes.BARO1.decodeMsgFunction = decodeBaro
+	tableMsgTypes.TEMP_HUM_BARO1.decodeMsgFunction = decodeTempHumBaro
+	tableMsgTypes.TEMP_HUM_BARO2.decodeMsgFunction = decodeTempHumBaro
+	tableMsgTypes.RAIN1.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN2.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN3.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN4.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN5.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN6.decodeMsgFunction = decodeRain
+	tableMsgTypes.RAIN7.decodeMsgFunction = decodeRain
+	tableMsgTypes.WIND1.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND2.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND3.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND4.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND5.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND6.decodeMsgFunction = decodeWind
+	tableMsgTypes.WIND7.decodeMsgFunction = decodeWind
+	tableMsgTypes.UV1.decodeMsgFunction = decodeUV
+	tableMsgTypes.UV2.decodeMsgFunction = decodeUV
+	tableMsgTypes.UV3.decodeMsgFunction = decodeUV
+	tableMsgTypes.ELEC1.decodeMsgFunction = decodeElec1
+	tableMsgTypes.ELEC2.decodeMsgFunction = decodeElec2Elec3
+	tableMsgTypes.ELEC3.decodeMsgFunction = decodeElec2Elec3
+	tableMsgTypes.ELEC4.decodeMsgFunction = decodeElec4
+	tableMsgTypes.WEIGHT1.decodeMsgFunction = decodeWeight
+	tableMsgTypes.WEIGHT2.decodeMsgFunction = decodeWeight
+	tableMsgTypes.RFXSENSOR_T.decodeMsgFunction = decodeRFXSensor
+	tableMsgTypes.RFXMETER.decodeMsgFunction = decodeRFXMeter
 end
 
 -- Function called at plugin startup
@@ -4348,7 +5105,7 @@ function startup(lul_device)
 
 	THIS_DEVICE = lul_device
 
-	task("Starting RFXtrx device: " .. tostring(lul_device), TASK_SUCCESS)
+	task("Starting RFXtrx device: "..tostring(lul_device), TASK_SUCCESS)
 	setDefaultValue(lul_device, tabVars.VAR_VERAPORT, "10000")
 	setDefaultValue(lul_device, tabVars.VAR_DEBUG_LOGS, "0")
 	DEBUG_MODE = getVariable(lul_device, tabVars.VAR_DEBUG_LOGS)
@@ -4400,12 +5157,19 @@ function startup(lul_device)
 end
 
 function deferredStartup(data)
-
 	-- Build a table for selecting the message type based on the key
 	for _, msgType in pairs(tableMsgTypes) do
-		tableMsgSelect[msgType.key] = msgType
+		tableMsgByKey[msgType.key] = msgType
 	end
-
+	-- Build a table for selecting the message type based on the device altid
+	for _, msgType in pairs(tableMsgTypes) do
+		tableMsgBySubID[msgType.subAltID] = msgType
+	end
+	-- Build a table for selecting the category based on the subAltid
+	for _, category in pairs(tableCategories) do
+		tableCategoryBySubAltid[category.subAltid] = category
+	end
+	
 	initIDLookup()
 
 	initDecodingFunctions()
@@ -4419,19 +5183,19 @@ function deferredStartup(data)
 
 	-- Send a reset command
 	debug("reset...")
-	debug("MODE_COMMAND.packetType: " .. tableMsgTypes.MODE_COMMAND.type or 'nil')
-	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_RESET, nil)
+	debug("MODE_COMMAND.packetType: "..tableMsgTypes.MODE_COMMAND.pktType or 'nil')
+	sendCommand(tableMsgTypes.MODE_COMMAND.pktType, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_RESET, nil)
 
 	-- Wait at least 50 ms and max 9 s
 	luup.sleep(2000)
 
 	-- Send a get status command
-	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_GET_STATUS, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.pktType, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_GET_STATUS, nil)
 
 	-- Clear the buffer and enable buffering
 	buffer = ""
 	buffering = true
-	
+
 end
 
 -- Function called when data incoming
@@ -4447,11 +5211,11 @@ function incomingData(lul_device, lul_data)
 	local val = string.byte(data, 1)
 	if (#buffer == 0 and (val < 4 or val > 40))
 		then
-		warning("Bad starting message; ignore byte " .. string.format("%02X", val))
+		warning("Bad starting message; ignore byte "..string.format("%02X", val))
 		return
 	end
 
-	buffer = buffer .. data
+	buffer = buffer..data
 
 	local length = string.byte(buffer, 1)
 	if (#buffer > length)
@@ -4459,7 +5223,7 @@ function incomingData(lul_device, lul_data)
 		local message = getStringPart(buffer, 1, length + 1)
 		buffer = getStringPart(buffer, length + 2, #buffer)
 
-		debug("Received message: " .. formattohex(message))
+		debug("Received message: "..formattohex(message))
 		setVariable(THIS_DEVICE, tabVars.VAR_LAST_RECEIVED_MSG, formattohex(message))
 		setVariable(THIS_DEVICE, tabVars.VAR_VERATIME, os.time())
 		if (getVariable(THIS_DEVICE, tabVars.VAR_COMM_FAILURE) ~= "0")
@@ -4469,7 +5233,7 @@ function incomingData(lul_device, lul_data)
 
 		local success, error = pcall(decodeMessage,message)
 		if(not success)then
-			warning("No decode message for message: ".. formattohex(message) .. "Error: " .. error)
+			warning("No decode message for message: "..formattohex(message).."Error: "..error)
 		end
 	end
 
@@ -4478,697 +5242,208 @@ end
 function saveSettings()
 
 	log("Saving receiving modes in non-volatile memory...")
-	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_SAVE, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.pktType, tableMsgTypes.MODE_COMMAND.subType, DATA_MSG_SAVE, nil)
 
 end
 
+-- switchPower only receives the device number and a 0 or 1 as input. It will select a command
+-- based on the device type (LS, DL, or WC) and the desired state (0 or 1)
 function switchPower(deviceNum, newTargetValue)
-
-	local id = luup.devices[deviceNum].id
-	newTargetValue = newTargetValue or "0"
-	debug("switchPower " .. id .. " target " .. newTargetValue)
-
-	local category
-	if ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-		then
-		category = 0
-	elseif ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-		then
-		category = tonumber(string.sub(id, 5, 5))
-	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "LS/X10/L") and (string.sub(id, 10, 10) == "/"))
-		then
-		category = 7
-	elseif ((string.len(id) == 15) and (string.sub(id, 1, 5) == "HT/HT") and (string.sub(id, 7, 7) == ".")  and (string.sub(id, 9, 9) == "/"))
-		then
-		category = 8
-	elseif ((string.len(id) == 15) and (string.sub(id, 1, 5) == "L4/L4"))
-		then
-		category = 9
-	else
-		warning("Unexpected device id " .. id .. ". Switch Power command not sent")
+	local cmd, msgType, altid, subAltid, devType
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	devType = string.match(altid, '([^/]+)')
+	debug("switchPower-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." devType: "..(devType or 'nil'))
+	if not( subAltid ) then
+		warning("switchPower: invalid altid: "..altid)
 		return
 	end
-
-	local type
-	local subType
-	local housecode
-	local unitcode
-	local remoteId
-	local cmdCode
-	local nbTimes = 1
-	local cmd = tableCommandTypes.CMD_OFF
-	if (newTargetValue == "1")
-		then
+	msgType = tableMsgBySubID[subAltid]
+	if not ( msgType ) then
+		warning("switchPower: no msgType found for altid: "..altid)
+		return
+	end
+	newTargetValue = newTargetValue or "0"
+	if (newTargetValue == "0") then
+		cmd = tableCommandTypes.CMD_OFF
+	elseif (newTargetValue == "1") then
 		cmd = tableCommandTypes.CMD_ON
-	end
-	local data = nil
-
-	if (category == 0)
-		then
-		if (cmd == tableCommandTypes.CMD_ON)
-			then
-			windowCovering(deviceNum, "Up")
-		elseif (cmd == tableCommandTypes.CMD_OFF)
-			then
-			windowCovering(deviceNum, "Down")
-		end
-	elseif (category == 1)
-		then
-		type = tableMsgTypes.LIGHTING_ARC.type
-		subType = tonumber(string.sub(id, 7, 7), 16)
-		if (cmd == tableCommandTypes.CMD_ON)
-			then
-			cmdCode = 1
-		elseif (cmd == tableCommandTypes.CMD_OFF)
-			then
-			cmdCode = 0
-		end
-		housecode = string.sub(id, 9, 9)
-		unitcode = tonumber(string.sub(id, 10, 11))
-		data = housecode .. string.char(unitcode, cmdCode, 0)
-	elseif (category == 2)
-		then
-		type = tableMsgTypes.LIGHTING_AC.type
-		subType = tonumber(string.sub(id, 7, 7))
-		if (cmd == tableCommandTypes.CMD_ON)
-			then
-			cmdCode = 1
-		elseif (cmd == tableCommandTypes.CMD_OFF)
-			then
-			cmdCode = 0
-		end
-		remoteId = string.sub(id, 9, 18)
-		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-		tonumber(string.sub(remoteId, 2, 3), 16),
-		tonumber(string.sub(remoteId, 4, 5), 16),
-		tonumber(string.sub(remoteId, 6, 7), 16),
-		tonumber(string.sub(remoteId, 9, 10)),
-		cmdCode, 0, 0)
-	elseif (category == 3)
-		then
-		type = tableMsgTypes.LIGHTING_KOPPLA.type
-		subType = tonumber(string.sub(id, 7, 7))
-		if (cmd == tableCommandTypes.CMD_ON)
-			then
-			cmdCode = 0x10
-		elseif (cmd == tableCommandTypes.CMD_OFF)
-			then
-			cmdCode = 0x1A
-		end
-		remoteId = tonumber(string.sub(id, 9, 9), 16)
-		unitcode = tonumber(string.sub(id, 10, 11))
-		local channel1 = 0
-		local channel2 = 0
-		if (unitcode >= 1 and unitcode <= 8)
-			then
-			channel1 = 1
-			if (unitcode > 1)
-				then
-				channel1 = bitw.lshift(channel1, unitcode-1)
-			end
-		elseif (unitcode >= 9 and unitcode <= 10)
-			then
-			channel2 = 1
-			if (unitcode > 9)
-				then
-				channel2 = bitw.lshift(channel2, unitcode-9)
-			end
-		end
-		data = string.char(remoteId, channel1, channel2, cmdCode, 0)
-	elseif (category == 5)
-		then
-		if (luup.devices[deviceNum].device_type == tableDeviceTypes.COVER.deviceType)
-			then
-			if (cmd == tableCommandTypes.CMD_ON)
-				then
-				windowCovering(deviceNum, "Up")
-			elseif (cmd == tableCommandTypes.CMD_OFF)
-				then
-				windowCovering(deviceNum, "Down")
-			end
-		else
-			type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-			-- This is a hack to handle subtypes > 15
-			subChar = string.sub(id, 7, 7)
-			if (subChar == "B") then
-				subType = 0x11
-			else
-				subType = tonumber(subchar)
-			end
-			if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
-				then
-				-- Livolo
-				if (luup.devices[deviceNum].device_type == tableDeviceTypes.LIGHT.deviceType)
-					then
-					if (cmd == tableCommandTypes.CMD_ON)
-						then
-						remoteId = string.sub(id, 9, 16)
-						cmdCode = tonumber(string.sub(remoteId, 8, 8))
-						data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-						tonumber(string.sub(remoteId, 3, 4), 16),
-						tonumber(string.sub(remoteId, 5, 6), 16),
-						0,
-						cmdCode, 0, 0)
-						if (tonumber(getVariable(deviceNum, tabVars.VAR_LIGHT) or "0") == 1)
-							then
-							cmd = tableCommandTypes.CMD_OFF
-						end
-					elseif (cmd == tableCommandTypes.CMD_OFF)
-						then
-						groupOff(deviceNum)
-					end
-				elseif (luup.devices[deviceNum].device_type == tableDeviceTypes.DIMMER.deviceType)
-					then
-					if (cmd == tableCommandTypes.CMD_ON)
-						then
-						cmdCode = 0x2
-					elseif (cmd == tableCommandTypes.CMD_OFF)
-						then
-						cmdCode = 0x3
-					end
-					nbTimes = 6
-					remoteId = string.sub(id, 9, 16)
-					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-					tonumber(string.sub(remoteId, 3, 4), 16),
-					tonumber(string.sub(remoteId, 5, 6), 16),
-					0,
-					cmdCode, 0, 0)
-				end
-			else
-				if (cmd == tableCommandTypes.CMD_ON)
-					then
-					cmdCode = 1
-				elseif (cmd == tableCommandTypes.CMD_OFF)
-					then
-					cmdCode = 0
-				end
-				remoteId = string.sub(id, 9, 17)
-				data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-				tonumber(string.sub(remoteId, 3, 4), 16),
-				tonumber(string.sub(remoteId, 5, 6), 16),
-				tonumber(string.sub(remoteId, 8, 9)),
-				cmdCode, 0, 0)
-			end
-		end
-	elseif (category == 6)
-		then
-		type = tableMsgTypes.LIGHTING_BLYSS.type
-		subType = tonumber(string.sub(id, 7, 7))
-		if (cmd == tableCommandTypes.CMD_ON)
-			then
-			cmdCode = 0
-		elseif (cmd == tableCommandTypes.CMD_OFF)
-			then
-			cmdCode = 1
-		end
-		remoteId = string.sub(id, 9, 12)
-		housecode = string.sub(id, 14, 14)
-		unitcode = tonumber(string.sub(id, 15, 15))
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16))
-		.. housecode
-		.. string.char(unitcode, cmdCode, 1, 0, 0)
-	elseif (category == 7)
-		then
-		type = tableMsgTypes.SECURITY_X10SR.type
-		subType = tableMsgTypes.SECURITY_X10SR.subType
-		local light_num = string.sub(id, 9, 9)
-		if (cmd == tableCommandTypes.CMD_ON and light_num == "1")
-			then
-			cmdCode = 0x11
-		elseif (cmd == tableCommandTypes.CMD_ON and light_num == "2")
-			then
-			cmdCode = 0x13
-		elseif (cmd == tableCommandTypes.CMD_OFF and light_num == "1")
-			then
-			cmdCode = 0x10
-		elseif (cmd == tableCommandTypes.CMD_OFF and light_num == "2")
-			then
-			cmdCode = 0x12
-		else
-			cmdCode = nil
-		end
-		if (cmdCode ~= nil)
-			then
-			remoteId = string.sub(id, 11, 16)
-			data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-			tonumber(string.sub(remoteId, 3, 4), 16),
-			tonumber(string.sub(remoteId, 5, 6), 16),
-			cmdCode, 0)
-		end
-		-- elseif (category == 8)
-		-- then
-		-- TODO: Mertik
-	elseif (category == 9)
-		then
-		type = tableMsgTypes.SECURITY_DOOR.type
-		subType = tableMsgTypes.SECURITY_DOOR.subType
-		nbTimes = 1
-		remoteId = string.sub(id, 7, 12)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		tonumber("01", 16),
-		tonumber("76", 16),
-		0)
 	else
-		warning("Unimplemented lighting type " .. category .. ". Switch Power command not sent")
+		warning("Invalid newTargetValue "..(newTargetValue or 'nil').." altid: "..altid)
+		return
 	end
-
-	if (data ~= nil)
+	local data, nbTimes = msgType.createMsgDataFunction(altid, cmd.name)
+	if ( data )
 		then
+		if not (nbTimes) then nbTimes = 1 end
 		local tableCmds = {}
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, nil, 0 ))
-		sendRepeatCommand(type, subType, data, nbTimes, tableCmds)
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, nil, 0 ))
+		sendRepeatCommand(msgType.pktType, msgType.subType, data, nbTimes, tableCmds)
+	else
+		warning('switchPower: createMsgDataFunction failed for altid '..altid)
 	end
-
 end
 
 function setDimLevel(deviceNum, newLoadlevelTarget)
-
-	local id = luup.devices[deviceNum].id
-	newLoadlevelTarget = newLoadlevelTarget or "0"
-	debug("setDimLevel " .. id .. " target " .. newLoadlevelTarget)
-
-	local category
-	if ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-		then
-		category = 0
-	elseif ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-		then
-		category = tonumber(string.sub(id, 5, 5))
-	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-		then
-		category = 0
-	else
-		warning("Unexpected device id " .. id .. ". Set level command not sent")
+	local altid, subAltid, level, msgType, nbTimes, data, cmd
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	level = tonumber(newLoadlevelTarget) or 0
+	debug("setDimLevel-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." target: "..(newLoadlevelTarget or 'nil'))
+	if not( subAltid ) then
+		warning("setDimLevel: invalid altid: "..altid)
 		return
 	end
-
-	local type
-	local subType
-	local housecode
-	local unitcode
-	local remoteId
-	local cmdCode
-	local nbTimes = 1
-	local cmd = tableCommandTypes.CMD_DIM
-	local level
-	local data = nil
-
-	if (category == 0)
-		then
-		if (tonumber(newLoadlevelTarget) == 0)
-			then
-			windowCovering(deviceNum, "Down")
-		else
-			windowCovering(deviceNum, "Up")
+	data = nil
+	cmd = tableCommandTypes.CMD_DIM
+	-- window covers can't accept levels other than 0 or 100
+	if (string.sub(altid,1,3) == "WC/") then
+		if (level == 0) then
+			windowCovering(deviceNum, "Close")
+			return
+		elseif (level == 100) then
+			windowCovering(deviceNum, "Open")
+			return
+		elseif (level) then
+			warning("setDimLevel: invalid newLoadlevelTarget value given for window cover: "..level)
+			return
 		end
-	elseif (category == 2)
-		then
-		if (tonumber(newLoadlevelTarget) == 0)
-			then
-			switchPower(deviceNum, "0")
-		else
-			type = tableMsgTypes.LIGHTING_AC.type
-			subType = tonumber(string.sub(id, 7, 7))
-			remoteId = string.sub(id, 9, 18)
-			cmdCode = 0x2
-			level = math.floor(newLoadlevelTarget * 0x0F / 100 + 0.5)
-			data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-			tonumber(string.sub(remoteId, 2, 3), 16),
-			tonumber(string.sub(remoteId, 4, 5), 16),
-			tonumber(string.sub(remoteId, 6, 7), 16),
-			tonumber(string.sub(remoteId, 9, 10)),
-			cmdCode, level, 0)
-		end
-	elseif (category == 3)
-		then
-		level = math.floor(newLoadlevelTarget / 10 + 0.5)
-		if (level == 0)
-			then
-			switchPower(deviceNum, "0")
-		elseif (level == 10)
-			then
-			switchPower(deviceNum, "1")
-		else
-			type = tableMsgTypes.LIGHTING_KOPPLA.type
-			subType = tonumber(string.sub(id, 7, 7))
-			remoteId = tonumber(string.sub(id, 9, 9), 16)
-			unitcode = tonumber(string.sub(id, 10, 11))
-			local channel1 = 0
-			local channel2 = 0
-			if (unitcode >= 1 and unitcode <= 8)
-				then
-				channel1 = 1
-				if (unitcode > 1)
-					then
-					channel1 = bitw.lshift(channel1, unitcode-1)
-				end
-			elseif (unitcode >= 9 and unitcode <= 10)
-				then
-				channel2 = 1
-				if (unitcode > 9)
-					then
-					channel2 = bitw.lshift(channel2, unitcode-9)
-				end
-			end
-			cmdCode = level + 0x10
-			data = string.char(remoteId, channel1, channel2, cmdCode, 0)
-		end
-	elseif (category == 5)
-		then
-		if (luup.devices[deviceNum].device_type == tableDeviceTypes.COVER.deviceType and tonumber(newLoadlevelTarget) > 0)
-			then
-			newLoadlevelTarget = "100"
-		end
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		subType = tonumber(string.sub(id, 7, 7))
-		newLoadlevelTarget = tonumber(newLoadlevelTarget)
-		if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
-			then
-			-- Livolo
-			local curLevel = tonumber(getVariable(deviceNum, tabVars.VAR_DIMMER) or "0") or 0
-			if (newLoadlevelTarget == 0)
-				then
-				switchPower(deviceNum, "0")
-			elseif (newLoadlevelTarget == 100)
-				then
-				switchPower(deviceNum, "1")
-			else
-				local tableLevels = { 0, 17, 33, 50, 67, 83, 100 }
-				local idx1 = 0
-				local delta = 100
-				local diff
-				for i = 1, #tableLevels
-					do
-					diff = math.abs(curLevel - tableLevels[i])
-					if (diff < delta)
-						then
-						delta = diff
-						idx1 = i
-					end
-				end
-				if (newLoadlevelTarget < curLevel)
-					then
-					local idx2 = 1
-					delta = 100
-					for i = 1, (idx1-1)
-						do
-						diff = math.abs(newLoadlevelTarget - tableLevels[i])
-						if (diff < delta)
-							then
-							delta = diff
-							idx2 = i
-						end
-					end
-					newLoadlevelTarget = tableLevels[idx2]
-					nbTimes = idx1 - idx2
-					cmdCode = 0x3
-					remoteId = string.sub(id, 9, 16)
-					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-					tonumber(string.sub(remoteId, 3, 4), 16),
-					tonumber(string.sub(remoteId, 5, 6), 16),
-					0,
-					cmdCode, 0, 0)
-				elseif (newLoadlevelTarget > curLevel)
-					then
-					local idx2 = 7
-					delta = 100
-					for i = (idx1+1), #tableLevels
-						do
-						diff = math.abs(newLoadlevelTarget - tableLevels[i])
-						if (diff < delta)
-							then
-							delta = diff
-							idx2 = i
-						end
-					end
-					newLoadlevelTarget = tableLevels[idx2]
-					nbTimes = idx2 - idx1
-					cmdCode = 0x2
-					remoteId = string.sub(id, 9, 16)
-					data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-					tonumber(string.sub(remoteId, 3, 4), 16),
-					tonumber(string.sub(remoteId, 5, 6), 16),
-					0,
-					cmdCode, 0, 0)
-				end
-			end
-		else
-			if (newLoadlevelTarget == 0)
-				then
-				switchPower(deviceNum, "0")
-			else
-				remoteId = string.sub(id, 9, 17)
-				cmdCode = 0x10
-				level = math.floor(newLoadlevelTarget * 0x1F / 100 + 0.5)
-				data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-				tonumber(string.sub(remoteId, 3, 4), 16),
-				tonumber(string.sub(remoteId, 5, 6), 16),
-				tonumber(string.sub(remoteId, 8, 9)),
-				cmdCode, level, 0)
-			end
-		end
-	else
-		warning("Unimplemented lighting type " .. category .. ". Set level command not sent")
 	end
+	msgType = tableMsgBySubID[subAltid]
+	if not (msgType) then
+		warning("setDimLevel: no msgType found for altid: "..altid)
+		return
+	end
+	level = tonumber(newLoadlevelTarget) -- if newLoadlevelTarget is nil - so be it
+	data, nbTimes = msgType.createMsgDataFunction(altid, cmd.name, level)
+	if not (nbTimes) then nbTimes = 1 end
 
-	if (data ~= nil)
+	if (data)
 		then
 		local tableCmds = {}
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, newLoadlevelTarget, 0 ))
-		sendRepeatCommand(type, subType, data, nbTimes, tableCmds)
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, newLoadlevelTarget, 0 ))
+		-- Set the last dim level to 100. Do this to deal with Vera's using last dim level for some reason
+		--  when we try to send a switchPower ON command.
+		--table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), tableCommandTypes.CMD_DIMLAST, 100, 0 ))
+		sendRepeatCommand(msgType.pktType, msgType.subType, data, nbTimes, tableCmds)
+	else
+		warning('setDimLevel: createMsgDataFunction failed for altid '..altid)
 	end
-
 end
 
 function windowCovering(deviceNum, action)
-
-	local id = luup.devices[deviceNum].id
-	debug("windowCovering " .. action .. " ".. id)
-
-	local cmd = nil
-	if (action == "Up")
-		then
-		cmd = tableCommandTypes.CMD_OPEN
-	elseif (action == "Down")
-		then
-		cmd = tableCommandTypes.CMD_CLOSE
-	elseif (action == "Stop")
-		then
-		cmd = tableCommandTypes.CMD_STOP
-	else
-		warning("windowCovering: unexpected value for action parameter")
+	local cmd, msgType, altid, subAltid
+	local action2cmd = {
+		['Up'] = tableCommandTypes.CMD_OPEN,
+		['Open'] = tableCommandTypes.CMD_OPEN,
+		['Down'] = tableCommandTypes.CMD_CLOSE,
+		['Close'] = tableCommandTypes.CMD_CLOSE,
+		['Stop'] = tableCommandTypes.CMD_STOP,
+		['Program'] = tableCommandTypes.CMD_PROGRAM
+	}
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	cmd = action2cmd[action]
+	debug("windowCovering-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." action: "..action)
+	if not( cmd ) then
+		warning("windowCovering: unusual action: "..action)
+		--return
+	end
+	if not( subAltid ) then
+		warning("windowCovering: invalid altid: "..altid)
 		return
 	end
-
-	local category
-	if ((string.len(id) >= 9) and (string.sub(id, 3, 6) == "/L5.") and (string.sub(id, 8, 8) == "/"))
-		then
-		category = 5
-	elseif ((string.len(id) == 9) and (string.sub(id, 1, 4) == "WC/C") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 0
-	elseif ((string.len(id) == 15) and (string.sub(id, 1, 4) == "WC/B") and (string.sub(id, 6, 6) == "/"))
-		then
-		category = 6
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B6/"))
-		then
-		category = 6
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 6) == "WC/B7/"))
-		then
-		category = 6
-	elseif ((string.len(id) == 16) and (string.sub(id, 1, 8) == "WC/RFY0/"))
-		then
-		category = 7
-	elseif ((string.len(id) == 18) and (string.sub(id, 1, 8) == "WC/L2.0/"))
-		then
-		category = 2
-	else
-		warning("Unexpected device id " .. id .. ". " .. action .. " command not sent")
+	msgType = tableMsgBySubID[subAltid]
+	if not ( msgType ) then
+		warning("windowCovering: no msgType found for altid: "..altid)
 		return
 	end
-
-	local type
-	local subType
-	local housecode
-	local unitcode
-	local remoteId
-	local id4
-	local cmdCode = 0
-	local data = nil
-
-	if (category == 0)
-		then
-		type = tableMsgTypes.CURTAIN_HARRISON.type
-		subType = tonumber(string.sub(id, 5, 5))
-		if (cmd == tableCommandTypes.CMD_OPEN)
-			then
-			cmdCode = 0
-		elseif (cmd == tableCommandTypes.CMD_CLOSE)
-			then
-			cmdCode = 1
-		elseif (cmd == tableCommandTypes.CMD_STOP)
-			then
-			cmdCode = 2
-		end
-		housecode = string.sub(id, 7, 7)
-		unitcode = tonumber(string.sub(id, 8, 9))
-		data = housecode .. string.char(unitcode, cmdCode, 0)
-	elseif (category == 2)
-		then
-		if (cmd == tableCommandTypes.CMD_STOP)
-			then
-			windowCovering(deviceNum, "Up")
-			luup.sleep(1000)
-			windowCovering(deviceNum, "Down")
-			luup.sleep(1000)
-			windowCovering(deviceNum, "Down")
-		else
-			type = tableMsgTypes.LIGHTING_AC.type
-			subType = tonumber(string.sub(id, 7, 7))
-			remoteId = string.sub(id, 9, 18)
-			if (cmd == tableCommandTypes.CMD_OPEN)
-				then
-				cmdCode = 1
-			elseif (cmd == tableCommandTypes.CMD_CLOSE)
-				then
-				cmdCode = 0
-			end
-			data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-			tonumber(string.sub(remoteId, 2, 3), 16),
-			tonumber(string.sub(remoteId, 4, 5), 16),
-			tonumber(string.sub(remoteId, 6, 7), 16),
-			tonumber(string.sub(remoteId, 9, 10)),
-			cmdCode, 0, 0)
-		end
-	elseif (category == 5)
-		then
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		subType = tonumber(string.sub(id, 7, 7))
-		if (cmd == tableCommandTypes.CMD_OPEN)
-			then
-			cmdCode = 0x0F
-		elseif (cmd == tableCommandTypes.CMD_CLOSE)
-			then
-			cmdCode = 0x0D
-		elseif (cmd == tableCommandTypes.CMD_STOP)
-			then
-			cmdCode = 0x0E
-		end
-		remoteId = string.sub(id, 9, 17)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		tonumber(string.sub(remoteId, 8, 9)),
-		cmdCode, 0, 0)
-	elseif (category == 6)
-		then
-		type = tableMsgTypes.BLIND_T0.type
-		subType = tonumber(string.sub(id, 5, 5))
-		if (cmd == tableCommandTypes.CMD_OPEN)
-			then
-			cmdCode = 0
-		elseif (cmd == tableCommandTypes.CMD_CLOSE)
-			then
-			cmdCode = 1
-		elseif (cmd == tableCommandTypes.CMD_STOP)
-			then
-			cmdCode = 2
-		end
-		remoteId = string.sub(id, 7, 12)
-		if (subType == tableMsgTypes.BLIND_T6.subType or subType == tableMsgTypes.BLIND_T7.subType)
-			then
-			id4 = tonumber(string.sub(id, 13, 13), 16)
-			unitcode = tonumber(string.sub(id, 15, 16)) % 16
-		else
-			id4 = 0
-			unitcode = tonumber(string.sub(id, 14, 15)) % 16
-		end
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		id4 * 16 + unitcode, cmdCode, 0)
-	elseif (category == 7)
-		then
-		local mode = getVariable(deviceNum, tabVars.VAR_RFY_MODE) or ""
-		type = tableMsgTypes.RFY0.type
-		subType = tonumber(string.sub(id, 7, 7))
-		if (cmd == tableCommandTypes.CMD_OPEN)
-			then
-			if (mode == "VENETIAN_US")
-				then
-				cmdCode = 0x0F
-			elseif (mode == "VENETIAN_EU")
-				then
-				cmdCode = 0x11
-			else
-				cmdCode = 0x01
-			end
-		elseif (cmd == tableCommandTypes.CMD_CLOSE)
-			then
-			if (mode == "VENETIAN_US")
-				then
-				cmdCode = 0x10
-			elseif (mode == "VENETIAN_EU")
-				then
-				cmdCode = 0x12
-			else
-				cmdCode = 0x03
-			end
-		elseif (cmd == tableCommandTypes.CMD_STOP)
-			then
-			cmdCode = 0
-		end
-		remoteId = string.sub(id, 9, 13)
-		unitcode = tonumber(string.sub(id, 15, 16))
-		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-		tonumber(string.sub(remoteId, 2, 3), 16),
-		tonumber(string.sub(remoteId, 4, 5), 16),
-		unitcode, cmdCode, 0, 0, 0, 0)
-	end
-
-	if (data ~= nil)
+	local data = msgType.createMsgDataFunction(altid, action)
+	if (data)
 		then
 		local tableCmds = {}
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, nil, 0 ))
-		sendCommand(type, subType, data, tableCmds)
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, nil, 0 ))
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
+	else
+		warning('windowCovering: createMsgDataFunction failed for altid '..altid)
 	end
+end
 
+function controlFan(deviceNum, action)
+	local msgType, altid, subAltid, currentState, value
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("controlFan-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." action: "..action)
+	if not( subAltid ) then
+		warning("controlFan: invalid altid: "..altid)
+		return
+	end
+	msgType = tableMsgBySubID[subAltid]
+	if not ( msgType ) then
+		warning("controlFan: no msgType found for altid: "..altid)
+		return
+	end
+	local data, cmd = msgType.createMsgDataFunction(altid, action)
+	if not( cmd ) then
+		warning("controlFan: no cmd for action "..action.." on "..altid)
+	end
+	if (cmd == tableCommandTypes.CMD_FANLIGHT) then
+		if (action == 'LightOn') then
+			value = 1
+		elseif (action == 'LightOff') then
+			value = 0
+		else
+			currentState = getVariable(deviceNum, tabVars.VAR_STATE) or "0"
+			if (currentState == "0") then
+				value = "1"
+			else
+				value = "0"
+			end
+		end
+	elseif (cmd == tableCommandTypes.CMD_REVERSE) then
+		currentState = getVariable(deviceNum, tabVars.VAR_REVERSE) or "0"
+		if (currentState == "0") then
+			value = "1"
+		else
+			value = "0"
+		end
+	elseif (action == 'SpeedUp') then
+		currentState = tonumber(getVariable(deviceNum, tabVars.VAR_SPEED))
+		if not(currentState) then currentState = 0 end
+		-- increment the speed but don't go above 6
+		value =tostring(math.min(currentState+1, 6))
+	elseif (action == 'SpeedDown') then
+		currentState = tonumber(getVariable(deviceNum, tabVars.VAR_SPEED))
+		if not(currentState) then currentState = 1 end
+		-- decrement the speed but don't go below 0
+		value = tostring(math.max(currentState-1, 0))
+		if (value == '0') then value = 'Off' end
+	elseif (action == 'Flow') then
+		currentState = tonumber(getVariable(deviceNum, tabVars.VAR_SPEED))
+		if not(currentState) then currentState = 0 end
+		local currentSpeed = math.min(currentState,6)
+		if (currentSpeed < 4) then
+			value = tostring(math.max(currentSpeed-1, 1))
+		else
+			value = tostring(math.min(currentSpeed+1, 6))
+		end
+	else
+		value = action
+	end
+	if (data)
+		then
+		local tableCmds = {}
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, value, 0 ))
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
+	else
+		warning('controlFan: createMsgDataFunction failed for altid '..altid)
+	end
 end
 
 function setArmed(deviceNum, newArmedValue)
 
 	local id = luup.devices[deviceNum].id
-	debug("setArmed " .. id .. " target " .. (newArmedValue or "nil"))
+	debug("setArmed "..id.." target "..(newArmedValue or "nil"))
 	if(newArmedValue == "1") then
 		newArmedValue = true
 	else
@@ -5182,7 +5457,7 @@ end
 function requestArmMode(deviceNum, state, PINcode)
 
 	local id = luup.devices[deviceNum].id
-	debug("requestArmMode " .. id .. " state " .. state .. " PIN code " .. PINcode)
+	debug("requestArmMode "..id.." state "..state.." PIN code "..PINcode)
 	requestQuickArmMode(deviceNum, state)
 
 end
@@ -5190,11 +5465,11 @@ end
 function requestQuickArmMode(deviceNum, state)
 
 	local id = luup.devices[deviceNum].id
-	debug("requestQuickArmMode " .. id .. " state " .. state)
+	debug("requestQuickArmMode "..id.." state "..state)
 
 	if ((string.len(id) ~= 16) or (string.sub(id, 1, 10) ~= "SR/X10/SR/" and string.sub(id, 1, 10) ~= "SR/MEI/SR/"))
 		then
-		warning("Unexpected device id " .. id .. ". Quick Arm Mode command not sent")
+		warning("Unexpected device id "..id..". Quick Arm Mode command not sent")
 		return
 	end
 
@@ -5203,12 +5478,12 @@ function requestQuickArmMode(deviceNum, state)
 	local exitDelay = 0
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
 		then
-		type = tableMsgTypes.SECURITY_X10SR.type
+		type = tableMsgTypes.SECURITY_X10SR.pktType
 		subType = tableMsgTypes.SECURITY_X10SR.subType
 		exitDelay = tonumber(getVariable(deviceNum, tabVars.VAR_EXIT_DELAY) or "0")
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
 		then
-		type = tableMsgTypes.SECURITY_MEISR.type
+		type = tableMsgTypes.SECURITY_MEISR.pktType
 		subType = tableMsgTypes.SECURITY_MEISR.subType
 	end
 
@@ -5255,9 +5530,9 @@ function requestQuickArmMode(deviceNum, state)
 		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), tableCommandTypes.CMD_ALARM_SCENE_ON, 123, 0 ) )
 	else
 		cmdCode = nil
-		warning("Unimplemented state " .. state .. ". Quick Arm Mode command not sent")
+		warning("Unimplemented state "..state..". Quick Arm Mode command not sent")
 	end
-	if (cmdCode ~= nil)
+	if (cmdCode)
 		then
 		local remoteId = string.sub(id, 11, 16)
 		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
@@ -5272,14 +5547,14 @@ end
 function requestPanicMode(deviceNum, state)
 
 	local id = luup.devices[deviceNum].id
-	debug("requestPanicMode " .. id .. " state " .. state)
+	debug("requestPanicMode "..id.." state "..state)
 
 	if ((string.len(id) ~= 16) or (string.sub(id, 1, 10) ~= "SR/X10/SR/"
 		and string.sub(id, 1, 10) ~= "SR/MEI/SR/"
 		and string.sub(id, 1, 10) ~= "SR/KD1/SR/"
 		and string.sub(id, 1, 10) ~= "SR/S30/SR/"))
 		then
-		warning("Unexpected device id " .. id .. ". Panic Mode command not sent")
+		warning("Unexpected device id "..id..". Panic Mode command not sent")
 		return
 	end
 
@@ -5287,19 +5562,19 @@ function requestPanicMode(deviceNum, state)
 	local subType = nil
 	if (string.sub(id, 1, 9) == "SR/X10/SR")
 		then
-		type = tableMsgTypes.SECURITY_X10SR.type
+		type = tableMsgTypes.SECURITY_X10SR.pktType
 		subType = tableMsgTypes.SECURITY_X10SR.subType
 	elseif (string.sub(id, 1, 9) == "SR/MEI/SR")
 		then
-		type = tableMsgTypes.SECURITY_MEISR.type
+		type = tableMsgTypes.SECURITY_MEISR.pktType
 		subType = tableMsgTypes.SECURITY_MEISR.subType
 	elseif (string.sub(id, 1, 9) == "SR/KD1/SR")
 		then
-		type = tableMsgTypes.KD101.type
+		type = tableMsgTypes.KD101.pktType
 		subType = tableMsgTypes.KD101.subType
 	elseif (string.sub(id, 1, 9) == "SR/S30/SR")
 		then
-		type = tableMsgTypes.SA30.type
+		type = tableMsgTypes.SA30.pktType
 		subType = tableMsgTypes.SA30.subType
 	end
 
@@ -5310,18 +5585,18 @@ function requestPanicMode(deviceNum, state)
 	0x06, 0)
 	local tableCmds = {}
 	table.insert(tableCmds, DeviceCmd( string.sub(id, 4), tableCommandTypes.CMD_ALARM_SCENE_ON, 120, 0 ))
-	if (type == tableMsgTypes.KD101.type)
+	if (type == tableMsgTypes.KD101.pktType)
 		then
-		id = "KD1/SS/" .. string.sub(remoteId, 1, 2)
-		.. string.sub(remoteId, 3, 4)
-		.. string.sub(remoteId, 5, 6)
+		id = "KD1/SS/"..string.sub(remoteId, 1, 2)
+		..string.sub(remoteId, 3, 4)
+		..string.sub(remoteId, 5, 6)
 		table.insert(tableCmds, DeviceCmd( id, tableCommandTypes.CMD_SMOKE, "1", 0 ) )
 		table.insert(tableCmds, DeviceCmd( id, tableCommandTypes.CMD_SMOKE_OFF, nil, 30 ) )
-	elseif (type == tableMsgTypes.SA30.type)
+	elseif (type == tableMsgTypes.SA30.pktType)
 		then
-		id = "S30/SS/" .. string.sub(remoteId, 1, 2)
-		.. string.sub(remoteId, 3, 4)
-		.. string.sub(remoteId, 5, 6)
+		id = "S30/SS/"..string.sub(remoteId, 1, 2)
+		..string.sub(remoteId, 3, 4)
+		..string.sub(remoteId, 5, 6)
 		table.insert(tableCmds, DeviceCmd( id, tableCommandTypes.CMD_SMOKE, "1", 0 ) )
 		table.insert(tableCmds, DeviceCmd( id, tableCommandTypes.CMD_SMOKE_OFF, nil, 30 ) )
 	end
@@ -5332,11 +5607,11 @@ end
 function setExitDelay(deviceNum, newValue)
 
 	local id = luup.devices[deviceNum].id
-	debug("setExitDelay " .. id .. " new value " .. (newValue or ""))
+	debug("setExitDelay "..id.." new value "..(newValue or ""))
 
 	if ((string.len(id) ~= 16) or string.sub(id, 1, 10) ~= "SR/X10/SR/")
 		then
-		task("Exit delay is not relevant for device id " .. id, TASK_ERROR)
+		task("Exit delay is not relevant for device id "..id, TASK_ERROR)
 		return
 	end
 
@@ -5345,373 +5620,277 @@ function setExitDelay(deviceNum, newValue)
 end
 
 function dim(deviceNum)
-
-	local id = luup.devices[deviceNum].id
-	debug("dim " .. id)
-
-	if ((string.len(id) ~= 9) or (string.sub(id, 1, 8) ~= "RC/L1.0/"))
-		then
-		task("Dim command is not relevant for device " .. id, TASK_ERROR)
+	local cmd, msgType, altid, subAltid
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("dim-> altid: "..altid.." subAltid: "..(subAltid or 'nil'))
+	if not (string.find(subAltid, 'L[1235]')) then
+		warning("dim: Dim command not valid for altid: "..altid)
+		return
+	end
+	if not( subAltid ) then
+		warning("Dim: invalid altid: "..altid)
+		return
+	end
+	msgType = tableMsgBySubID[subAltid]
+	if not ( msgType ) then
+		warning("dim: no msgType found for altid: "..altid)
 		return
 	end
 
-	local tableCmds = {}
-	table.insert(tableCmds, DeviceCmd( string.sub(id, 4), tableCommandTypes.CMD_SCENE_ON, 102, 0 ))
-
-	local data = string.sub(id, 9, 9) .. string.char(0, 0x02, 0)
-	sendCommand(tableMsgTypes.LIGHTING_X10.type, tableMsgTypes.LIGHTING_X10.subType, data, tableCmds)
-
+	cmd = tableCommandTypes.CMD_SCENE_ON
+	--local data = string.sub(id, 9, 9)..string.char(0, 0x02, 0)
+	local data = msgType.createMsgDataFunction(altid, 'Dim')
+	if (data)
+		then
+		local tableCmds = {}
+		--table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, nil, 0 ))
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, 102, 0 ))
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
+	else
+		warning('dim: createMsgDataFunction failed for altid '..altid)
+	end
 end
 
 function bright(deviceNum)
-
-	local id = luup.devices[deviceNum].id
-	debug("bright " .. id)
-
-	if ((string.len(id) ~= 9) or (string.sub(id, 1, 8) ~= "RC/L1.0/"))
-		then
-		task("Bright command is not relevant for device " .. id, TASK_ERROR)
+	local cmd, msgType, altid, subAltid
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("bright-> altid: "..altid.." subAltid: "..(subAltid or 'nil'))
+	if not (string.find(subAltid, 'L[135]')) then
+		warning("bright: Bright command not valid for altid: "..altid)
+		return
+	end
+	if not( subAltid ) then
+		warning("bright: invalid altid: "..altid)
+		return
+	end
+	msgType = tableMsgBySubID[subAltid]
+	if not ( msgType ) then
+		warning("bright: no msgType found for altid: "..altid)
 		return
 	end
 
-	local tableCmds = {}
-	table.insert(tableCmds, DeviceCmd( string.sub(id, 4), tableCommandTypes.CMD_SCENE_ON, 103, 0 ))
-
-	local data = string.sub(id, 9, 9) .. string.char(0, 0x03, 0)
-	sendCommand(tableMsgTypes.LIGHTING_X10.type, tableMsgTypes.LIGHTING_X10.subType, data, tableCmds)
-
+	cmd = tableCommandTypes.CMD_SCENE_ON
+	--local data = string.sub(id, 9, 9)..string.char(0, 0x03, 0)
+	local data = msgType.createMsgDataFunction(altid, 'Bright')
+	if (data)
+		then
+		local tableCmds = {}
+		--table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, nil, 0 ))
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, 103, 0 ))
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
+	else
+		warning('bright: createMsgDataFunction failed for altid '..altid)
+	end
 end
 
 function groupOff(deviceNum)
-
-	local id = luup.devices[deviceNum].id
-	debug("groupOff " .. id)
-
-	local category
-	if ((string.len(id) >= 9) and (string.sub(id, 3, 4) == "/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-		then
-		category = tonumber(string.sub(id, 5, 5))
-	else
-		task("Group Off command is not relevant for device " .. id, TASK_ERROR)
+	-- Currently this function is only called as a result of a UI remote button press
+	-- The remotes associated with actual devices omit the unit code in the altid
+	local altid, subAltid, devType
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	if not( subAltid ) then
+		warning("groupOff: invalid altid: "..altid)
+		task("GroupOff: invalid altid: "..altid, TASK_ERROR)
 		return
 	end
+	debug("groupOff-> altid: "..altid.." subAltid: "..(subAltid or 'nil'))
+	if not (string.find(subAltid, 'L[1256]')) then
+		warning("groupOff: groupOff command not valid for altid: "..altid)
+		task("Group Off command is not relevant for device "..altid, TASK_ERROR)
+		return
+	end
+	devType = string.match(altid, '([^/]+)')
 
-	local cmd
-	local type
-	local subType
-	local remoteId
-	local cmdCode
+	local msgType, category, cmd, formatAltid, device
 	local unitCodeMin = nil
 	local unitCodeMax = nil
-	local altid, formatAltid, device2
 	local data = nil
 	local tableCmds = {}
 
-	if (category == 1)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_OFF
-		type = tableMsgTypes.LIGHTING_ARC.type
-		subType = tonumber(string.sub(id, 7, 7), 16)
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s%02d"
-				break
-			end
-		end
-		data = string.sub(id, 9, 9) .. string.char(0, 0x05, 0)
-	elseif (category == 2)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_OFF
-		type = tableMsgTypes.LIGHTING_AC.type
-		subType = tonumber(string.sub(id, 7, 7))
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s/%02d"
-				break
-			end
-		end
-		remoteId = string.sub(id, 9, 15)
-		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-		tonumber(string.sub(remoteId, 2, 3), 16),
-		tonumber(string.sub(remoteId, 4, 5), 16),
-		tonumber(string.sub(remoteId, 6, 7), 16),
-		0, 0x03, 0, 0)
-	elseif (category == 5)
-		then
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		-- This is a hack to handle subtypes > 15
-		subChar = string.sub(id, 7, 7)
-		if (subChar == "B") then
-			subType = 0x11
-		else
-			subType = tonumber(subchar)
-		end
-		cmdCode = 0x02
-		if (subType == tableMsgTypes.LIGHTING_LIVOLO.subType)
-			then
-			-- Livolo
-			unitCodeMin = 1
-			unitCodeMax = 3
-			id = string.sub(id, 1, #id-2)
-			formatAltid = "%s/%d"
-			cmdCode = 0
-		else
-			if (subType == tableMsgTypes.LIGHTING_LIGHTWARERF.subType)
-				then
-				cmd = tableCommandTypes.CMD_LWRF_SCENE_OFF
-			else
-				cmd = tableCommandTypes.CMD_SCENE_OFF
-			end
-			table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-			for _, v in pairs(tableCategories)
-				do
-				if (string.find(id, v[26]) == 4)
-					then
-					unitCodeMin = v[18]
-					unitCodeMax = v[19]
-					formatAltid = "%s/%02d"
-					break
-				end
-			end
-		end
-		remoteId = string.sub(id, 9, 14)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		0, cmdCode, 0, 0)
-	elseif (category == 6)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_OFF
-		type = tableMsgTypes.LIGHTING_BLYSS.type
-		subType = tonumber(string.sub(id, 7, 7))
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s%d"
-				break
-			end
-		end
-		remoteId = string.sub(id, 9, 12)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16))
-		.. string.sub(id, 14, 14)
-		.. string.char(0, 0x03, 1, 0, 0)
-	else
-		task("Unimpemented lighting type " .. category .. ". Group Off command not sent", TASK_ERROR)
+	msgType = tableMsgBySubID[subAltid]
+	if not (msgType) then
+		warning("groupOff: no msgType found for altid: "..altid)
+		task("GroupOff: no msgType found for altid: "..altid, TASK_ERROR)
+		return
 	end
+	category = tableCategoryBySubAltid[subAltid]
+	if not (category) then
+		warning("groupOff: no category found for altid: "..altid)
+		task("GroupOff: no category found for altid: "..altid, TASK_ERROR)
+		return
+	end
+	data = msgType.createMsgDataFunction(altid, 'GroupOff')
+	if (msgType == tableMsgTypes.LIGHTING_LIGHTWARERF) then
+		cmd = tableCommandTypes.CMD_LWRF_SCENE_OFF
+	else
+		cmd = tableCommandTypes.CMD_SCENE_OFF
+	end
+	if (msgType == tableMsgTypes.LIGHTING_LIVOLO) then
+		unitCodeMin = 1
+		unitCodeMax = 3
+		formatAltid = "%s/%d"
+	else
+		if (category.unitCodeLimits and category.unitCodeLimits.minimum and category.unitCodeLimits.maximum) then
+			unitCodeMin = category.unitCodeLimits.minimum
+			unitCodeMax = category.unitCodeLimits.maximum
+		else
+			warning("groupOff: no unitCodeLimits found for altid: "..altid)
+		end
+		if (string.find(subAltid, 'L6')) then
+			formatAltid = "%s%d"
+		elseif (string.find(subAltid, 'L1')) then
+			formatAltid = "%s%02d"
+		else
+			formatAltid = "%s/%02d"
+		end
+	end
+	-- This will update the remote UI device
+	table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, 100, 0 ))
 
-	if (data ~= nil)
+	if (data)
 		then
-		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
+		if (unitCodeMin and unitCodeMax)
 			then
+			local searchId
 			for i = unitCodeMin, unitCodeMax
 				do
-				altid = string.format(formatAltid, string.sub(id, 4), i)
-				device2 = findChild(THIS_DEVICE, altid, nil)
-				if (device2 ~= nil)
+				searchId = string.format(formatAltid, string.sub(altid, 4), i)
+				device = findChild(THIS_DEVICE, searchId, nil)
+				if (device)
 					then
-					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_OFF, nil, 0 ))
+					table.insert(tableCmds, DeviceCmd( searchId, tableCommandTypes.CMD_OFF, nil, 0 ))
 				end
 			end
 		end
-		sendCommand(type, subType, data, tableCmds)
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
 	end
 
 end
 
 function groupOn(deviceNum)
-
-	local id = luup.devices[deviceNum].id
-	debug("groupOn " .. id)
-
-	local category
-	if ((string.len(id) >= 9) and (string.sub(id, 1, 4) == "RC/L") and (string.sub(id, 6, 6) == ".") and (string.sub(id, 8, 8) == "/"))
-		then
-		category = tonumber(string.sub(id, 5, 5))
-	else
-		task("Group On command is not relevant for device " .. id, TASK_ERROR)
+	-- Currently this function is only called as a result of a UI remote button press
+	-- The remotes associated with actual devices omit the unit code in the altid
+	local altid, subAltid, devType
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("groupOn-> altid: "..altid.." subAltid: "..(subAltid or 'nil'))
+	if not( subAltid ) then
+		warning("groupOn: invalid altid: "..altid)
+		task("groupOn: invalid altid: "..altid, TASK_ERROR)
 		return
 	end
+	if not (string.find(subAltid, 'L[1256]')) then
+		warning("groupOn: groupOff command not valid for altid: "..altid)
+		task("Group On command is not relevant for device "..altid, TASK_ERROR)
+		return
+	end
+	devType = string.match(altid, '([^/]+)')
 
-	local cmd
-	local type
-	local subType
-	local remoteId
+	local msgType, category, cmd, formatAltid, device
 	local unitCodeMin = nil
 	local unitCodeMax = nil
-	local altid, formatAltid, device2
 	local data = nil
 	local tableCmds = {}
 
-	if (category == 1)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_ON
-		type = tableMsgTypes.LIGHTING_ARC.type
-		subType = tonumber(string.sub(id, 7, 7), 16)
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s%02d"
-				break
-			end
-		end
-		data = string.sub(id, 9, 9) .. string.char(0, 0x06, 0)
-	elseif (category == 2)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_ON
-		type = tableMsgTypes.LIGHTING_AC.type
-		subType = tonumber(string.sub(id, 7, 7))
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s/%02d"
-				break
-			end
-		end
-		remoteId = string.sub(id, 9, 15)
-		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-		tonumber(string.sub(remoteId, 2, 3), 16),
-		tonumber(string.sub(remoteId, 4, 5), 16),
-		tonumber(string.sub(remoteId, 6, 7), 16),
-		0, 0x04, 0, 0)
-	elseif (category == 5)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_ON
-		type = tableMsgTypes.LIGHTING_LIGHTWARERF.type
-		-- This is a hack to handle subtypes > 15
-		subChar = string.sub(id, 7, 7)
-		if (subChar == "B") then
-			subType = 0x11
-		else
-			subType = tonumber(subchar)
-		end
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s/%02d"
-				break
-			end
-		end
-		remoteId = string.sub(id, 9, 14)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		0, 0x03, 0, 0)
-	elseif (category == 6)
-		then
-		cmd = tableCommandTypes.CMD_SCENE_ON
-		type = tableMsgTypes.LIGHTING_BLYSS.type
-		subType = tonumber(string.sub(id, 7, 7))
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), cmd, 100, 0 ))
-		for _, v in pairs(tableCategories)
-			do
-			if (string.find(id, v[26]) == 4)
-				then
-				unitCodeMin = v[18]
-				unitCodeMax = v[19]
-				formatAltid = "%s%d"
-				break
-			end
-		end
-		remoteId = string.sub(id, 9, 12)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16))
-		.. string.sub(id, 14, 14)
-		.. string.char(0, 0x02, 1, 0, 0)
-	else
-		task("Unimpemented lighting type " .. category .. ". Group On command not sent", TASK_ERROR)
+	msgType = tableMsgBySubID[subAltid]
+	if not (msgType) then
+		warning("groupOn: no msgType found for altid: "..altid)
+		task("groupOn: no msgType found for altid: "..altid, TASK_ERROR)
+		return
 	end
+	category = tableCategoryBySubAltid[subAltid]
+	if not (category) then
+		warning("groupOn: no category found for altid: "..altid)
+		task("groupOn: no category found for altid: "..altid, TASK_ERROR)
+		return
+	end
+	data = msgType.createMsgDataFunction(altid, 'GroupOn')
+	cmd = tableCommandTypes.CMD_SCENE_ON
+	if (category.unitCodeLimits and category.unitCodeLimits.minimum and category.unitCodeLimits.maximum) then
+		unitCodeMin = category.unitCodeLimits.minimum
+		unitCodeMax = category.unitCodeLimits.maximum
+	else
+		warning("groupOn: no unitCodeLimits found for altid: "..altid)
+	end
+	if (string.find(subAltid, 'L6')) then
+		formatAltid = "%s%d"
+	elseif (string.find(subAltid, 'L1')) then
+		formatAltid = "%s%02d"
+	else
+		formatAltid = "%s/%02d"
+	end
+	-- This will update the remote UI device
+	table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, 100, 0 ))
 
-	if (data ~= nil)
+	if (data)
 		then
-		if (unitCodeMin ~= nil and unitCodeMax ~= nil)
+		if (unitCodeMin and unitCodeMax)
 			then
+			local searchId
 			for i = unitCodeMin, unitCodeMax
 				do
-				altid = string.format(formatAltid, string.sub(id, 4), i)
-				device2 = findChild(THIS_DEVICE, altid, nil)
-				if (device2 ~= nil)
+				searchId = string.format(formatAltid, string.sub(altid, 4), i)
+				device = findChild(THIS_DEVICE, searchId, nil)
+				if (device)
 					then
-					table.insert(tableCmds, DeviceCmd( altid, tableCommandTypes.CMD_ON, nil, 0 ))
+					table.insert(tableCmds, DeviceCmd( searchId, tableCommandTypes.CMD_ON, nil, 0 ))
 				end
 			end
 		end
-		sendCommand(type, subType, data, tableCmds)
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
 	end
 
 end
 
 function mood(deviceNum, param)
-
-	local id = luup.devices[deviceNum].id
-	debug("mood" .. param .. " " .. id)
-
-	if ((string.len(id) ~= 14) or (string.sub(id, 1, 8) ~= "RC/L5.0/"))
-		then
-		task("Mood command is not relevant for device " .. id, TASK_ERROR)
+	local altid, subAltid, devType, msgType
+	altid = luup.devices[deviceNum].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("mood-> altid: "..altid.." subAltid: "..(subAltid or 'nil'))
+	if not( subAltid ) then
+		warning("mood: invalid altid: "..altid)
+		task("mood: invalid altid: "..altid, TASK_ERROR)
 		return
 	end
-
-	local cmdCode = nil
+	devType = string.match(altid, '([^/]+)')
+	msgType = tableMsgBySubID[subAltid]
+	if not (msgType) then
+		warning("mood: no msgType found for altid: "..altid)
+		task("mood: no msgType found for altid: "..altid, TASK_ERROR)
+		return
+	end
+	if (msgType ~= tableMsgTypes.LIGHTING_LIGHTWARERF)
+		then
+		warning("Mood command is not relevant for device: "..altid)
+		task("Mood command is not relevant for device "..altid, TASK_ERROR)
+		return
+	end
+	local mood2cmdCode = {
+		0x03,
+		0x04,
+		0x05,
+		0x06,
+	}
 
 	local value = tonumber(param)
-	if (value == 1)
-		then
-		cmdCode = 0x03
-	elseif (value == 2)
-		then
-		cmdCode = 0x04
-	elseif (value == 3)
-		then
-		cmdCode = 0x05
-	elseif (value == 4)
-		then
-		cmdCode = 0x06
-	elseif (value == 5)
-		then
-		cmdCode = 0x07
-	else
-		task("action Mood: unexpected value for argument", TASK_ERROR)
+	local cmdCode = mood2cmdCode[value]
+	if not (cmdCode) then
+		warning("action Mood: unexpected value for argument: "..(param or 'nil'))
+		task("action Mood: unexpected value for argument: "..(param or 'nil'), TASK_ERROR)
 		return
-	end
-
-	if (cmdCode ~= nil)
-		then
+	else
 		local tableCmds = {}
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), tableCommandTypes.CMD_LWRF_SCENE_ON, 110+value, 0 ))
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), tableCommandTypes.CMD_LWRF_SCENE_ON, 110+value, 0 ))
 
-		local remoteId = string.sub(id, 9, 14)
+		local remoteId = string.sub(altid, 9, 14)
 		local data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
 		tonumber(string.sub(remoteId, 3, 4), 16),
 		tonumber(string.sub(remoteId, 5, 6), 16),
 		0, cmdCode, 0, 0)
-		sendCommand(tableMsgTypes.LIGHTING_LIGHTWARERF.type, tableMsgTypes.LIGHTING_LIGHTWARERF.subType, data, tableCmds)
+		sendCommand(tableMsgTypes.LIGHTING_LIGHTWARERF.pktType, tableMsgTypes.LIGHTING_LIGHTWARERF.subType, data, tableCmds)
 	end
 
 end
@@ -5719,17 +5898,17 @@ end
 function sendATICode(deviceNum, code)
 
 	local id = luup.devices[deviceNum].id
-	debug("sendATICode " .. id .. " code " .. code)
+	debug("sendATICode "..id.." code "..code)
 
 	if ((string.len(id) ~= 9) or (string.sub(id, 1, 5) ~= "RC/RC") or (string.sub(id, 7, 7) ~= "/"))
 		then
-		task("Send code is not relevant for device " .. id, TASK_ERROR)
+		task("Send code is not relevant for device "..id, TASK_ERROR)
 		return
 	end
 	local subType = tonumber(string.sub(id, 6, 6))
 	if (subType >= 0x4)
 		then
-		task("Send code is not relevant for device " .. id, TASK_ERROR)
+		task("Send code is not relevant for device "..id, TASK_ERROR)
 		return
 	end
 
@@ -5738,20 +5917,20 @@ function sendATICode(deviceNum, code)
 
 	local data = string.char(tonumber(string.sub(id, 8, 9), 16), tonumber(code), 0)
 	-- TODO toggle
-	sendCommand(tableMsgTypes.ATI_REMOTE_WONDER.type, subType, data, tableCmds)
+	sendCommand(tableMsgTypes.ATI_REMOTE_WONDER.pktType, subType, data, tableCmds)
 
 end
 
 function setModeTarget(deviceNum, NewModeTarget)
 	local id = luup.devices[deviceNum].id
-	debug("setModeTarget " .. id .. " target " .. NewModeTarget)
+	debug("setModeTarget "..id.." target "..NewModeTarget)
 
 	local category
 	if ((string.len(id) == 15) and (string.sub(id, 1, 5) == "HT/HT") and (string.sub(id, 7, 7) == ".")  and (string.sub(id, 9, 9) == "/"))
 		then
 		category = 3
 	else
-		warning("Unexpected device id " .. id .. ". Set Mode command not sent")
+		warning("Unexpected device id "..id..". Set Mode command not sent")
 		return
 	end
 
@@ -5762,7 +5941,7 @@ function setModeTarget(deviceNum, NewModeTarget)
 
 	if (category == 3) -- Mertik
 		then
-		type = tableMsgTypes.HEATER3_MERTIK1.type
+		type = tableMsgTypes.HEATER3_MERTIK1.pktType
 		subType = tonumber(string.sub(id, 8, 8))
 		local cmdCode = nil
 		local currentState = getVariable(deviceNum, tabVars.VAR_HEATER) or "Off"
@@ -5800,7 +5979,7 @@ function setModeTarget(deviceNum, NewModeTarget)
 		cmdCode, 0)
 	end
 
-	if (data ~= nil)
+	if (data)
 		then
 		sendCommand(type, subType, data, tableCmds)
 	end
@@ -5808,56 +5987,52 @@ function setModeTarget(deviceNum, NewModeTarget)
 end
 
 function toggleState(deviceNum)
-	debug("toggleState: " .. deviceNum)
-	local devType = string.sub(luup.devices[deviceNum].id, 1, 2)
-	debug("Device type: " .. devType)
+	debug("toggleState: "..deviceNum)
+	local altId = luup.devices[deviceNum].id
+	local devType = string.sub(altId, 1, 2)
+	local subAltid = string.match(altId, '/([^/\.]+)')
+ 	local currentState, newTargetState
+
+	debug("Device type: "..devType.." subType: "..(subAltid or 'nil'))
 
 	-- Only implemented for Sonoff switches, Light Switches and Heaters so far
-	if (devType == "LS")
-		then
-		local curStat = getVariable(deviceNum, tabVars.VAR_LIGHT) or "0"
-		local newTargetState
-		if (curStat == "0")
-			then
-			newTargetState = "1"
+	if (devType == "LS") then
+		if (subAltid == "L4") then
+			currentState = getVariable(deviceNum,tabVars.VAR_STATE) or "0"
+			if (currentState == "0") then
+				newTargetState = "1"
+			else
+				newTargetState = "0"
+			end
+			setVariable(deviceNum, tabVars.VAR_STATE, newTargetState)
 		else
-			newTargetState = "0"
-		end
+			currentState = getVariable(deviceNum, tabVars.VAR_LIGHT) or "0"
+			if (currentState == "0") then
+				newTargetState = "1"
+			else
+				newTargetState = "0"
+			end
+		end	
 		switchPower(deviceNum, newTargetState)
-	elseif (devType == "HT")
-		then
-		local curStat = getVariable(deviceNum, tabVars.VAR_HEATER) or "Off"
-		local NewModeTarget
-		if (curStat == "Off")
-			then
-			NewModeTarget = "HeatOn"
+	elseif (devType == "HT") then
+		currentState = getVariable(deviceNum, tabVars.VAR_HEATER) or "Off"
+		if (currentState == "Off") then
+			newTargetState = "HeatOn"
 		else
-			NewModeTarget = "Off"
+			newTargetState = "Off"
 		end
-		setModeTarget(deviceNum, NewModeTarget)
-	elseif (devType == "L4")
-		then
-		local currentState = getVariable(deviceNum,tabVars.VAR_STATE) or "0"
-		local newTargetState
-		if (currentState == "0")
-			then
-			newTargetState = "1"
-		else
-			newTargetState = "0"
-		end
-		setVariable(deviceNum, tabVars.VAR_STATE, newTargetState)
-		-- Send a command to toggle the switch state
-		switchPower(deviceNum, newTargetState)
-
+		setModeTarget(deviceNum, newTargetState)
+	elseif (devType == "FN") then
+		controlFan(deviceNum, "Light")
 	end
 end
 
 function createNewDevice(category, deviceType, name, id, houseCode, groupCode, unitCode, systemCode, channel)
-	debug("createNewDevice " .. (category or "nil") .. " " .. (deviceType or "nil"))
+	debug("createNewDevice->category: "..(category or "nil").." device type: "..(deviceType or "nil"))
 
 	if (category == nil or tableCategories[category] == nil)
 		then
-		warning("action CreateNewDevice: invalid value for the Category argument")
+		warning("action CreateNewDevice: invalid value for the Category argument: "..(category or 'nil'))
 		task("CreateNewDevice: invalid arguments", TASK_ERROR)
 		return
 	end
@@ -5869,18 +6044,20 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 		then
 		warning("action CreateNewDevice: missing value for the DeviceType argument")
 		valid = false
-	elseif (deviceType ~= "SWITCH_LIGHT" and deviceType ~= "DIMMABLE_LIGHT"
-		and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
-		and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
+	elseif (deviceType ~= "LIGHT" and deviceType ~= "DIMMER"
+		and deviceType ~= "MOTION" and deviceType ~= "DOOR"
+		and deviceType ~= "LIGHT_LEVEL" and deviceType ~= "COVER"
+		and deviceType ~= "FAN")
 		then
 		warning("action CreateNewDevice: invalid value for the DeviceType argument")
 		valid = false
-	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category].isaLIGHT)
-		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category].isaDIMMER)
-		or (deviceType == "MOTION_SENSOR" and not tableCategories[category].isaMOTION_SENSOR)
-		or (deviceType == "DOOR_SENSOR" and not tableCategories[category].isaDOOR_SENSOR)
-		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category].isaLIGHT_SENSOR)
-		or (deviceType == "WINDOW_COVERING" and not tableCategories[category].isaWINDOW_COVERING))
+	elseif ((deviceType == "LIGHT" and not tableCategories[category].isaLIGHT)
+		or (deviceType == "DIMMER" and not tableCategories[category].isaDIMMER)
+		or (deviceType == "MOTION" and not tableCategories[category].isaMOTION)
+		or (deviceType == "DOOR" and not tableCategories[category].isaDOOR)
+		or (deviceType == "LIGHT_LEVEL" and not tableCategories[category].isaLIGHT_LEVEL)
+		or (deviceType == "COVER" and not tableCategories[category].isaCOVER)
+		or (deviceType == "FAN" and not tableCategories[category].isaFAN))
 		then
 		warning("action CreateNewDevice: DeviceType value not accepted for this category")
 		valid = false
@@ -5896,7 +6073,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the Id argument")
 			valid = false
-		elseif (tableCategories[category].idLimits.minimum ~= nil and tableCategories[category].idLimits.maximum ~= nil
+		elseif (tableCategories[category].idLimits.minimum and tableCategories[category].idLimits.maximum
 			and (tonumber(id) < tableCategories[category].idLimits.minimum
 			or tonumber(id) > tableCategories[category].idLimits.maximum))
 			then
@@ -5918,7 +6095,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the HouseCode argument")
 			valid = false
-		elseif (tableCategories[category].houseCodeLimits.minimum ~= nil and tableCategories[category].houseCodeLimits.maximum ~= nil
+		elseif (tableCategories[category].houseCodeLimits.minimum and tableCategories[category].houseCodeLimits.maximum
 			and (string.byte(houseCode) < tableCategories[category].houseCodeLimits.minimum
 			or string.byte(houseCode) > tableCategories[category].houseCodeLimits.maximum))
 			then
@@ -5940,7 +6117,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the GroupCode argument")
 			valid = false
-		elseif (tableCategories[category].groupCodeLimits.minimum ~= nil and tableCategories[category].groupCodeLimits.maximum ~= nil
+		elseif (tableCategories[category].groupCodeLimits.minimum and tableCategories[category].groupCodeLimits.maximum
 			and (string.byte(groupCode) < tableCategories[category].groupCodeLimits.minimum
 			or string.byte(groupCode) > tableCategories[category].groupCodeLimits.maximum))
 			then
@@ -5962,7 +6139,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the UnitCode argument")
 			valid = false
-		elseif (tableCategories[category].unitCodeLimits.minimum ~= nil and tableCategories[category].unitCodeLimits.maximum ~= nil
+		elseif (tableCategories[category].unitCodeLimits.minimum and tableCategories[category].unitCodeLimits.maximum
 			and (tonumber(unitCode) < tableCategories[category].unitCodeLimits.minimum
 			or tonumber(unitCode) > tableCategories[category].unitCodeLimits.maximum))
 			then
@@ -5984,7 +6161,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the SystemCode argument")
 			valid = false
-		elseif (tableCategories[category].systemCodeLimits.minimum ~= nil and tableCategories[category].systemCodeLimits.maximum ~= nil
+		elseif (tableCategories[category].systemCodeLimits.minimum and tableCategories[category].systemCodeLimits.maximum
 			and (tonumber(systemCode) < tableCategories[category].systemCodeLimits.minimum
 			or tonumber(systemCode) > tableCategories[category].systemCodeLimits.maximum))
 			then
@@ -6006,7 +6183,7 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 			then
 			warning("action CreateNewDevice: invalid value for the Channel argument")
 			valid = false
-		elseif (tableCategories[category].channelLimits.minimum ~= nil and tableCategories[category].channelLimits.maximum ~= nil
+		elseif (tableCategories[category].channelLimits.minimum and tableCategories[category].channelLimits.maximum
 			and (tonumber(channel) < tableCategories[category].channelLimits.minimum
 			or tonumber(channel) > tableCategories[category].channelLimits.maximum))
 			then
@@ -6030,50 +6207,30 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 	end
 
 	local devType
-	if (deviceType == "SWITCH_LIGHT")
-		then
-		devType = "LIGHT"
-		-- This is part of the SONOFF hack
-		if (category == "SONOFF")
-			then
-			devType = "SWITCH_TOGGLE"
-		end
-	elseif (deviceType == "DIMMABLE_LIGHT")
-		then
-		devType = "DIMMER"
-	elseif (deviceType == "MOTION_SENSOR")
-		then
-		devType = "MOTION"
-	elseif (deviceType == "DOOR_SENSOR")
-		then
-		devType = "DOOR"
-	elseif (deviceType == "LIGHT_SENSOR")
-		then
-		devType = "LIGHT_LEVEL"
-	elseif (deviceType == "WINDOW_COVERING")
-		then
-		devType = "COVER"
+	if (deviceType == "LIGHT" and category == "SONOFF") then
+		devType = "SWITCH_TOGGLE"
+	else
+		devType = deviceType
 	end
-
 	local devices = {}
-	local altid = string.format(tableCategories[category].altidFmt, tableCategories[category].subID,
+	local altid = string.format(tableCategories[category].altidFmt, tableCategories[category].subAltid,
 	params[1], params[2], params[3])
 	if (findChild(THIS_DEVICE, altid, nil) == nil)
 		then
 		table.insert(devices, { name, nil, altid, devType })
 	end
-	if (tableCategories[category].type2 ~= nil and tableCategories[category].altid2Fmt ~= nil)
+	if (tableCategories[category].type2 and tableCategories[category].altid2Fmt)
 		then
-		altid = string.format(tableCategories[category].altid2Fmt, tableCategories[category].subID,
+		altid = string.format(tableCategories[category].altid2Fmt, tableCategories[category].subAltid,
 		params[1], params[2], params[3])
 		if (findChild(THIS_DEVICE, altid, nil) == nil)
 			then
 			table.insert(devices, { name, nil, altid, tableCategories[category].type2 })
 		end
 	end
-	if (tableCategories[category].type3 ~= nil and tableCategories[category].altid3Fmt ~= nil)
+	if (tableCategories[category].type3 and tableCategories[category].altid3Fmt)
 		then
-		altid = string.format(tableCategories[category].altid3Fmt, tableCategories[category].subID,
+		altid = string.format(tableCategories[category].altid3Fmt, tableCategories[category].subAltid,
 		params[1], params[2], params[3])
 		if (findChild(THIS_DEVICE, altid, nil) == nil)
 			then
@@ -6090,9 +6247,9 @@ end
 
 function changeDeviceType(deviceId, deviceType, name)
 
-	debug("changeDeviceType " .. (deviceId or "nil") .. " " .. (deviceType or "nil"))
+	debug("changeDeviceType "..(deviceId or "nil").." "..(deviceType or "nil"))
 
-	if (deviceId ~= nil)
+	if (deviceId)
 		then
 		deviceId = tonumber(deviceId)
 	end
@@ -6104,7 +6261,7 @@ function changeDeviceType(deviceId, deviceType, name)
 		return
 	elseif (luup.devices[deviceId] == nil)
 		then
-		warning("action ChangeDeviceType: the device " .. deviceId .. " does not exist")
+		warning("action ChangeDeviceType: the device "..deviceId.." does not exist")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
 	end
@@ -6114,7 +6271,7 @@ function changeDeviceType(deviceId, deviceType, name)
 	local category = nil
 	for k, v in pairs(tableCategories)
 		do
-		if (string.find(altid, v[26]) == 1)
+		if (string.find(altid, v.subAltid) == 1)
 			then
 			category = k
 			break
@@ -6122,7 +6279,7 @@ function changeDeviceType(deviceId, deviceType, name)
 	end
 	if (category == nil)
 		then
-		warning("action ChangeDeviceType: invalid altid for the device " .. deviceId)
+		warning("action ChangeDeviceType: invalid altid for the device "..deviceId)
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
 	end
@@ -6138,12 +6295,12 @@ function changeDeviceType(deviceId, deviceType, name)
 	end
 	if (currentType == nil or currentType.jsDeviceType == nil)
 		then
-		warning("action ChangeDeviceType: the device type cannot be changed for the device " .. deviceId)
+		warning("action ChangeDeviceType: the device type cannot be changed for the device "..deviceId)
 		task("ChangeDeviceType: forbidden for this device", TASK_ERROR)
 		return
 	elseif (deviceType == currentType.jsDeviceType and luup.devices[deviceId].device_type == currentType.deviceType)
 		then
-		warning("action ChangeDeviceType: the device " .. deviceId .. " has already the requested type")
+		warning("action ChangeDeviceType: the device "..deviceId.." has already the requested type")
 		task("ChangeDeviceType: type is ok", TASK_ERROR)
 		return
 	end
@@ -6153,52 +6310,32 @@ function changeDeviceType(deviceId, deviceType, name)
 		warning("action ChangeDeviceType: missing value for the DeviceType argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
-	elseif (deviceType ~= "SWITCH_LIGHT" and deviceType ~= "DIMMABLE_LIGHT"
-		and deviceType ~= "MOTION_SENSOR" and deviceType ~= "DOOR_SENSOR"
-		and deviceType ~= "LIGHT_SENSOR" and deviceType ~= "WINDOW_COVERING")
+	elseif (deviceType ~= "LIGHT" and deviceType ~= "DIMMER"
+		and deviceType ~= "MOTION" and deviceType ~= "DOOR"
+		and deviceType ~= "LIGHT_LEVEL" and deviceType ~= "COVER")
 		then
 		warning("action ChangeDeviceType: invalid value for the DeviceType argument")
 		task("ChangeDeviceType: invalid arguments", TASK_ERROR)
 		return
-	elseif ((deviceType == "SWITCH_LIGHT" and not tableCategories[category].isaLIGHT)
-		or (deviceType == "DIMMABLE_LIGHT" and not tableCategories[category].isaDIMMER)
-		or (deviceType == "MOTION_SENSOR" and not tableCategories[category].isaMOTION_SENSOR)
-		or (deviceType == "DOOR_SENSOR" and not tableCategories[category].isaDOOR_SENSOR)
-		or (deviceType == "LIGHT_SENSOR" and not tableCategories[category].isaLIGHT_SENSOR)
-		or (deviceType == "WINDOW_COVERING" and not tableCategories[category].isaWINDOW_COVERING))
+	elseif ((deviceType == "LIGHT" and not tableCategories[category].isaLIGHT)
+		or (deviceType == "DIMMER" and not tableCategories[category].isaDIMMER)
+		or (deviceType == "MOTION" and not tableCategories[category].isaMOTION)
+		or (deviceType == "DOOR" and not tableCategories[category].isaDOOR)
+		or (deviceType == "LIGHT_LEVEL" and not tableCategories[category].isaLIGHT_LEVEL)
+		or (deviceType == "COVER" and not tableCategories[category].isaCOVER))
 		then
-		warning("action ChangeDeviceType: DeviceType value not accepted for the device " .. deviceId)
+		warning("action ChangeDeviceType: DeviceType value not accepted for the device "..deviceId)
 		task("ChangeDeviceType: new type forbidden for this device", TASK_ERROR)
 		return
 	end
 
-	local devType
-	if (deviceType == "SWITCH_LIGHT")
-		then
-		devType = "LIGHT"
-	elseif (deviceType == "DIMMABLE_LIGHT")
-		then
-		devType = "DIMMER"
-	elseif (deviceType == "MOTION_SENSOR")
-		then
-		devType = "MOTION"
-	elseif (deviceType == "DOOR_SENSOR")
-		then
-		devType = "DOOR"
-	elseif (deviceType == "LIGHT_SENSOR")
-		then
-		devType = "LIGHT_LEVEL"
-	elseif (deviceType == "WINDOW_COVERING")
-		then
-		devType = "COVER"
-	end
-
+	local devType = deviceType
 	local newName = luup.devices[deviceId].description
-	if (name ~= nil and name ~= "")
+	if (name and name ~= "")
 		then
 		newName = name
 	end
-	debug("changeDeviceType " .. altid .. " " .. devType .. " "  .. newName)
+	debug("changeDeviceType "..altid.." "..devType.." "..newName)
 	updateManagedDevices(nil,
 		{ { newName,
 			luup.devices[deviceId].room_num,
@@ -6210,10 +6347,10 @@ end
 
 function deleteDevices(listDevices, disableCreation)
 
-	debug("deleteDevices " .. (listDevices or "nil") .. " " .. (disableCreation or "nil"))
+	debug("deleteDevices "..(listDevices or "nil").." "..(disableCreation or "nil"))
 
 	local tableDeletion = {}
-	if (listDevices ~= nil)
+	if (listDevices)
 		then
 		for value in string.gmatch(listDevices, "[%u%d/.]+")
 			do
@@ -6229,142 +6366,55 @@ function deleteDevices(listDevices, disableCreation)
 
 end
 
-function sendUnusualCommand(deviceId, commandType)
+function sendUnusualCommand(deviceId, commandName)
 
-	debug("sendUnusualCommand " .. (deviceId or "nil") .. " " .. (commandType or "nil"))
+	debug("sendUnusualCommand->Device number: "..(deviceId or "nil").." Command: "..(commandName or "nil"))
 
-	if (deviceId ~= nil)
+	if (deviceId)
 		then
 		deviceId = tonumber(deviceId)
 	end
-
-	if (deviceId == nil)
+	if not (deviceId)
 		then
-		warning("action SendCommand: missing value for the DeviceId argument")
-		task("SendCommand: invalid arguments", TASK_ERROR)
+		warning("sendUnusualCommand: missing value for the DeviceId argument")
+		task("sendUnusualCommand: invalid arguments", TASK_ERROR)
 		return
-	elseif (luup.devices[deviceId] == nil)
+	elseif not (luup.devices[deviceId])
 		then
-		warning("action SendCommand: the device " .. deviceId .. " does not exist")
-		task("SendCommand: invalid arguments", TASK_ERROR)
+		warning("sendUnusualCommand: the device "..deviceId.." does not exist")
+		task("sendUnusualCommand: invalid arguments", TASK_ERROR)
 		return
-	end
-
-	local id = luup.devices[deviceId].id
-
-	local tableUnusualCmds = {
-		{ "L5.1/", "LEARN", tableMsgTypes.LIGHTING_EMW100.type, tableMsgTypes.LIGHTING_EMW100.subType, 0x02 },
-		{ "L3.0/", "PROGRAM", tableMsgTypes.LIGHTING_KOPPLA.type, tableMsgTypes.LIGHTING_KOPPLA.subType, 0x1C },
-		{ "C0/", "PROGRAM", tableMsgTypes.CURTAIN_HARRISON.type, tableMsgTypes.CURTAIN_HARRISON.subType, 0x03 },
-		{ "B0/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T0.type, tableMsgTypes.BLIND_T0.subType, 0x03 },
-		{ "B1/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T1.type, tableMsgTypes.BLIND_T1.subType, 0x03 },
-		{ "B2/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T2.type, tableMsgTypes.BLIND_T2.subType, 0x03 },
-		{ "B3/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T3.type, tableMsgTypes.BLIND_T3.subType, 0x03 },
-		{ "B4/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T4.type, tableMsgTypes.BLIND_T4.subType, 0x03 },
-		{ "B6/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T6.type, tableMsgTypes.BLIND_T6.subType, 0x03 },
-		{ "B7/", "CONFIRM_PAIR", tableMsgTypes.BLIND_T7.type, tableMsgTypes.BLIND_T7.subType, 0x03 },
-		{ "RFY0/", "PROGRAM", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x07 },
-		{ "RFY0/", "LOWER_LIMIT", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x04 },
-		{ "RFY0/", "UPPER_LIMIT", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x02 },
-		{ "RFY0/", "VENETIAN_US_ANGLE_PLUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x11 },
-		{ "RFY0/", "VENETIAN_US_ANGLE_MINUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x12 },
-		{ "RFY0/", "VENETIAN_EU_ANGLE_PLUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x0F },
-		{ "RFY0/", "VENETIAN_EU_ANGLE_MINUS", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x10 },
-		{ "RFY0/", "ENABLE_DETECTOR", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x13 },
-		{ "RFY0/", "DISABLE_DETECTOR", tableMsgTypes.RFY0.type, tableMsgTypes.RFY0.subType, 0x14 }
-	}
-
-	local idxCmd = nil
-	for k, v in pairs(tableUnusualCmds)
-		do
-		if ((string.find(id, v[1], 4) == 4) and (commandType == v[2]))
-			then
-			idxCmd = k
-			break
-		end
-	end
-	if (idxCmd == nil)
+	elseif not (commandName)
 		then
-		warning("action SendCommand: invalid command for the device " .. deviceId)
-		task("SendCommand: invalid arguments", TASK_ERROR)
+		warning("sendUnusualCommand: missing value for the commandName argument")
+		task("sendUnusualCommand: missing value for the commandName argument", TASK_ERROR)
 		return
 	end
 
-	debug("Command " .. tableUnusualCmds[idxCmd][1] .. " " .. tableUnusualCmds[idxCmd][2])
-
-	local remoteId
-	local housecode
-	local unitcode
-	local id4
-	local data = nil
-
-	if (idxCmd == 1)
-		then
-		remoteId = string.sub(id, 9, 17)
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		tonumber(string.sub(remoteId, 8, 9)),
-		tableUnusualCmds[idxCmd][5], 0, 0)
-	elseif (idxCmd == 2)
-		then
-		remoteId = tonumber(string.sub(id, 9, 9), 16)
-		unitcode = tonumber(string.sub(id, 10, 11))
-		local channel1 = 0
-		local channel2 = 0
-		if (unitcode >= 1 and unitcode <= 8)
-			then
-			channel1 = 1
-			if (unitcode > 1)
-				then
-				channel1 = bitw.lshift(channel1, unitcode-1)
-			end
-		elseif (unitcode >= 9 and unitcode <= 10)
-			then
-			channel2 = 1
-			if (unitcode > 9)
-				then
-				channel2 = bitw.lshift(channel2, unitcode-9)
-			end
-		end
-		data = string.char(remoteId, channel1, channel2, tableUnusualCmds[idxCmd][5], 0)
-	elseif (idxCmd == 3)
-		then
-		housecode = string.sub(id, 7, 7)
-		unitcode = tonumber(string.sub(id, 8, 9))
-		data = housecode .. string.char(unitcode, tableUnusualCmds[idxCmd][5], 0)
-	elseif (idxCmd >= 4 and idxCmd <= 10)
-		then
-		remoteId = string.sub(id, 7, 12)
-		if (tableUnusualCmds[idxCmd][4] == tableMsgTypes.BLIND_T6.subType or tableUnusualCmds[idxCmd][4] == tableMsgTypes.BLIND_T7.subType)
-			then
-			id4 = tonumber(string.sub(id, 13, 13), 16)
-			unitcode = tonumber(string.sub(id, 15, 16)) % 16
-		else
-			id4 = 0
-			unitcode = tonumber(string.sub(id, 14, 15)) % 16
-		end
-		data = string.char(tonumber(string.sub(remoteId, 1, 2), 16),
-		tonumber(string.sub(remoteId, 3, 4), 16),
-		tonumber(string.sub(remoteId, 5, 6), 16),
-		id4 * 16 + unitcode, tableUnusualCmds[idxCmd][5], 0)
-	elseif (idxCmd >= 11 and idxCmd <= 19)
-		then
-		remoteId = string.sub(id, 9, 13)
-		unitcode = tonumber(string.sub(id, 15, 16))
-		data = string.char(tonumber(string.sub(remoteId, 1, 1), 16),
-		tonumber(string.sub(remoteId, 2, 3), 16),
-		tonumber(string.sub(remoteId, 4, 5), 16),
-		unitcode, tableUnusualCmds[idxCmd][5], 0, 0, 0, 0)
+	local altid, subAltid, msgType, data
+	altid = luup.devices[deviceId].id
+	subAltid = string.match(altid, '/([^/]+/)')
+	debug("sendUnusualCommand-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." command: "..(commandName or 'nil'))
+	if not( subAltid ) then
+		warning("sendUnusualCommand: invalid altid: "..altid)
+		return
 	end
+	data = nil
+	msgType = tableMsgBySubID[subAltid]
+	if not (msgType) then
+		warning("sendUnusualCommand: no msgType found for altid: "..altid)
+		return
+	end
+	data = msgType.createMsgDataFunction(altid, commandName)
 
-	if (data ~= nil)
+	if (data)
 		then
 		local tableCmds = {}
-		table.insert(tableCmds, DeviceCmd( string.sub(id, 4), "", nil, 0 ))
-		sendCommand(tableUnusualCmds[idxCmd][3], tableUnusualCmds[idxCmd][4], data, tableCmds)
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), "", nil, 0 ))
+		sendCommand(msgType.pktType, msgType.subType, data, tableCmds)
+	else
+		warning('sendUnusualCommand: createMsgDataFunction failed for altid '..altid)
 	end
-
 end
 
 function receiveMessage(message)
@@ -6375,12 +6425,12 @@ function receiveMessage(message)
 		return
 	end
 
-	debug("Action ReceiveMessage: message received: " .. message)
+	debug("Action ReceiveMessage: message received: "..message)
 
 	local msg = ""
 	for i = 1, #message / 2
 		do
-		msg = msg .. string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
+		msg = msg..string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
 	end
 
 	decodeMessage(msg)
@@ -6395,12 +6445,12 @@ function sendMessage(message)
 		return
 	end
 
-	debug("Action SendMessage: message to send: " .. message)
+	debug("Action SendMessage: message to send: "..message)
 
 	local msg = ""
 	for i = 1, #message / 2
 		do
-		msg = msg .. string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
+		msg = msg..string.char(tonumber(string.sub(message, i*2-1, i*2), 16))
 	end
 
 	local length = string.byte(msg, 1)
@@ -6417,7 +6467,7 @@ end
 
 function setTemperatureUnit(unit)
 
-	debug("setTemperatureUnit " .. (unit or "nil"))
+	debug("setTemperatureUnit "..(unit or "nil"))
 
 	if (unit ~= "CELCIUS" and unit ~= "FAHRENHEIT")
 		then
@@ -6436,7 +6486,7 @@ end
 
 function setLengthUnit(newUnit)
 
-	debug("setLengthUnit " .. (newUnit or "nil"))
+	debug("setLengthUnit "..(newUnit or "nil"))
 	if (newUnit ~= "MILLIMETERS" and newUnit ~= "INCHES")
 		then
 		task("setLengthUnit: invalid argument", TASK_ERROR)
@@ -6452,7 +6502,7 @@ end
 
 function setSpeedUnit(unit)
 
-	debug("setSpeedUnit " .. (unit or "nil"))
+	debug("setSpeedUnit "..(unit or "nil"))
 	if (unit ~= "KMH" and unit ~= "MPH")
 		then
 		task("SetSpeedUnit: invalid argument", TASK_ERROR)
@@ -6469,13 +6519,13 @@ end
 
 function setVoltage(value)
 
-	debug("setVoltage " .. (value or "nil"))
+	debug("setVoltage "..(value or "nil"))
 	setVariable(THIS_DEVICE, tabVars.VAR_VOLTAGE, value or 230)
 end
 
 function setAutoCreate(enable)
 
-	debug("setAutoCreate " .. (enable or "nil"))
+	debug("setAutoCreate "..(enable or "nil"))
 	if (enable ~= "true" and enable ~= "false")
 		then
 		task("SetAutoCreate: invalid argument", TASK_ERROR)
@@ -6491,7 +6541,7 @@ end
 
 function setDebugLogs(enable)
 
-	debug("setDebugLogs " .. (enable or "nil"))
+	debug("setDebugLogs "..(enable or "nil"))
 	if ((enable == "true") or (enable == "yes"))
 		then
 		enable = true
@@ -6632,13 +6682,13 @@ local function setMode()
 	end
 
 	local data = string.char(3, typeRFX, 0, msg3, msg4, msg5, msg6, 0, 0, 0)
-	sendCommand(tableMsgTypes.MODE_COMMAND.type, tableMsgTypes.MODE_COMMAND.subType, data, nil)
+	sendCommand(tableMsgTypes.MODE_COMMAND.pktType, tableMsgTypes.MODE_COMMAND.subType, data, nil)
 
 end
 
 function setupReceiving(protocol, enable)
 
-	debug("setupReceiving " .. (protocol or "nil") .. " " .. (enable or "nil"))
+	debug("setupReceiving "..(protocol or "nil").." "..(enable or "nil"))
 	local tabProtocols = {
 		UndecodedReceiving = "VAR_UNDECODED_RECEIVING",
 		ImagintronixReceiving = "VAR_IMAGINTRONIX_RECEIVING",
