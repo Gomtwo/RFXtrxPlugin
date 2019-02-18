@@ -218,7 +218,8 @@ local tableCommandTypes = {
 	CMD_HEATER_DOWN = Command("HeaterDown", "HEATER", nil)
 }
 -- These tables are used to translate an action initiated in the UI
---  into a device command code
+--  into a device command code. All of the command codes are here
+--  even though there may not be a UI button to trigger some of them.
 local tableActions2CmdCodes = {
 	-- Lighting devices
 	L1Action2CmdCode = {
@@ -1472,7 +1473,7 @@ local function createCMsgData(altid, action)
 	return data
 end
 
-function createSMsgData(altid, action)
+local function createSMsgData(altid, action)
 	local cmdCode, remoteId, light_num
 	local data = ""
 	light_num = string.sub(altid, 9, 9)
@@ -1765,7 +1766,7 @@ local tableDevices = {}
 
 local function tableSize(theTable)
 	local count = 0
-	for i, v in ipairs(theTable) do
+	for _, _ in ipairs(theTable) do
 		count = count + 1
 	end
 	return count
@@ -2242,9 +2243,9 @@ local function findChildren(parentDevice, deviceType)
 
 	local children = {}
 
-	for k, v in pairs(luup.devices)
+	for _, v in pairs(luup.devices)
 		do
-		if (v.device_type == deviceType)
+		if (v.device_num_parent == parentDevice and v.device_type == deviceType)
 			then
 			children[#children+1] = v.id
 		end
@@ -4499,7 +4500,7 @@ local function decodeSecurityMS(subType, data)
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
-	local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
+	--local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
 
 	if (cmdCode == 0x04)
 		then
@@ -4520,7 +4521,7 @@ local function decodeSecurityMS(subType, data)
 	if (cmd)
 		then
 		table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
-		--		tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION.deviceType, tampered, tableCmds)
+		--tableCmds = handleTamperSwitch(altid, tableDeviceTypes.MOTION.deviceType, tampered, tableCmds)
 	end
 
 	local strength = decodeSignalStrength(data, 5)
@@ -4544,7 +4545,7 @@ local function decodeSecurityDS(subType, data)
 	local cmd = nil
 	local cmdValue = nil
 	local cmdCode = bitw.band(string.byte(data, 4), 0x7F)
-	local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
+	--local tampered = (bitw.band(string.byte(data, 4), 0x80))/128
 	-- If the cmdCode is 4 or 5 then this is really a motion sensor
 	if (cmdCode == 0x04 or cmdCode == 0x05) then
 		tableCmds = decodeSecurityMS(subType, data)
@@ -4568,7 +4569,7 @@ local function decodeSecurityDS(subType, data)
 		if (cmd)
 			then
 			table.insert(tableCmds, DeviceCmd( altid, cmd, cmdValue, 0 ) )
-			--			tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR.deviceType, tampered, tableCmds)
+			--tableCmds = handleTamperSwitch(altid, tableDeviceTypes.DOOR.deviceType, tampered, tableCmds)
 		end
 
 		local strength = decodeSignalStrength(data, 5)
@@ -5253,7 +5254,7 @@ function switchPower(deviceNum, newTargetValue)
 	altid = luup.devices[deviceNum].id
 	subAltid = string.match(altid, '/([^/]+/)')
 	devType = string.match(altid, '([^/]+)')
-	debug("switchPower-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." devType: "..(devType or 'nil'))
+	debug("switchPower-> altid: "..altid.." subAltid: "..(subAltid or 'nil').." devType: "..(devType or 'nil').." newTargetValue: "..(newTargetValue or 'nil'))
 	if not( subAltid ) then
 		warning("switchPower: invalid altid: "..altid)
 		return
@@ -5990,7 +5991,7 @@ function toggleState(deviceNum)
 	debug("toggleState: "..deviceNum)
 	local altId = luup.devices[deviceNum].id
 	local devType = string.sub(altId, 1, 2)
-	local subAltid = string.match(altId, '/([^/\.]+)')
+	local subAltid = string.match(altId, '/([^/.]+)')
  	local currentState, newTargetState
 
 	debug("Device type: "..devType.." subType: "..(subAltid or 'nil'))
