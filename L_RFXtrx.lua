@@ -141,6 +141,11 @@ function Command:__tostring()
 	return("Command.name: "..self.name.." .deviceType: "..self.deviceType..' .variable: '..self.variable or 'nil')
 end
 
+local CmdAction = class(function(a, cmd, action)
+	a.cmd = cmd			-- the command to be acted on for the UI - translates to a variable
+	a.actin = action	-- the associated action, used as a value for a variable
+end)
+
 -- The table defines all commands used by the plugin
 -- Each command object (defined above)
 -- 1) command (a string)
@@ -156,7 +161,7 @@ local tableCommandTypes = {
 	CMD_DIM = Command("Dim", "DIMMER", "VAR_DIMMER"),
 	CMD_DIMLAST = Command("DimLast", "DIMMER", "VAR_DIMMERLAST"),
 	CMD_PROGRAM = Command("Program", nil, nil),
-	CMD_FANLIGHT = Command("Light", "FAN", "VAR_STATE"),
+	CMD_FANLIGHT = Command("Light", "FAN", "VAR_LIGHT"),
 	CMD_REVERSE = Command("Reverse", "FAN", "VAR_REVERSE"),
 	CMD_SPEED = Command("Speed", "FAN", "VAR_SPEED"),
 	CMD_TEMP = Command("Temperature", "TEMP", "VAR_TEMP"),
@@ -474,7 +479,7 @@ local tableActions2CmdCodes = {
 		['LightOn']	= CmdCodeCmd(0x0A, tableCommandTypes.CMD_FANLIGHT),
 		['LightOff']= CmdCodeCmd(0x0B, tableCommandTypes.CMD_FANLIGHT)
 		},
-	FeAction2CmdCode = { -- Seav 
+	FeAction2CmdCode = { -- Seav
 		['T1']		= CmdCodeCmd(0x04, nil),
 		['T2']		= CmdCodeCmd(0x05, nil),
 		['T3']		= CmdCodeCmd(0x06, nil),
@@ -514,6 +519,20 @@ local tableActions2CmdCodes = {
 		['Erase']	= CmdCodeCmd(0x07, nil)
 	}
 }
+-- This table is initialized in deferredStartup
+--  It is used to select a UI cmd uaing a command code received an incoming message
+--  Currently it is only used for fan devices.
+local tableCmdCodes2Commands = {
+	FaCmdCode2Command = {},
+	FbCmdCode2Command = {},
+	FcCmdCode2Command = {},
+	FdCmdCode2Command = {},
+	FeCmdCode2Command = {},
+	FfCmdCode2Command = {},
+	FgCmdCode2Command = {},
+	FhCmdCode2Command = {},
+}
+
 -- A table of JSON filenames associated with device altid prefix.
 -- It is used to set the JSON file in cases where different files
 -- exist for similar devices. This avoids the need for many device
@@ -528,7 +547,8 @@ local tableDevice2Json = {
 	["F6"] = "D_Fan2.json",
 	["F7"] = "D_Fan7.json",
 	["F8"] = "D_Fan8.json",
-	["F9"] = "D_Fan9.json"
+	["F9"] = "D_Fan9.json",
+	["L4.0"] = "D_SwitchToggle1.json"
 	}
 -- Define a class for commands to be processed
 local DeviceCmd = class(function(a, altid, cmd, value, delay)
@@ -612,7 +632,6 @@ local tabVars = {
 	VAR_OFFSET = Variable( "urn:delanghe-com:serviceId:RFXMetering1", "Offset", false, false, true ),
 	VAR_MULT = Variable( "urn:delanghe-com:serviceId:RFXMetering1", "Mult", false, false, true ),
 	VAR_LIGHT_LEVEL = Variable( "urn:micasaverde-com:serviceId:LightSensor1", "CurrentLevel", false, false, true ),
-	VAR_STATE = Variable( "urn:upnp-org:serviceId:SwitchPower1", "Status", false, false, true ),
 	VAR_REVERSE = Variable( "urn:rfxcom-com:serviceId:Fan1", "Reversed", false, false, true ),
 	VAR_SPEED = Variable( "urn:rfxcom-com:serviceId:Fan1", "Speed", false, false, true ),
 	VAR_COMM_FAILURE = Variable( "urn:micasaverde-com:serviceId:HaDevice1", "CommFailure", false, false, true ),
@@ -699,12 +718,8 @@ local tableParams = {
 	LIGHT_LEVEL = {
 		Parameter(tabVars.VAR_LIGHT_LEVEL, "0")
 	},
-	TOGGLE = {
-		Parameter(tabVars.VAR_STATE, "0"),
-		Parameter(tabVars.VAR_REPEAT_EVENT, "1")
-	},
 	FAN = {
-		Parameter(tabVars.VAR_STATE, "0"),
+		Parameter(tabVars.VAR_LIGHT, "0"),
 		Parameter(tabVars.VAR_REVERSE, "0"),
 		Parameter(tabVars.VAR_SPEED, "Off")
 	},
@@ -757,8 +772,7 @@ local tableDeviceTypes = {
 	LWRF_REMOTE = Device("urn:rfxcom-com:device:LWRFRemote:1", "D_LWRFRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil ),
 	ATI_REMOTE = Device("urn:rfxcom-com:device:ATIRemote:1", "D_ATIRemote1.xml", "RFX Remote ", "RC/", false, false, false, nil ),
 	HEATER = Device("urn:schemas-upnp-org:device:Heater:1", "D_Heater1.xml", "RFX Heater ", "HT/", false, false, false, nil ),
-	LIGHT_LEVEL = Device("urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_LEVEL", tableParams.LIGHT_LEVEL ),
-	SWITCH_TOGGLE = Device("urn:rfxcom-com:device:SwitchToggle:1", "D_SwitchToggle1.xml", "RFX Toggle Switch ", "LS/", false, false, false, "SWITCH_TOGGLE", tableParams.TOGGLE )
+	LIGHT_LEVEL = Device("urn:schemas-micasaverde-com:device:LightSensor:1", "D_LightSensor1.xml", "RFX Light level ", "LL/", false, false, false, "LIGHT_LEVEL", tableParams.LIGHT_LEVEL )
 }
 
 -- Define a class for parameter limits
@@ -2061,7 +2075,6 @@ local function logDevices()
 	local countHT = 0
 	local countRM = 0
 	local countLL = 0
-	local countST = 0
 
 	for _, device in ipairs(tableDevices)
 		do
@@ -2123,9 +2136,6 @@ local function logDevices()
 		elseif (key == "LIGHT_LEVEL")
 			then
 			countLL = countLL + 1
-		elseif (key == "SWITCH_TOGGLE")
-			then
-			countST = countST + 1
 		end
 	end
 	log("Tree with number child devices: "..#tableDevices)
@@ -2148,7 +2158,6 @@ local function logDevices()
 	log("    remote controls: "..countRC)
 	log("    heating devices: "..countHT)
 	log("          RFXMeters: "..countRM)
-	log("     smart switches: "..countST)
 
 end
 
@@ -4988,6 +4997,65 @@ local function decodeRFXMeter(subType, data)
 
 end
 
+local function decodeFan(subType, data)
+	local subTypeTblSelect = {
+		tableCmdCodes2Commands.FaCmdCode2Command,	-- subtype 0
+		tableCmdCodes2Commands.FhCmdCode2Command,	-- subtype 1
+		tableCmdCodes2Commands.FbCmdCode2Command,	--   .
+		tableCmdCodes2Commands.FeCmdCode2Command,	--   .
+		tableCmdCodes2Commands.FbCmdCode2Command,	--   .
+		tableCmdCodes2Commands.FcCmdCode2Command,	-- subtype 5
+		tableCmdCodes2Commands.FbCmdCode2Command,
+		tableCmdCodes2Commands.FfCmdCode2Command,
+		tableCmdCodes2Commands.FdCmdCode2Command,
+		tableCmdCodes2Commands.FgCmdCode2Command
+	}
+	local altid = "FN/F"..subType.."/"
+	..string.format("%02X", string.byte(data, 1))
+	..string.format("%02X", string.byte(data, 2))
+	..string.format("%02X", string.byte(data, 3))
+
+	local tableCmds = {}
+	local cmdCode = string.byte(data, 4)
+	local thisCmdAction = subTypeTblSelect[subType+1][cmdCode]
+	local action = thisCmdAction.action
+	local cmd = thisCmdAction.cmd
+	local value
+	debug("decodeFan->altid: "..altid.."subType: "..subType.." cmdCode: "..cmdCode.." action: "..(action or 'nil').." cmd: "..(cmd.Name or 'nil'))
+	local deviceNum = findChild(THIS_DEVICE, altid, tableDeviceTypes.FAN.deviceType)
+	if (action and cmd and deviceNum) then
+		if (cmd == tableCommandTypes.CMD_FANLIGHT) then
+			if (action == 'LightOn') then
+				value = 1
+			elseif (action == 'LightOff') then
+				value = 0
+			else
+				local curStat = getVariable(deviceNum, tabVars.VAR_STATE) or "0"
+				if (curStat == "0") then
+					value = "1"
+				else
+					value = "0"
+				end
+			end
+		elseif (cmd == tableCommandTypes.CMD_REVERSE) then
+			local curStat = getVariable(deviceNum, tabVars.VAR_REVERSE) or "0"
+			if (curStat == "0") then
+				value = "1"
+			else
+				value = "0"
+			end
+		else
+			value = action
+		end
+		table.insert(tableCmds, DeviceCmd( string.sub(altid, 4), cmd, value, 0 ))
+	else
+		warning("decodeFan undecoded message")
+	end
+
+	return tableCmds
+
+end
+
 local function initDecodingFunctions()
 
 	tableMsgTypes.RESPONSE_MODE_COMMAND.decodeMsgFunction = decodeResponseMode
@@ -5017,6 +5085,16 @@ local function initDecodingFunctions()
 	tableMsgTypes.LIGHTING_RSL2.decodeMsgFunction = decodeLighting5
 	tableMsgTypes.LIGHTING_KANGTAI.decodeMsgFunction = decodeLighting5
 	tableMsgTypes.LIGHTING_BLYSS.decodeMsgFunction = decodeLighting6
+	tableMsgTypes.FAN_T0.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T1.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T2.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T3.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T4.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T5.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T6.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T7.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T8.decodeMsgFunction = decodeFan
+	tableMsgTypes.FAN_T9.decodeMsgFunction = decodeFan
 	tableMsgTypes.CURTAIN_HARRISON.decodeMsgFunction = decodeCurtain
 	tableMsgTypes.BLIND_T0.decodeMsgFunction = decodeBlind
 	tableMsgTypes.BLIND_T1.decodeMsgFunction = decodeBlind
@@ -5170,7 +5248,32 @@ function deferredStartup(data)
 	for _, category in pairs(tableCategories) do
 		tableCategoryBySubAltid[category.subAltid] = category
 	end
-	
+	-- Build a table for selecting a command using a command code in a received message
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FaAction2CmdCode) do
+		tableCmdCodes2Commands.FaCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FbAction2CmdCode) do
+		tableCmdCodes2Commands.FbCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FcAction2CmdCode) do
+		tableCmdCodes2Commands.FcCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FdAction2CmdCode) do
+		tableCmdCodes2Commands.FdCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FeAction2CmdCode) do
+		tableCmdCodes2Commands.FeCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FfAction2CmdCode) do
+		tableCmdCodes2Commands.FfCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FgAction2CmdCode) do
+		tableCmdCodes2Commands.FgCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+	for action, cmdCodeCmd in pairs(tableActions2CmdCodes.FhAction2CmdCode) do
+		tableCmdCodes2Commands.FhCmdCode2Command[cmdCodeCmd.cmdCode] = CmdAction(cmdCodeCmd.cmd, action)
+	end
+
 	initIDLookup()
 
 	initDecodingFunctions()
@@ -5394,7 +5497,7 @@ function controlFan(deviceNum, action)
 		elseif (action == 'LightOff') then
 			value = 0
 		else
-			currentState = getVariable(deviceNum, tabVars.VAR_STATE) or "0"
+			currentState = getVariable(deviceNum, tabVars.VAR_LIGHT) or "0"
 			if (currentState == "0") then
 				value = "1"
 			else
@@ -5998,22 +6101,12 @@ function toggleState(deviceNum)
 
 	-- Only implemented for Sonoff switches, Light Switches and Heaters so far
 	if (devType == "LS") then
-		if (subAltid == "L4") then
-			currentState = getVariable(deviceNum,tabVars.VAR_STATE) or "0"
-			if (currentState == "0") then
-				newTargetState = "1"
-			else
-				newTargetState = "0"
-			end
-			setVariable(deviceNum, tabVars.VAR_STATE, newTargetState)
+		currentState = getVariable(deviceNum, tabVars.VAR_LIGHT) or "0"
+		if (currentState == "0") then
+			newTargetState = "1"
 		else
-			currentState = getVariable(deviceNum, tabVars.VAR_LIGHT) or "0"
-			if (currentState == "0") then
-				newTargetState = "1"
-			else
-				newTargetState = "0"
-			end
-		end	
+			newTargetState = "0"
+		end
 		switchPower(deviceNum, newTargetState)
 	elseif (devType == "HT") then
 		currentState = getVariable(deviceNum, tabVars.VAR_HEATER) or "Off"
@@ -6207,18 +6300,12 @@ function createNewDevice(category, deviceType, name, id, houseCode, groupCode, u
 		table.insert(params, "")
 	end
 
-	local devType
-	if (deviceType == "LIGHT" and category == "SONOFF") then
-		devType = "SWITCH_TOGGLE"
-	else
-		devType = deviceType
-	end
 	local devices = {}
 	local altid = string.format(tableCategories[category].altidFmt, tableCategories[category].subAltid,
 	params[1], params[2], params[3])
 	if (findChild(THIS_DEVICE, altid, nil) == nil)
 		then
-		table.insert(devices, { name, nil, altid, devType })
+		table.insert(devices, { name, nil, altid, deviceType })
 	end
 	if (tableCategories[category].type2 and tableCategories[category].altid2Fmt)
 		then
