@@ -19,9 +19,6 @@
 	</serviceStateTable>
 	<actionList>
 		<action>
-			<name>ToggleReversed</name>
-		</action>
-		<action>
 			<name>ToggleLight</name>
 		</action>
 		<action>

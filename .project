@@ -14,4 +14,11 @@
 	<natures>
 		<nature>org.eclipse.wst.jsdt.core.jsNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>D_Fan2.json</name>
+			<type>1</type>
+			<location>C:/Users/Tom Demler/Documents/NetBeansProjects/RFXtrxPlugIn/D_Fan2.json</location>
+		</link>
+	</linkedResources>
 </projectDescription>
