@@ -1238,7 +1238,7 @@ function RFX_updateTempAndHumData(device) {
 				maxValue += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
 
-			var minValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].maxVarName, 1);
+			var minValue = get_device_state(RFX.userData.devices[i].id, RFX.tempAndHumDeviceTypes[idxType].serviceId, RFX.tempAndHumDeviceTypes[idxType].minVarName, 1);
 			if (minValue != undefined) {
 				minValue += RFX.tempAndHumDeviceTypes[idxType].units;
 			}
