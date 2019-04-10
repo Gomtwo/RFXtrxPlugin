@@ -49,7 +49,7 @@ end
 
 local bitw = require("bit")
 
-local PLUGIN_VERSION = "1.80"
+local PLUGIN_VERSION = "1.81"
 
 local THIS_DEVICE = 0
 local buffer = ""
